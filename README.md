@@ -27,10 +27,15 @@ That's it — unlike the M8, picoTracker projects are self-contained (each proje
 ### Inspect
 - **Pattern viewer** — chain-coloured timeline of all 8 channels, the full song grid, drill-down into chains and phrases with real picoTracker FX names (KIL, HOP, PSL, TBL, …), plus a note histogram with scale detection.
 - **Compare** — diff two projects: shared/unique instruments and samples, metadata side by side.
-- **MIDI export** — download any project as a standard MIDI file (type 1, 24 PPQ, one track per channel, groove-0 timing, chain + project transpose applied).
+- **MIDI export** — download any project as a standard MIDI file (type 1, 24 PPQ, one track per channel, chain + project transpose applied, per-channel GRV groove switches and HOP flow honoured).
+
+### Device (USB)
+- **Live screen mirror** — connect the picoTracker over USB (WebSerial) and watch the device screen in the browser, with full-refresh requests and PNG capture. View-only: stock firmware does not accept remote key input yet. Implements the firmware's Remote UI protocol.
 
 ### Maintain
 - **Problems tab** — missing sample references, unused pool samples (with reclaimable sizes), unused instruments, content-identical samples (byte-level dupe scan), duplicate `.pti` names, stale autosaves, unreadable files, backbone sounds, and the repair log.
+- **Fix all exact matches** — one-click batch repair: every missing reference with an exact-name copy elsewhere on the card (library or another pool) is restored by file copy, verified, and audit-logged.
+- **Extract as .pti** — pull any instrument out of a project bank into `instruments/` as a `.pti` file (or download it if the card is read-only).
 - **Repair mode** — two fixes for a broken reference: *copy* a matching WAV from the library or another project's pool into this project's pool (no project-file edit), or *re-point* the reference to an existing pool sample by rewriting only that attribute inside `lgptsav.dat`.
 - **Backup** — copy the card to a folder or download it as a ZIP, with per-directory selection (`.config.xml` and `.current` always included).
 - **Sets** — tick projects and export a lean, card-ready `projects/` layout as a folder or ZIP. Sets can be named and saved for reuse.
@@ -45,7 +50,7 @@ The card is opened **read-only**. Nothing is written unless you explicitly confi
 - After writing, the file is re-read and re-parsed and the repaired reference verified. If verification fails, the original is restored automatically.
 - Every repair is recorded in the browser and appended to `PTLibrarian_Backups/audit-log.txt` on the card.
 
-Everything runs locally. No server, no telemetry, no network access beyond loading the page.
+Everything runs locally. No server, no telemetry, no network access beyond loading the page. The hosted page installs as an offline-capable PWA (service worker, cache-first).
 
 ## Format compatibility
 
@@ -58,7 +63,7 @@ The entire app is a single `index.html` — deliberately, so it can be hosted an
 Tests are zero-dependency Node scripts that extract the `PT` module straight out of `index.html`:
 
 ```bash
-node tests/parser.test.mjs   # format unit tests (34, incl. Advance format variants)
+node tests/parser.test.mjs   # format unit tests (35, incl. Advance variants + MIDI timing)
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
 ```
 

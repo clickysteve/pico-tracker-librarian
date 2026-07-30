@@ -4,14 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>picoTracker Librarian</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b0d0e">
   <style>
     *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
     :root {
       --bg:#0b0d0e; --surface:#141719; --surface2:#1d2124;
       --border:#292e32; --border2:#3a4046;
       --text:#eef1f2; --muted:#7b858c;
-      --accent:#2dd4bf;
-      --accent-dim:#0e2a26; --accent-brd:#155e54;
+      --accent:#79b5e3;
+      --accent-dim:#12283a; --accent-brd:#2e5a80;
       --c-sam:#34d399; --c-mid:#fcd34d; --c-sid:#a78bfa; --c-opl:#f472b6;
       --c-miss:#f87171; --c-found:#34d399; --warn:#f59e0b;
     }
@@ -32,10 +34,10 @@
     .ro-badge.rw { background:#1f1200; color:var(--warn); border-color:#4a2e00; }
 
     /* BUTTONS */
-    .btn { background:var(--accent); border:none; color:#04211d; padding:6px 14px;
+    .btn { background:var(--accent); border:none; color:#081c2c; padding:6px 14px;
       font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
       border-radius:6px; transition:background .15s,opacity .15s; white-space:nowrap; }
-    .btn:hover { background:#5eead4; }
+    .btn:hover { background:#9ccbf0; }
     .btn:disabled { opacity:.35; cursor:default; }
     .btn.ghost { background:transparent; border:1px solid var(--border2); color:var(--muted); font-weight:600; }
     .btn.ghost:hover { border-color:var(--text); color:var(--text); }
@@ -53,7 +55,7 @@
       padding:4px 9px; font-size:14px; line-height:1; cursor:pointer; transition:all .15s; }
     .vtog:first-child { border-radius:6px 0 0 6px; }
     .vtog:last-child  { border-radius:0 6px 6px 0; border-left:none; }
-    .vtog.active { background:var(--accent); border-color:var(--accent); color:#04211d; }
+    .vtog.active { background:var(--accent); border-color:var(--accent); color:#081c2c; }
     .vtog:not(.active):hover { color:var(--text); }
 
     /* TABS */
@@ -330,7 +332,7 @@
       padding:5px 12px; font-family:inherit; font-size:11px; font-weight:600;
       cursor:pointer; border-radius:20px; transition:all .15s; white-space:nowrap; }
     .prob-btn:hover { border-color:var(--border2); color:var(--text); }
-    .prob-btn.active { background:var(--accent); border-color:var(--accent); color:#04211d; }
+    .prob-btn.active { background:var(--accent); border-color:var(--accent); color:#081c2c; }
     .prob-count { font-weight:400; opacity:.75; margin-left:4px; }
     .prob-group-hdr { padding:12px 20px 4px; font-size:10px; font-weight:700;
       letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
@@ -464,8 +466,8 @@
       font-size:10px; font-family:monospace; border-radius:3px;
       background:var(--surface2); color:var(--border2); cursor:default; user-select:none; }
     .pv-cell.chain { background:var(--accent-dim); color:var(--accent); cursor:pointer; }
-    .pv-cell.chain:hover { background:#14403a; }
-    .pv-cell.chain.hi { background:var(--accent); color:#04211d; }
+    .pv-cell.chain:hover { background:#1a3a5c; }
+    .pv-cell.chain.hi { background:var(--accent); color:#081c2c; }
     .pv-cell.rlbl { background:transparent; color:var(--border2); font-size:9px; }
     .pv-cell.clbl { background:transparent; color:var(--muted); font-size:9px; font-weight:600; }
     .pv-detail { margin-top:10px; background:var(--surface2); border:1px solid var(--border);
@@ -604,7 +606,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.1.0 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.2.0 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -641,6 +643,7 @@
       <button class="tab-btn" data-tab="sets" title="8">SETS</button>
       <button class="tab-btn" data-tab="backup" title="9">BACKUP</button>
       <button class="tab-btn" data-tab="stats" title="0">STATS</button>
+      <button class="tab-btn" data-tab="device">DEVICE</button>
     </div>
 
     <div id="cache-bar">
@@ -813,6 +816,24 @@
     <!-- ── STATS ── -->
     <div class="tab-pane" id="tab-stats">
       <div class="stats-scroll"><div class="stats-grid" id="stats-grid"></div></div>
+    </div>
+
+    <!-- ── DEVICE (USB Remote UI) ── -->
+    <div class="tab-pane" id="tab-device">
+      <div class="toolbar">
+        <button class="btn" id="btn-usb-connect">CONNECT USB</button>
+        <button class="btn ghost sm" id="btn-usb-refresh" disabled>↺ Refresh screen</button>
+        <button class="btn ghost sm" id="btn-usb-png" disabled>⬇ PNG</button>
+        <span class="stat-chip" id="usb-status" style="margin-left:auto">Not connected</span>
+      </div>
+      <div class="scroll-area" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:20px">
+        <canvas id="usb-canvas" width="960" height="720" style="width:min(90%,960px);image-rendering:pixelated;border:1px solid var(--border2);border-radius:8px;background:#000"></canvas>
+        <div style="font-size:11px;color:var(--muted);max-width:640px;text-align:center;line-height:1.7">
+          Live mirror of the picoTracker screen over USB (Remote UI protocol). View-only:
+          stock firmware doesn't accept remote key input yet. Requires Chrome/Edge (WebSerial)
+          and Remote UI set to On in the device config.
+        </div>
+      </div>
     </div>
 
   </div><!-- #main -->
@@ -1445,14 +1466,18 @@ const PT = (() => {
   function buildMidi(proj, name) {
     const last = lastSongRow(proj);
     if (last < 0) return null;
-    const CMD_KIL = 0x1E;
-    let gSteps = (proj.grooves[0] || []).filter(v => v > 0 && v <= 0x80);
-    if (!gSteps.length) gSteps = [6];
+    const CMD_KIL = 0x1E, CMD_HOP = 0x1B, CMD_GRV = 0x1A;
+    const grooveOf = g => {
+      const steps = (proj.grooves[g] || []).filter(v => v > 0 && v <= 0x80);
+      return steps.length ? steps : [6];
+    };
 
     const tracks = [];
     for (let t = 0; t < CHANNELS; t++) {
       const ev = [];
-      let tick = 0, stepIdx = 0, open = null;
+      let tick = 0, open = null;
+      // per-channel groove state (GRV switches it; position resets)
+      let gSteps = grooveOf(0), gPos = 0, trackHopEntry = 0;
       const noteOff = at => { if (open !== null) { ev.push({tick: at, data: [0x80 | t, open, 0x40]}); open = null; } };
       for (let row = 0; row <= last; row++) {
         const c = gridCell(proj, row, t);
@@ -1460,9 +1485,25 @@ const PT = (() => {
         for (let cs = 0; cs < STEPS; cs++) {
           const { phrase, transpose } = chainStep(proj, c, cs);
           if (phrase === EMPTY || phrase >= geom(proj).phraseCount) continue;
-          for (let ps = 0; ps < STEPS; ps++) {
+          // enterAt: HOP lands us mid-phrase (player semantics: the HOP
+          // step itself is not played; playback continues in the NEXT
+          // chain phrase at the hop target step)
+          let enterAt = trackHopEntry;
+          trackHopEntry = 0;
+          for (let ps = enterAt; ps < STEPS; ps++) {
             const st = phraseStep(proj, phrase, ps);
-            const dur = gSteps[stepIdx % gSteps.length];
+            // HOP replaces its own step: jump to next chain phrase
+            if (st.cmd1 === CMD_HOP || st.cmd2 === CMD_HOP) {
+              trackHopEntry = (st.cmd1 === CMD_HOP ? st.param1 : st.param2) & 0xF;
+              break;
+            }
+            // GRV switches this channel's groove from this step on
+            if (st.cmd1 === CMD_GRV || st.cmd2 === CMD_GRV) {
+              const g = (st.cmd1 === CMD_GRV ? st.param1 : st.param2) & 0xFF;
+              if (g < GROOVE_COUNT) { gSteps = grooveOf(g); gPos = 0; }
+            }
+            const dur = gSteps[gPos % gSteps.length];
+            gPos++;
             if (st.cmd1 === CMD_KIL || st.cmd2 === CMD_KIL || st.note === NOTE_OFF) noteOff(tick);
             if (st.note !== EMPTY && st.note !== NOTE_OFF && st.note <= 119) {
               const note = st.note + transpose + proj.transpose;
@@ -1473,7 +1514,6 @@ const PT = (() => {
               }
             }
             tick += dur;
-            stepIdx++;
           }
         }
       }
@@ -1537,8 +1577,21 @@ const PT = (() => {
     return { ok:true, text: text.slice(0, start) + newBlock + text.slice(end) };
   }
 
+  // ── .pti writer (firmware XMLPrinter shape: no declaration,
+  //    4-space indent, self-closed PARAMs) ─────────────────
+  function buildPti(inst) {
+    const lines = [`<INSTRUMENT VERSION="${escapeAttr(inst.version ?? '')}" TYPE="${escapeAttr(inst.rawType ?? inst.type)}">`];
+    if (inst.name) lines.push(`    <PARAM NAME="InstrumentName" VALUE="${escapeAttr(inst.name)}"/>`);
+    for (const [k, v] of Object.entries(inst.params))
+      lines.push(`    <PARAM NAME="${escapeAttr(k)}" VALUE="${escapeAttr(v)}"/>`);
+    for (const sl of inst.slices)
+      lines.push(`    <PARAM NAME="SL${String(sl.index).padStart(2,'0')}" VALUE="${sl.offset}"/>`);
+    lines.push('</INSTRUMENT>');
+    return lines.join('\n') + '\n';
+  }
+
   return {
-    parseXml, decodeHexBuffer, u16leFrom,
+    parseXml, decodeHexBuffer, u16leFrom, buildPti,
     parseProject, parsePti, parseTheme, parseConfig, parseInstrumentEl,
     parseWavHeader, rewriteSampleRef,
     noteStr, cmdName, fxStr, hx2, hx4, colorHex, detectScales, buildMidi,
@@ -2180,7 +2233,7 @@ const AudioPlayer = (() => {
     ctx2d.fillRect(0, 0, W, H);
     const data = audioBuffer.getChannelData(0);
     const step = Math.ceil(data.length / W);
-    ctx2d.strokeStyle = '#2dd4bf';
+    ctx2d.strokeStyle = '#79b5e3';
     ctx2d.lineWidth = 1;
     ctx2d.beginPath();
     for (let x = 0; x < W; x++) {
@@ -2197,6 +2250,172 @@ const AudioPlayer = (() => {
 
 
 // ══════════════════════════════════════════════════════════
+// USB — Remote UI client (WebSerial)
+// Protocol from the picoTracker firmware (System/RemoteUI):
+// device streams FE <op> frames: TEXT(6, raw), CLEAR(5, raw),
+// SETFONT(3, raw), SETCOLOR(2+3 escaped), DRAWRECT(2+8 escaped).
+// Client sends FE 02 to request a full repaint. Coordinates in
+// TEXT are cell indices + 0x0F; grid is 32x24 cells of 10x10 px.
+// ══════════════════════════════════════════════════════════
+const USB = (() => {
+  const COLS = 32, ROWS = 24, CELLW = 10, CELLH = 10, SCALE = 3;
+  const MARKER = 0xFE, ESC = 0xFD, ESC_XOR = 0x20, OFFSET = 0x0F;
+  let port = null, reader = null, running = false;
+  let canvas = null, ctx = null;
+  let fg = [173,173,173], bg = [15,15,15];
+  let onStatus = () => {};
+
+  const rgb = a => `rgb(${a[0]},${a[1]},${a[2]})`;
+
+  function clearScreen() {
+    ctx.fillStyle = rgb(bg);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function drawChar(ch, col, row, invert) {
+    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return;
+    const x = col * CELLW * SCALE, y = row * CELLH * SCALE;
+    const cellFg = invert ? bg : fg, cellBg = invert ? fg : bg;
+    ctx.fillStyle = rgb(cellBg);
+    ctx.fillRect(x, y, CELLW * SCALE, CELLH * SCALE);
+    if (ch === 0x20) return;
+    ctx.fillStyle = rgb(cellFg);
+    if (ch >= 0x21 && ch <= 0x7E) {
+      ctx.font = `bold ${9 * SCALE}px ui-monospace, Menlo, monospace`;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      ctx.fillText(String.fromCharCode(ch), x + CELLW * SCALE / 2, y + CELLH * SCALE / 2 + SCALE);
+    } else {
+      // special glyph page (>= 0x80) — approximate with a block
+      ctx.fillRect(x + 2 * SCALE, y + 2 * SCALE, (CELLW - 4) * SCALE, (CELLH - 4) * SCALE);
+    }
+  }
+
+  function drawRect(l, t, w, h) {
+    ctx.fillStyle = rgb(fg);
+    ctx.fillRect(l * SCALE, t * SCALE, w * SCALE, h * SCALE);
+  }
+
+  // Streaming frame parser. Fixed-length frames for TEXT/CLEAR/SETFONT
+  // (their payloads are NOT escaped); escape-decoded payloads for
+  // SETCOLOR (3 values) and DRAWRECT (8 values).
+  let buf = [];
+  function feed(bytes) {
+    for (const b of bytes) buf.push(b);
+    for (;;) {
+      if (buf.length < 2) return;
+      if (buf[0] !== MARKER) { buf.shift(); continue; }
+      const op = buf[1];
+      if (op === 0x02) {            // TEXT — 6 raw bytes
+        if (buf.length < 6) return;
+        const [, , ch, cx, cy, inv] = buf;
+        drawChar(ch, cx - OFFSET, cy - OFFSET, inv === 0x7F);
+        buf = buf.slice(6);
+      } else if (op === 0x03) {     // CLEAR — 5 raw bytes
+        if (buf.length < 5) return;
+        bg = [buf[2], buf[3], buf[4]];
+        clearScreen();
+        buf = buf.slice(5);
+      } else if (op === 0x05) {     // SETFONT — 3 raw bytes
+        if (buf.length < 3) return;
+        buf = buf.slice(3);
+      } else if (op === 0x04 || op === 0x06) { // escaped payloads
+        const want = op === 0x04 ? 3 : 8;
+        const vals = [];
+        let i = 2;
+        while (i < buf.length && vals.length < want) {
+          if (buf[i] === ESC) {
+            if (i + 1 >= buf.length) return; // wait for more
+            vals.push(buf[i + 1] ^ ESC_XOR);
+            i += 2;
+          } else {
+            vals.push(buf[i]);
+            i += 1;
+          }
+        }
+        if (vals.length < want) return;
+        if (op === 0x04) fg = vals;
+        else drawRect(vals[0] | (vals[1] << 8), vals[2] | (vals[3] << 8),
+                      vals[4] | (vals[5] << 8), vals[6] | (vals[7] << 8));
+        buf = buf.slice(i);
+      } else {
+        buf.shift(); // unknown opcode — resync
+      }
+    }
+  }
+
+  async function connect(statusCb) {
+    onStatus = statusCb || (() => {});
+    if (!('serial' in navigator)) { onStatus('WebSerial not supported in this browser.', false); return false; }
+    try {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+    } catch(e) {
+      if (e.name !== 'NotFoundError') onStatus('Connect failed: ' + (e.message || e), false);
+      port = null;
+      return false;
+    }
+    canvas = document.getElementById('usb-canvas');
+    ctx = canvas.getContext('2d');
+    fg = [173,173,173]; bg = [15,15,15]; buf = [];
+    clearScreen();
+    running = true;
+    onStatus('Connected — requesting screen…', true);
+    readLoop();
+    await requestRefresh();
+    return true;
+  }
+
+  async function readLoop() {
+    try {
+      while (running && port.readable) {
+        reader = port.readable.getReader();
+        try {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (value) { feed(value); onStatus('Connected — live', true); }
+          }
+        } finally { reader.releaseLock(); }
+      }
+    } catch(e) {
+      if (running) onStatus('Read error: ' + (e.message || e), false);
+    }
+    if (running) disconnect();
+  }
+
+  async function requestRefresh() {
+    if (!port?.writable) return;
+    const w = port.writable.getWriter();
+    try { await w.write(new Uint8Array([MARKER, 0x02])); }
+    finally { w.releaseLock(); }
+  }
+
+  async function disconnect() {
+    running = false;
+    try { await reader?.cancel(); } catch {}
+    try { await port?.close(); } catch {}
+    port = null;
+    onStatus('Disconnected', false);
+  }
+
+  function snapshotPng() {
+    if (!canvas) return;
+    canvas.toBlob(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'picotracker-screen.png';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+  }
+
+  const isConnected = () => !!port;
+  return { connect, disconnect, requestRefresh, snapshotPng, isConnected, feed:  feed };
+})();
+
+
+// ══════════════════════════════════════════════════════════
 // UI
 // ══════════════════════════════════════════════════════════
 const UI = (() => {
@@ -2204,6 +2423,28 @@ const UI = (() => {
   const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   const debounce = (fn, ms=120) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+  // Chunked list rendering: renders the first `chunk` items, then keeps
+  // appending as a sentinel scrolls into view. Keeps huge cards fast.
+  function renderChunked(host, items, renderItem, wire, chunk = 150) {
+    host.innerHTML = '';
+    let idx = 0;
+    function append() {
+      const end = Math.min(items.length, idx + chunk);
+      const frag = document.createElement('div');
+      frag.innerHTML = items.slice(idx, end).map(renderItem).join('');
+      while (frag.firstChild) host.insertBefore(frag.firstChild, sentinel);
+      wire?.(host, idx, end);
+      idx = end;
+      if (idx >= items.length) { obs.disconnect(); sentinel.remove(); }
+    }
+    const sentinel = document.createElement('div');
+    sentinel.style.height = '1px';
+    host.appendChild(sentinel);
+    const obs = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) append(); },
+      { root: host.closest('.scroll-area'), rootMargin: '600px' });
+    append();
+    if (idx < items.length) obs.observe(sentinel);
+  }
   const fmtBytes = Scanner.fmtBytes, fmtDate = Scanner.fmtDate, fmtDur = Scanner.fmtDur;
 
   // ── State ──────────────────────────────────────────────
@@ -2363,7 +2604,7 @@ const UI = (() => {
         el.addEventListener('click', () => openProjModal(el.dataset.proj)));
       return;
     }
-    host.innerHTML = list.map(p => `
+    renderChunked(host, list, p => `
       <div class="proj-item" data-proj="${esc(p.dirName)}">
         <div class="proj-row">
           <span class="p-chev">▶</span>
@@ -2376,9 +2617,11 @@ const UI = (() => {
           ${missBadge(p, 'p-miss')}
         </div>
         <div class="proj-detail"></div>
-      </div>`).join('');
-    host.querySelectorAll('.proj-item').forEach(el => {
-      el.querySelector('.proj-row').addEventListener('click', () => toggleProjDetail(el));
+      </div>`, host2 => {
+      host2.querySelectorAll('.proj-item:not([data-wired])').forEach(el => {
+        el.dataset.wired = '1';
+        el.querySelector('.proj-row').addEventListener('click', () => toggleProjDetail(el));
+      });
     });
   }
 
@@ -2527,8 +2770,8 @@ const UI = (() => {
   function closeProjModal() { $('proj-modal').style.display = 'none'; modalProj = null; }
 
   // ── Pattern viewer ─────────────────────────────────────
-  const CHAIN_PALETTE = ['#2dd4bf','#60a5fa','#a78bfa','#f472b6','#fcd34d','#34d399','#fb923c','#f87171',
-    '#38bdf8','#c084fc','#facc15','#4ade80','#e879f9','#fca5a5','#93c5fd','#5eead4'];
+  const CHAIN_PALETTE = ['#79b5e3','#34d399','#a78bfa','#f472b6','#fcd34d','#34d399','#fb923c','#f87171',
+    '#38bdf8','#c084fc','#facc15','#4ade80','#e879f9','#fca5a5','#93c5fd','#a5f3d0'];
 
   function togglePatternView() {
     const sec = $('modal-pattern-section');
@@ -2743,7 +2986,7 @@ const UI = (() => {
     $('instrs-stat').textContent = `${list.length} instruments (${lib.ptis.length} library, ${list.length - (instrTypeFilter.size||q?0:lib.ptis.length) >= 0 ? '' : ''}${instrInProj?'incl. project banks':'library only'})`;
     const host = $('instrs-list');
     if (!list.length) { host.innerHTML = '<div class="no-results">No instruments match.</div>'; return; }
-    host.innerHTML = list.map((i, idx) => {
+    const rowHtml = (i, idx) => {
       const ss = instrSampleState(i);
       const usage = instrUsage(i);
       return `
@@ -2758,8 +3001,10 @@ const UI = (() => {
         </div>
         <div class="instr-det"></div>
       </div>`;
-    }).join('');
-    host.querySelectorAll('.instr-item').forEach(el => {
+    };
+    renderChunked(host, list.map((i, idx) => ({i, idx})), o => rowHtml(o.i, o.idx), host2 => {
+    host2.querySelectorAll('.instr-item:not([data-wired])').forEach(el => {
+      el.dataset.wired = '1';
       el.querySelector('.instr-row').addEventListener('click', () => {
         const wasOpen = el.classList.contains('open');
         el.classList.toggle('open');
@@ -2774,10 +3019,16 @@ const UI = (() => {
             </div></div>
           ${i.sample ? `<div class="drow"><span class="dlabel">Sample</span><span class="dval ${instrSampleState(i)==='miss'?'miss':'dim'}">${esc(i.sample)}${instrSampleState(i)==='miss'?' — not found':''}</span></div>` : ''}
           <div class="drow"><span class="dlabel">Used in</span><span class="dval dim">${usage.length ? usage.map(p => `<span style="cursor:pointer;color:var(--accent)" class="use-link" data-proj="${esc(p.dirName)}">${esc(p.name)}</span>`).join(' · ') : 'nowhere'}</span></div>
-          ${i.version ? `<div class="drow"><span class="dlabel">Firmware</span><span class="dval dim">${esc(i.version)}</span></div>` : ''}`;
+          ${i.version ? `<div class="drow"><span class="dlabel">Firmware</span><span class="dval dim">${esc(i.version)}</span></div>` : ''}
+          ${i.source === 'project' ? `<div class="drow"><span class="dlabel"></span><button class="btn ghost sm btn-export-pti">⬇ Extract as .pti</button></div>` : ''}`;
         el.querySelectorAll('.use-link').forEach(l =>
           l.addEventListener('click', e => { e.stopPropagation(); switchTab('projects'); openProjModal(l.dataset.proj); }));
+        el.querySelector('.btn-export-pti')?.addEventListener('click', e => {
+          e.stopPropagation();
+          exportPti(list[parseInt(el.dataset.idx, 10)]);
+        });
       });
+    });
     });
   }
   function renderTypeFilters() {
@@ -2812,7 +3063,9 @@ const UI = (() => {
     for (const d of sortedDirs) {
       const files = dirs.get(d);
       if (d) html += `<div class="grp open"><div class="grp-hdr" style="padding-left:32px"><span class="grp-chev">▶</span><span class="grp-name">${esc(d)}/</span><span class="grp-cnt">${files.length}</span></div><div class="grp-body">`;
-      for (const s of files) {
+      const CAP = 300;
+      const shown = files.length > CAP + 50 ? files.slice(0, CAP) : files;
+      for (const s of shown) {
         const nm = sampleNameMap.get(s.name.toLowerCase());
         const usedIn = nm ? nm.projects.filter(x => x.used).length : 0;
         const rowIdx = sampbrRows.length;
@@ -2825,6 +3078,8 @@ const UI = (() => {
           <span class="sb-badge ${usedIn?'used':'unused'}" data-name="${esc(s.name)}">${usedIn ? 'in '+usedIn+' proj' : 'unused'}</span>
         </div>`;
       }
+      if (shown.length < files.length)
+        html += `<div class="sb-file-row" style="color:var(--muted);font-size:11px;cursor:default">… ${files.length - shown.length} more files in this folder (use the filter to narrow down)</div>`;
       if (d) html += `</div></div>`;
     }
     html += `</div></div>`;
@@ -3038,7 +3293,12 @@ const UI = (() => {
             <button class="btn sm btn-row-fix" data-proj="${esc(p.dirName)}">🔧 Repair</button>
           </div>`);
         }
-      host.innerHTML = rows.join('') || empty('Every referenced sample is present in its project pool.');
+      const fixable = exactFixables().length;
+      const hdr = fixable ? `<div class="prob-group-hdr" style="display:flex;align-items:center;gap:10px">
+        ${fixable} of ${rows.length} missing samples have an exact-name copy elsewhere on the card
+        <button class="btn sm" id="btn-fixall">🔧 Fix all exact matches</button></div>` : '';
+      host.innerHTML = hdr + (rows.join('') || empty('Every referenced sample is present in its project pool.'));
+      $('btn-fixall')?.addEventListener('click', fixAllExact);
       host.querySelectorAll('.btn-row-fix').forEach(b =>
         b.addEventListener('click', e => { e.stopPropagation(); openFixModal(projByDir(b.dataset.proj)); }));
       host.querySelectorAll('.prob-row.clickable').forEach(r =>
@@ -3370,6 +3630,91 @@ const UI = (() => {
       $('btn-fix-apply').disabled = false;
       await persist();
     }
+  }
+
+  // ── EXTRACT INSTRUMENT AS .PTI ─────────────────────────
+  async function exportPti(inst) {
+    if (!inst) return;
+    const xml = PT.buildPti(inst);
+    const base = (inst.name || 'instrument').replace(/[^\w \-]+/g, '').slice(0, 20).trim() || 'instrument';
+    // Try writing to the card's instruments/ dir; fall back to download.
+    if (await ensureWrite()) {
+      try {
+        const dir = await sd.getDirectoryHandle('instruments', {create: true});
+        let name = base + '.pti';
+        for (let n = 2; n < 100; n++) {
+          try { await dir.getFileHandle(name); name = `${base}${n}.pti`; }
+          catch { break; }
+        }
+        const w = await (await dir.getFileHandle(name, {create: true})).createWritable();
+        await w.write(xml); await w.close();
+        logRepair(true, 'export-pti', `${inst.srcLabel} → instruments/${name}`);
+        await persist();
+        setCacheBar(`Exported instruments/${name} — rescanning…`, true);
+        await rescan(lib);
+        return;
+      } catch(e) { console.warn('pti card write failed, downloading instead', e); }
+    }
+    const blob = new Blob([xml], {type: 'application/xml'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = base + '.pti';
+    a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  // ── BATCH REPAIR: fix all exact-name matches ───────────
+  function exactFixables() {
+    const jobs = [];
+    for (const p of lib.projects)
+      for (const nm of p.missing) {
+        const cand = sampleNameMap.get(nm.toLowerCase());
+        if (!cand) continue;
+        let src = null;
+        if (cand.library.length) src = { kind: 'library', path: cand.library[0] };
+        else {
+          const other = cand.projects.find(x => x.proj !== p.name);
+          if (other) {
+            const op = lib.projects.find(x => x.name === other.proj);
+            if (op) src = { kind: 'pool', proj: op.dirName };
+          }
+        }
+        if (src) jobs.push({ proj: p, name: nm, src });
+      }
+    return jobs;
+  }
+  async function fixAllExact() {
+    const jobs = exactFixables();
+    if (!jobs.length) return;
+    if (!await ensureWrite()) return;
+    const btn = $('btn-fixall');
+    if (btn) { btn.disabled = true; btn.textContent = 'Fixing…'; }
+    let ok = 0, failed = 0;
+    for (const job of jobs) {
+      try {
+        let srcFile;
+        if (job.src.kind === 'library') {
+          const lp = job.src.path;
+          const slash = lp.lastIndexOf('/');
+          srcFile = await readCardFile('samples' + (slash >= 0 ? '/' + lp.slice(0, slash) : ''), lp.split('/').pop());
+        } else {
+          srcFile = await readCardFile(`projects/${job.src.proj}/samples`, job.name);
+        }
+        const bytes = await srcFile.arrayBuffer();
+        await writeCardFile(`projects/${job.proj.dirName}/samples`, job.name, bytes);
+        const verify = await readCardFile(`projects/${job.proj.dirName}/samples`, job.name);
+        if (verify.size !== bytes.byteLength) throw new Error('size mismatch after copy');
+        logRepair(true, 'copy-sample', `${job.proj.name}: ${job.name} restored from ${job.src.kind === 'library' ? 'samples/' + job.src.path : job.src.proj + ' pool'} (${fmtBytes(bytes.byteLength)})`);
+        ok++;
+      } catch(e) {
+        logRepair(false, 'copy-sample', `${job.proj.name}: ${job.name}: ${e.message || e}`);
+        failed++;
+      }
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '🔧 Fix all exact matches'; }
+    setCacheBar(`Batch repair: ${ok} fixed${failed ? `, ${failed} failed` : ''} — rescanning…`, true);
+    await persist();
+    await rescan(lib);
+    switchTab('problems');
   }
 
   // ── SETS ───────────────────────────────────────────────
@@ -3750,6 +4095,24 @@ const UI = (() => {
         sampbrAudition(e.key === 'ArrowDown' ? 1 : -1);
       }
     });
+
+    // Device (USB Remote UI)
+    const usbStatus = (msg, connected) => {
+      $('usb-status').textContent = msg;
+      $('btn-usb-refresh').disabled = !connected;
+      $('btn-usb-png').disabled = !connected;
+      $('btn-usb-connect').textContent = connected ? 'DISCONNECT' : 'CONNECT USB';
+    };
+    $('btn-usb-connect').addEventListener('click', () =>
+      USB.isConnected() ? USB.disconnect() : USB.connect(usbStatus));
+    $('btn-usb-refresh').addEventListener('click', () => USB.requestRefresh());
+    $('btn-usb-png').addEventListener('click', () => USB.snapshotPng());
+
+    // PWA: register the service worker when served over http(s); the
+    // file:// case (opening index.html directly) skips it silently.
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
 
     refreshSavedSets();
   }

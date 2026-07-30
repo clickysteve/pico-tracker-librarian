@@ -407,5 +407,53 @@ t('advance: theme Font value with # prefix', () => {
   eq(th.colors.BACKGROUND, 0x100000);
 });
 
+
+// ── MIDI: GRV + HOP semantics ──────────────────────────
+function buildTimingXml() {
+  // chain 00: phrase 00 then phrase 01.
+  // phrase 00: note C3 at step 0, GRV 01 at step 4 (switch to groove 1),
+  //            HOP to step 2 at step 8 (skips rest of phrase 00,
+  //            enters phrase 01 at step 2).
+  const grid = new Array(128*8).fill(0xFF); grid[0] = 0x00;
+  const chains = new Array(255*16).fill(0xFF); chains[0] = 0x00; chains[1] = 0x01;
+  const notes = new Array(128*16).fill(0xFF);
+  notes[0] = 60;        // phrase 0 step 0
+  notes[16+2] = 62;     // phrase 1 step 2 (hop target)
+  notes[16+3] = 64;     // phrase 1 step 3
+  const instr = new Array(128*16).fill(0xFF); instr[0]=0; instr[18]=0; instr[19]=0;
+  const cmd1 = new Array(128*16).fill(0x2D);
+  const par1 = new Array(128*16).fill(0);
+  cmd1[4] = 0x1A; par1[4] = 1;    // GRV 01
+  cmd1[8] = 0x1B; par1[8] = 2;    // HOP -> step 2 of next phrase
+  const cmd2 = new Array(128*16).fill(0x2D);
+  const par2 = new Array(128*16).fill(0);
+  const grooves = (() => {
+    const g = new Array(512).fill(0xFF);
+    g[0]=6; g[1]=6;      // groove 0: straight 6
+    g[16]=4; g[17]=8;    // groove 1: 4/8 swing
+    return g;
+  })();
+  return `<PICOTRACKER><PROJECT VERSION="2.3"><PARAMETER NAME="tempo" VALUE="120"/></PROJECT>
+<SONG><SONG>${dataChunks(grid)}</SONG><CHAINS>${dataChunks(chains)}</CHAINS>
+<TRANSPOSES>${dataChunks(new Array(255*16).fill(0))}</TRANSPOSES>
+<NOTES>${dataChunks(notes)}</NOTES><INSTRUMENTS>${dataChunks(instr)}</INSTRUMENTS>
+<COMMAND1>${dataChunks(cmd1)}</COMMAND1><PARAM1>${dataChunks(u16le(par1))}</PARAM1>
+<COMMAND2>${dataChunks(cmd2)}</COMMAND2><PARAM2>${dataChunks(u16le(par2))}</PARAM2></SONG>
+<INSTRUMENTBANK/><TABLES/><GROOVES>${dataChunks(grooves)}</GROOVES><MIXER/></PICOTRACKER>`;
+}
+t('MIDI: GRV switches groove timing, HOP skips into next phrase', () => {
+  const p = PT.parseProject(buildTimingXml());
+  const bytes = PT.buildMidi(p, 'T');
+  ok(bytes, 'midi null');
+  const smf = readSmf(bytes);
+  const ons = smf.tracks.flat().filter(e => e.st === 0x90 && e.vel > 0);
+  // Expected ticks: steps 0-3 at groove0 (6 each) = 24; GRV at step 4
+  // switches to groove1 (4,8,...): steps 4..7 take 4+8+4+8 = 24; HOP at
+  // step 8 (tick 48) jumps to phrase 1 step 2 — notes at phrase1 steps
+  // 2 and 3: first at tick 48, next at 48 + groove1[pos] where pos
+  // continued (4) -> 52.
+  eq(ons.map(e => [e.note, e.tick]), [[60, 0], [62, 48], [64, 52]]);
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
