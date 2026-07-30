@@ -1,0 +1,8 @@
+# Real card data must never be committed — parsers are tested against
+# synthetic fixtures only. Keep any device dumps outside the repo.
+source-examples/
+*.dat
+*.uf2
+*.bin
+card-dumps/
+.DS_Store

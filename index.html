@@ -1,0 +1,3763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>picoTracker Librarian</title>
+  <style>
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    :root {
+      --bg:#0b0d0e; --surface:#141719; --surface2:#1d2124;
+      --border:#292e32; --border2:#3a4046;
+      --text:#eef1f2; --muted:#7b858c;
+      --accent:#2dd4bf;
+      --accent-dim:#0e2a26; --accent-brd:#155e54;
+      --c-sam:#34d399; --c-mid:#fcd34d; --c-sid:#a78bfa; --c-opl:#f472b6;
+      --c-miss:#f87171; --c-found:#34d399; --warn:#f59e0b;
+    }
+    html,body { height:100%; background:var(--bg); color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-size:13px; }
+    #app { display:flex; flex-direction:column; height:100vh; }
+
+    /* HEADER */
+    header { display:flex; align-items:center; justify-content:space-between;
+      padding:0 20px; height:52px; background:var(--surface);
+      border-bottom:1px solid var(--border); flex-shrink:0; }
+    .logo { font-size:15px; font-weight:700; letter-spacing:3px; color:var(--accent); }
+    .hdr-right { display:flex; align-items:center; gap:10px; }
+    #sd-label { color:var(--muted); font-size:12px; }
+    .ro-badge { display:none; font-size:10px; font-weight:700; letter-spacing:.8px;
+      padding:2px 7px; border-radius:4px; background:#0e2a1a;
+      color:var(--c-found); border:1px solid #1a4a2a; }
+    .ro-badge.rw { background:#1f1200; color:var(--warn); border-color:#4a2e00; }
+
+    /* BUTTONS */
+    .btn { background:var(--accent); border:none; color:#04211d; padding:6px 14px;
+      font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
+      border-radius:6px; transition:background .15s,opacity .15s; white-space:nowrap; }
+    .btn:hover { background:#5eead4; }
+    .btn:disabled { opacity:.35; cursor:default; }
+    .btn.ghost { background:transparent; border:1px solid var(--border2); color:var(--muted); font-weight:600; }
+    .btn.ghost:hover { border-color:var(--text); color:var(--text); }
+    .btn.ghost.on { border-color:var(--warn); color:var(--warn); background:#1f1200; }
+    .btn.sm  { padding:4px 10px; font-size:11px; }
+    .btn.dim { background:var(--surface2); border:1px solid var(--border2); color:var(--muted); font-weight:600; }
+    .btn.dim:hover { color:var(--text); border-color:var(--text); background:var(--surface2); }
+    .btn.secondary { background:var(--surface2); border:1px solid var(--border2); color:var(--text); font-weight:600; }
+    .btn.secondary:hover { border-color:var(--accent); color:var(--accent); }
+    .btn.icon { padding:5px 9px; font-size:15px; line-height:1; }
+
+    /* VIEW TOGGLE */
+    .vtog-wrap { display:flex; flex-shrink:0; }
+    .vtog { background:var(--surface2); border:1px solid var(--border2); color:var(--muted);
+      padding:4px 9px; font-size:14px; line-height:1; cursor:pointer; transition:all .15s; }
+    .vtog:first-child { border-radius:6px 0 0 6px; }
+    .vtog:last-child  { border-radius:0 6px 6px 0; border-left:none; }
+    .vtog.active { background:var(--accent); border-color:var(--accent); color:#04211d; }
+    .vtog:not(.active):hover { color:var(--text); }
+
+    /* TABS */
+    .tab-bar { display:flex; background:var(--surface); border-bottom:1px solid var(--border);
+      flex-shrink:0; padding:0 20px; gap:0; overflow-x:auto; }
+    .tab-btn { background:transparent; border:none; border-bottom:2px solid transparent;
+      color:var(--muted); padding:12px 13px; font-family:inherit; font-size:12px;
+      font-weight:600; letter-spacing:.5px; cursor:pointer; transition:color .15s,border-color .15s;
+      white-space:nowrap; }
+    .tab-btn:hover { color:var(--text); }
+    .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+    /* CACHE BAR */
+    #cache-bar { display:none; align-items:center; gap:10px; padding:7px 20px;
+      background:var(--surface2); border-bottom:1px solid var(--border);
+      flex-shrink:0; font-size:11px; color:var(--muted); }
+    #cache-msg { flex:1; }
+    #cache-bar.stale #cache-msg { color:var(--warn); }
+
+    /* HEALTH BAR */
+    #health-bar { display:none; align-items:center; gap:18px; padding:5px 20px;
+      background:var(--surface); border-bottom:1px solid var(--border);
+      flex-shrink:0; font-size:11px; flex-wrap:wrap; }
+    #health-bar.visible { display:flex; }
+    .hstat { display:flex; align-items:center; gap:5px; color:var(--muted); cursor:default; }
+    .hstat b { color:var(--text); font-weight:600; }
+    .hstat.bad b { color:var(--c-miss); }
+    .hstat.warn b { color:var(--warn); }
+    .hstat.clickable { cursor:pointer; }
+    .hstat.clickable:hover b { text-decoration:underline; }
+
+    /* EMPTY STATE */
+    #empty-state { flex:1; display:flex; flex-direction:column; align-items:center;
+      justify-content:center; gap:14px; }
+    .empty-icon { font-size:40px; opacity:.25; }
+    .empty-title { font-size:18px; font-weight:700; color:var(--text); letter-spacing:2px; }
+    .empty-sub { font-size:13px; max-width:400px; text-align:center; line-height:1.7; color:var(--muted); }
+    .browser-warn { background:#1f1200; border:1px solid #4a2e00; color:var(--warn);
+      padding:8px 12px; font-size:12px; border-radius:6px; }
+    .reconnect-card { display:none; flex-direction:column; align-items:center; gap:8px;
+      padding:14px 24px; background:var(--surface); border:1px solid var(--border2);
+      border-radius:8px; }
+    .reconnect-lbl { font-size:11px; color:var(--muted); }
+    .reconnect-name { font-weight:600; color:var(--text); }
+    .empty-divider { font-size:11px; color:var(--border2); letter-spacing:1px; }
+
+    /* MAIN */
+    #main { display:none; flex:1; flex-direction:column; overflow:hidden; }
+    #main.visible { display:flex; }
+    .tab-pane { display:none; flex:1; overflow:hidden; flex-direction:column; }
+    .tab-pane.active { display:flex; }
+
+    /* TOOLBAR */
+    .toolbar { display:flex; align-items:center; gap:8px; padding:10px 20px;
+      background:var(--surface); border-bottom:1px solid var(--border);
+      flex-shrink:0; flex-wrap:wrap; }
+    .search { background:var(--surface2); border:1px solid var(--border); color:var(--text);
+      padding:6px 11px; font-family:inherit; font-size:12px; width:180px;
+      border-radius:6px; outline:none; }
+    .search:focus { border-color:var(--accent); }
+    .search::placeholder { color:var(--muted); }
+    .sorter { background:var(--surface2); border:1px solid var(--border); color:var(--text);
+      padding:5px 9px; font-family:inherit; font-size:12px; border-radius:6px;
+      outline:none; cursor:pointer; }
+    .sorter:focus { border-color:var(--accent); }
+    .type-pill { background:transparent; border:1px solid var(--border); color:var(--muted);
+      padding:4px 10px; font-family:inherit; font-size:11px; font-weight:500;
+      cursor:pointer; transition:all .15s; border-radius:20px; }
+    .type-pill:hover { border-color:var(--border2); color:var(--text); }
+    .type-pill.on { border-color:transparent; color:#000; }
+    .type-pill[data-t="SAMPLE"].on { background:var(--c-sam); }
+    .type-pill[data-t="MIDI"].on   { background:var(--c-mid); }
+    .type-pill[data-t="SID"].on    { background:var(--c-sid); }
+    .type-pill[data-t="OPAL"].on   { background:var(--c-opl); }
+    .type-pill[data-t="SAMPLESOURCE"].on { background:#60a5fa; }
+    .stat-chip { font-size:11px; color:var(--muted); white-space:nowrap; }
+
+    /* SCROLL */
+    .scroll-area { flex:1; overflow-y:auto; }
+    .scroll-area::-webkit-scrollbar { width:5px; }
+    .scroll-area::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+
+    /* PROJECTS — LIST ROWS */
+    .proj-item { border-bottom:1px solid var(--border); }
+    .proj-row { display:grid;
+      grid-template-columns:16px minmax(140px,1fr) 64px 60px 60px 70px 86px 90px;
+      align-items:center; gap:0 12px; padding:9px 20px;
+      cursor:pointer; user-select:none; transition:background .1s; }
+    .proj-row:hover { background:var(--surface); }
+    .proj-item.open .proj-row { background:var(--surface); }
+    .p-chev { color:var(--muted); transition:transform .15s; font-size:9px; }
+    .proj-item.open .p-chev { transform:rotate(90deg); }
+    .p-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .p-meta { font-size:11px; color:var(--muted); white-space:nowrap; }
+    .p-auto { font-size:9px; color:var(--warn); border:1px solid #4a2e00; background:#1f1200;
+      padding:1px 5px; border-radius:3px; margin-left:6px; vertical-align:middle; }
+    .p-miss { font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px;
+      white-space:nowrap; text-align:center; justify-self:end; }
+    .p-miss.bad  { background:#2d0f0f; color:var(--c-miss); border:1px solid #4a1a1a; }
+    .p-miss.good { background:#0e2a1a; color:var(--c-found); border:1px solid #1a4a2a; }
+    .p-miss.none { color:var(--border2); font-weight:400; }
+
+    /* PROJECTS — GRID */
+    .proj-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+      gap:10px; padding:14px 20px; align-content:start; }
+    .proj-card { background:var(--surface); border:1px solid var(--border); border-radius:8px;
+      overflow:hidden; cursor:pointer; transition:border-color .15s,transform .1s; }
+    .proj-card:hover { border-color:var(--border2); transform:translateY(-1px); }
+    .pc-bar { height:3px; }
+    .pc-bar.bad  { background:var(--c-miss); }
+    .pc-bar.good { background:var(--c-found); }
+    .pc-body { padding:11px 12px 12px; }
+    .pc-name { font-size:13px; font-weight:700; letter-spacing:.3px; margin-bottom:3px;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pc-meta { font-size:10px; color:var(--muted); margin-bottom:9px; }
+    .pc-foot { display:flex; align-items:center; gap:6px; }
+    .pc-ic { font-size:11px; color:var(--muted); flex:1; }
+    .pc-badge { font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; white-space:nowrap; }
+    .pc-badge.bad  { background:#2d0f0f; color:var(--c-miss); border:1px solid #4a1a1a; }
+    .pc-badge.good { background:#0e2a1a; color:var(--c-found); border:1px solid #1a4a2a; }
+
+    /* PROJECT DETAIL (expand) */
+    .proj-detail { display:none; padding:14px 20px 14px 48px;
+      background:var(--surface); border-top:1px solid var(--border); }
+    .proj-item.open .proj-detail { display:block; }
+    .sd-cols { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .sd-col { min-width:0; }
+    .det-title { font-size:10px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase;
+      color:var(--muted); margin-bottom:8px; }
+    .iblock { display:flex; flex-wrap:wrap; gap:4px; }
+    .ichip { display:inline-flex; align-items:center; gap:5px; padding:3px 8px;
+      background:var(--surface2); border:1px solid var(--border); border-radius:4px;
+      cursor:pointer; transition:border-color .1s; }
+    .ichip:hover { border-color:var(--accent); }
+    .ichip-slot { font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums; flex-shrink:0; }
+    .ichip-name { font-size:11px; white-space:nowrap; max-width:110px; overflow:hidden; text-overflow:ellipsis; }
+    .tb { font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; flex-shrink:0; letter-spacing:.3px; }
+    .tb.SAMPLE { background:#0e3325; color:var(--c-sam); }
+    .tb.MIDI   { background:#3a300e; color:var(--c-mid); }
+    .tb.SID    { background:#2d2054; color:var(--c-sid); }
+    .tb.OPAL   { background:#3a1428; color:var(--c-opl); }
+    .tb.SAMPLESOURCE { background:#132c40; color:#60a5fa; }
+    .tb.NONE, .tb.UNK { background:var(--surface2); color:var(--muted); }
+    .spr { display:flex; align-items:flex-start; gap:8px; padding:2px 0; font-size:12px; }
+    .spr-ic   { flex-shrink:0; width:14px; font-size:11px; }
+    .spr-path { flex:1; word-break:break-all; line-height:1.4; }
+    .spr.miss .spr-path { color:var(--c-miss); }
+    .spr.ok   .spr-path { color:var(--muted); }
+    .spr-meta { font-size:10px; color:var(--border2); flex-shrink:0; }
+    .btn-diff-row { opacity:0; transition:opacity .1s; }
+    .proj-item:hover .btn-diff-row, .proj-card:hover .btn-diff-row, .btn-diff-row.on { opacity:1; }
+    .similar-section { margin-top:14px; }
+    .sim-item { display:inline-flex; align-items:center; gap:6px; padding:3px 8px;
+      background:var(--surface2); border:1px solid var(--border); border-radius:4px;
+      margin:0 4px 4px 0; cursor:pointer; font-size:11px; transition:border-color .1s; }
+    .sim-item:hover { border-color:var(--accent); }
+    .sim-pct { font-size:10px; color:var(--muted); }
+
+    /* PROJECT MODAL */
+    .proj-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:100;
+      display:flex; align-items:center; justify-content:center; padding:24px; }
+    .proj-modal-box { background:var(--surface); border:1px solid var(--border2);
+      border-radius:10px; width:min(760px,100%); max-height:86vh;
+      display:flex; flex-direction:column; overflow:hidden; }
+    .proj-modal-hdr { display:flex; align-items:center; gap:10px; padding:13px 16px;
+      border-bottom:1px solid var(--border); flex-shrink:0; }
+    .proj-modal-title { font-size:14px; font-weight:700; flex:1; min-width:0;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .proj-modal-meta  { font-size:11px; color:var(--muted); flex-shrink:1; min-width:0;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:34%; }
+    .proj-modal-body  { overflow-y:auto; padding:16px; flex:1; }
+    .proj-modal-body::-webkit-scrollbar { width:5px; }
+    .proj-modal-body::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+    .modal-nav-btn { background:transparent; border:none; color:var(--muted);
+      font-size:20px; cursor:pointer; padding:2px 7px; border-radius:4px; line-height:1;
+      transition:color .1s; flex-shrink:0; }
+    .modal-nav-btn:hover { color:var(--text); }
+    .modal-nav-btn:disabled { opacity:.18; cursor:default; }
+
+    /* INSTRUMENTS */
+    .instr-item { border-bottom:1px solid var(--border); }
+    .instr-row { display:grid;
+      grid-template-columns:16px 60px minmax(130px,1fr) minmax(120px,180px) 170px 110px;
+      align-items:center; gap:0 14px; padding:9px 20px;
+      cursor:pointer; user-select:none; transition:background .1s; }
+    .instr-row:hover { background:var(--surface); }
+    .instr-item.open .instr-row { background:var(--surface); }
+    .i-chev  { color:var(--muted); transition:transform .15s; font-size:9px; }
+    .instr-item.open .i-chev { transform:rotate(90deg); }
+    .i-lname { font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .i-src { font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .samp-c { font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .samp-c.miss { color:var(--c-miss); font-weight:500; }
+    .samp-c.ok   { color:var(--muted); }
+    .ubadge { font-size:11px; font-weight:500; padding:2px 9px; border-radius:20px; white-space:nowrap; justify-self:end; }
+    .ubadge.used   { background:#1c2f1c; color:var(--c-found); border:1px solid #2a4a2a; }
+    .ubadge.unused { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
+    .instr-det { display:none; padding:12px 20px 12px 90px;
+      background:var(--surface); border-top:1px solid var(--border); flex-direction:column; gap:8px; }
+    .instr-item.open .instr-det { display:flex; }
+    .drow   { display:flex; align-items:flex-start; gap:8px; font-size:12px; }
+    .dlabel { font-size:10px; font-weight:600; letter-spacing:1px; text-transform:uppercase;
+      color:var(--muted); width:70px; flex-shrink:0; padding-top:1px; }
+    .dval { flex:1; word-break:break-all; }
+    .dval.miss { color:var(--c-miss); }
+    .dval.dim  { color:var(--muted); }
+    .ipwrap { display:flex; flex-wrap:wrap; gap:4px; flex:1; }
+    .ipchip { display:inline-flex; align-items:baseline; gap:5px; padding:2px 7px;
+      background:var(--surface2); border:1px solid var(--border); border-radius:4px; }
+    .ipchip.mod { border-color:var(--accent-brd); }
+    .ipk { font-size:9px; color:var(--muted); letter-spacing:.5px; }
+    .ipv { font-size:11px; font-family:monospace; color:var(--text); }
+
+    /* GROUP HEADERS (trees) */
+    .grp-hdr { display:flex; align-items:center; gap:8px;
+      background:var(--surface2); border-bottom:1px solid var(--border);
+      cursor:pointer; user-select:none; padding:7px 20px; transition:background .1s; }
+    .grp-hdr:hover { background:#24292d; }
+    .grp-chev { font-size:9px; color:var(--muted); transition:transform .15s; flex-shrink:0; }
+    .grp.open > .grp-hdr .grp-chev { transform:rotate(90deg); }
+    .grp-name { font-size:11px; font-weight:600; letter-spacing:.3px; color:var(--muted); flex:1; }
+    .grp-cnt  { font-size:11px; color:var(--border2); }
+    .grp-body { display:none; }
+    .grp.open > .grp-body { display:block; }
+
+    /* SAMPLE BROWSER */
+    .sb-file-row { display:flex; align-items:center; gap:8px; padding:5px 20px;
+      border-bottom:1px solid var(--border); }
+    .sb-fname { font-size:12px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .sb-fmeta { font-size:10px; color:var(--muted); flex-shrink:0; }
+    .sb-badge { font-size:10px; font-weight:600; padding:1px 7px; border-radius:4px; flex-shrink:0; white-space:nowrap; }
+    .sb-badge.used   { background:#1c2f1c; color:var(--c-found); border:1px solid #2a4a2a; cursor:pointer; }
+    .sb-badge.unused { background:var(--surface2); color:var(--border2); border:1px solid var(--border); }
+    .sb-file-row.sel { background:var(--accent-dim); box-shadow:inset 3px 0 0 var(--accent); }
+    .play-btn { background:transparent; border:none; cursor:pointer; padding:0 4px;
+      font-size:11px; color:var(--muted); line-height:1; transition:color .1s; flex-shrink:0; }
+    .play-btn:hover,.play-btn.playing { color:var(--accent); }
+    .play-btn:disabled { opacity:.4; cursor:default; }
+
+    /* THEMES */
+    .themes-scroll { flex:1; overflow-y:auto; padding:16px 20px; }
+    .themes-scroll::-webkit-scrollbar { width:5px; }
+    .themes-scroll::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+    .themes-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
+    .theme-card { background:var(--surface); border:1px solid var(--border); border-radius:8px;
+      overflow:hidden; transition:border-color .15s; }
+    .theme-card:hover { border-color:var(--border2); }
+    .theme-preview { height:118px; overflow:hidden; }
+    .theme-info { padding:10px 12px; display:flex; align-items:center; gap:8px; }
+    .theme-name { font-size:13px; font-weight:600; flex:1; }
+    .theme-swatches { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:0 12px 12px; }
+    .swatch-box { height:20px; border-radius:3px; border:1px solid rgba(255,255,255,.08); }
+    .swatch-lbl { font-size:8px; color:var(--muted); letter-spacing:.3px; margin-top:3px; }
+    .swatch-hex { font-size:9px; color:var(--border2); font-family:monospace; }
+
+    /* GROOVES TAB */
+    .groove-row { display:flex; align-items:center; gap:14px; padding:10px 20px;
+      border-bottom:1px solid var(--border); }
+    .groove-name { font-size:12px; font-weight:500; width:120px; flex-shrink:0;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .groove-steps { display:flex; gap:2px; flex-wrap:wrap; }
+    .g-step { width:19px; height:19px; border-radius:3px; background:var(--surface2);
+      border:1px solid var(--border); font-size:9px; color:var(--muted);
+      display:flex; align-items:center; justify-content:center; font-variant-numeric:tabular-nums; }
+    .g-step.accent { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+    .groove-meta { font-size:11px; color:var(--muted); flex-shrink:0; margin-left:auto; }
+    .center-note { color:var(--muted); padding:40px; text-align:center; font-size:13px; line-height:1.8; }
+
+    /* PROBLEMS */
+    .prob-nav { display:flex; align-items:center; gap:6px; padding:10px 20px;
+      background:var(--surface); border-bottom:1px solid var(--border);
+      flex-shrink:0; flex-wrap:wrap; }
+    .prob-btn { background:var(--surface2); border:1px solid var(--border); color:var(--muted);
+      padding:5px 12px; font-family:inherit; font-size:11px; font-weight:600;
+      cursor:pointer; border-radius:20px; transition:all .15s; white-space:nowrap; }
+    .prob-btn:hover { border-color:var(--border2); color:var(--text); }
+    .prob-btn.active { background:var(--accent); border-color:var(--accent); color:#04211d; }
+    .prob-count { font-weight:400; opacity:.75; margin-left:4px; }
+    .prob-group-hdr { padding:12px 20px 4px; font-size:10px; font-weight:700;
+      letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+    .prob-row { display:flex; align-items:center; gap:12px; padding:9px 20px;
+      border-bottom:1px solid var(--border); transition:background .1s; }
+    .prob-row:hover { background:var(--surface); }
+    .prob-row.clickable { cursor:pointer; }
+    .prob-icon { width:22px; text-align:center; flex-shrink:0; font-size:14px; }
+    .prob-main { flex:1; min-width:0; }
+    .prob-name { font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .prob-sub  { font-size:11px; color:var(--muted); margin-top:1px; word-break:break-all; }
+    .prob-right { font-size:11px; color:var(--muted); white-space:nowrap; flex-shrink:0; }
+    .prob-empty { color:var(--muted); padding:40px; text-align:center; font-size:13px; }
+    .prob-empty b { color:var(--c-found); display:block; font-size:18px; margin-bottom:8px; }
+
+    /* FIX (REPAIR) MODAL */
+    #fix-modal { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:160;
+      display:none; align-items:center; justify-content:center; padding:20px; }
+    #fix-modal.open { display:flex; }
+    .fix-box { background:var(--surface); border:1px solid var(--border2); border-radius:10px;
+      width:min(760px,100%); max-height:85vh; display:flex; flex-direction:column; overflow:hidden; }
+    .fix-hdr { display:flex; align-items:center; gap:12px; padding:12px 16px;
+      border-bottom:1px solid var(--border); flex-shrink:0; }
+    .fix-title { font-size:14px; font-weight:700; flex:1; min-width:0;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .fix-body { overflow-y:auto; flex:1; padding:14px 16px; display:flex; flex-direction:column; gap:14px; }
+    .fix-ref { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
+    .fix-broken { font-size:11px; font-family:monospace; color:var(--c-miss); word-break:break-all; margin-bottom:8px; }
+    .fix-row { display:flex; align-items:center; gap:8px; }
+    .fix-arrow { color:var(--muted); flex-shrink:0; }
+    .fix-select { flex:1; min-width:0; background:var(--surface); border:1px solid var(--border2); color:var(--text);
+      padding:5px 8px; font-family:monospace; font-size:11px; border-radius:5px; outline:none; }
+    .fix-select:focus { border-color:var(--accent); }
+    .fix-nocand { font-size:11px; color:var(--muted); font-style:italic; }
+    .fix-mode { display:flex; flex-direction:column; gap:8px; padding:10px 12px;
+      background:var(--surface2); border:1px solid var(--border); border-radius:8px; font-size:12px; }
+    .fix-mode label { display:flex; align-items:flex-start; gap:8px; cursor:pointer; }
+    .fix-mode input[type=radio] { accent-color:var(--accent); margin-top:2px; }
+    .fix-mode-sub { font-size:11px; color:var(--muted); }
+    .fix-ftr { display:flex; align-items:center; gap:10px; padding:12px 16px;
+      border-top:1px solid var(--border); flex-shrink:0; }
+    .fix-status { flex:1; font-size:12px; color:var(--muted); }
+    .fix-status.ok { color:var(--c-found); }
+    .fix-status.err { color:var(--c-miss); }
+
+    /* BACKUP */
+    .backup-layout { flex:1; display:flex; overflow:hidden; }
+    .backup-panel { padding:20px; background:var(--surface); border-right:1px solid var(--border);
+      width:330px; flex-shrink:0; display:flex; flex-direction:column; gap:16px; overflow-y:auto; }
+    .backup-log { flex:1; padding:18px 20px; overflow-y:auto;
+      font-size:12px; line-height:1.9; color:var(--muted); }
+    .backup-log::-webkit-scrollbar { width:5px; }
+    .backup-log::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+    .sblock { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:14px; }
+    .sblock-title { font-size:10px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase;
+      color:var(--muted); margin-bottom:10px; }
+    .inc-row { display:flex; align-items:center; gap:10px; padding:7px 0;
+      border-bottom:1px solid var(--border); cursor:pointer; }
+    .inc-row:last-child { border-bottom:none; }
+    .inc-row input[type=checkbox] { width:14px; height:14px; accent-color:var(--accent); cursor:pointer; flex-shrink:0; }
+    .inc-label { flex:1; font-size:13px; }
+    .inc-count { font-size:11px; color:var(--muted); }
+    .backup-info { font-size:12px; color:var(--muted); line-height:1.6; }
+    .log-line      { color:var(--muted); }
+    .log-line.ok   { color:var(--c-found); }
+    .log-line.err  { color:var(--c-miss); }
+    .log-line.head { color:var(--text); font-weight:500; }
+
+    /* SETS */
+    .set-summary { display:flex; align-items:center; gap:14px; padding:8px 20px; flex-wrap:wrap;
+      background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; font-size:12px; }
+    .set-sum-item { color:var(--muted); }
+    .set-sum-item b { color:var(--accent); font-weight:600; }
+    .set-sum-item.warn b { color:var(--c-miss); }
+    .set-row { display:flex; align-items:center; gap:10px; padding:7px 20px;
+      border-bottom:1px solid var(--border); cursor:pointer; transition:background .1s; }
+    .set-row:hover { background:var(--surface); }
+    .set-row input[type=checkbox] { width:14px; height:14px; accent-color:var(--accent); flex-shrink:0; pointer-events:none; }
+    .set-row-name { font-size:13px; font-weight:600; flex-shrink:0; max-width:240px;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .set-row-meta { font-size:11px; color:var(--muted); flex-shrink:0; margin-left:auto; }
+    .set-row-meta.bad { color:var(--c-miss); }
+    .set-log { font-size:11px; color:var(--muted); width:100%; max-height:72px; overflow-y:auto; line-height:1.6; }
+    .set-log .err { color:var(--c-miss); }
+    .set-log .ok { color:var(--c-found); }
+
+    /* RENDERS */
+    .render-row { display:grid; align-items:center; gap:0 12px; padding:8px 20px;
+      border-bottom:1px solid var(--border);
+      grid-template-columns:26px minmax(160px,1fr) 80px 80px 140px; }
+    .render-name { font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .render-meta { font-size:11px; color:var(--muted); }
+    .render-wave { width:140px; height:28px; border-radius:4px; background:var(--surface2);
+      border:1px solid var(--border); display:block; }
+
+    /* STATS */
+    .stats-scroll { flex:1; overflow-y:auto; padding:20px; }
+    .stats-scroll::-webkit-scrollbar { width:5px; }
+    .stats-scroll::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+    .stats-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; }
+    .stat-card-title { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+      color:var(--muted); margin-bottom:12px; }
+    .stat-kpi-row { display:flex; flex-wrap:wrap; gap:16px; }
+    .stat-kpi { text-align:center; padding:8px 12px; border-radius:6px; }
+    .stat-kpi-val { font-size:26px; font-weight:700; color:var(--accent); line-height:1; }
+    .stat-kpi-val.bad { color:var(--c-miss); }
+    .stat-kpi-lbl { font-size:10px; color:var(--muted); margin-top:3px; }
+    .bar-chart { display:flex; flex-direction:column; gap:2px; }
+    .bar-row { display:flex; align-items:center; gap:8px; font-size:11px; padding:3px 4px; border-radius:3px; }
+    .bar-label { width:110px; color:var(--muted); white-space:nowrap; overflow:hidden;
+      text-overflow:ellipsis; flex-shrink:0; text-align:right; font-size:10px; }
+    .bar-track { flex:1; background:var(--surface2); border-radius:2px; height:10px; overflow:hidden; }
+    .bar-fill  { height:100%; border-radius:2px; transition:width .3s; background:var(--accent); }
+    .bar-val   { width:34px; color:var(--muted); text-align:right; flex-shrink:0; font-size:10px; }
+    .recent-list { display:flex; flex-direction:column; gap:1px; }
+    .recent-item { display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:3px; cursor:pointer; transition:background .1s; }
+    .recent-item:hover { background:var(--surface2); }
+    .recent-name { flex:1; font-size:11px; font-weight:600; color:var(--text);
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .recent-date { font-size:10px; color:var(--muted); flex-shrink:0; }
+
+    /* PATTERN VIEWER */
+    .pv-section { margin-top:16px; border-top:1px solid var(--border); padding-top:14px; }
+    .pv-hdr { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+    .pv-hdr-title { font-size:10px; font-weight:700; letter-spacing:1.5px;
+      text-transform:uppercase; color:var(--muted); flex:1; }
+    .pv-grid-wrap { overflow-x:auto; padding-bottom:4px; }
+    .pv-grid { display:grid; gap:1px; width:max-content; }
+    .pv-cell { width:30px; height:22px; display:flex; align-items:center; justify-content:center;
+      font-size:10px; font-family:monospace; border-radius:3px;
+      background:var(--surface2); color:var(--border2); cursor:default; user-select:none; }
+    .pv-cell.chain { background:var(--accent-dim); color:var(--accent); cursor:pointer; }
+    .pv-cell.chain:hover { background:#14403a; }
+    .pv-cell.chain.hi { background:var(--accent); color:#04211d; }
+    .pv-cell.rlbl { background:transparent; color:var(--border2); font-size:9px; }
+    .pv-cell.clbl { background:transparent; color:var(--muted); font-size:9px; font-weight:600; }
+    .pv-detail { margin-top:10px; background:var(--surface2); border:1px solid var(--border);
+      border-radius:6px; padding:12px; max-height:300px; overflow-y:auto; }
+    .pv-detail::-webkit-scrollbar { width:4px; }
+    .pv-detail::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+    .pv-detail-title { font-size:10px; font-weight:700; letter-spacing:1px;
+      text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+    .pv-cstep { display:flex; gap:8px; padding:3px 0; font-size:11px; font-family:monospace;
+      border-bottom:1px solid var(--border); align-items:center; }
+    .pv-cstep:last-child { border-bottom:none; }
+    .pv-cstep .ci { color:var(--border2); width:18px; flex-shrink:0; }
+    .pv-cstep .cp { color:var(--accent); cursor:pointer; }
+    .pv-cstep .cp:hover { text-decoration:underline; }
+    .pv-cstep .ct { color:var(--muted); }
+    .pv-pstep { display:grid;
+      grid-template-columns:18px 36px 26px 1fr;
+      gap:4px; padding:3px 0; font-size:10px; font-family:monospace;
+      border-bottom:1px solid var(--border); align-items:center; }
+    .pv-pstep:last-child { border-bottom:none; }
+    .pv-pstep .pi { color:var(--border2); }
+    .pv-pstep .pn { color:#60a5fa; font-weight:600; }
+    .pv-pstep .pn.empty { color:var(--border2); font-weight:400; }
+    .pv-pstep .pv2 { color:var(--muted); }
+    .pv-pstep .pfx { color:var(--c-mid); }
+    .tl-svg-wrap { overflow-x:auto; }
+    .tl-svg { display:block; }
+    .tl-legend { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:8px; }
+    .tl-leg-item { display:inline-flex; align-items:center; gap:5px;
+      font-size:10px; color:var(--muted); max-width:160px;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .tl-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+    /* NOTE HISTOGRAM */
+    .nh-wrap { margin-top:14px; border-top:1px solid var(--border); padding-top:12px; }
+    .nh-title { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+      color:var(--muted); margin-bottom:8px; }
+    .nh-bins { display:flex; align-items:flex-end; gap:2px; height:52px; margin-bottom:4px; }
+    .nh-bin { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; min-width:0; }
+    .nh-bar { width:100%; border-radius:2px 2px 0 0; min-height:0; transition:height .2s; background:var(--accent); }
+    .nh-lbl { font-size:8px; color:var(--muted); font-family:monospace; white-space:nowrap; }
+    .nh-scale-row { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+    .nh-scale-chip { font-size:10px; padding:2px 7px; border-radius:4px;
+      background:var(--surface2); border:1px solid var(--border2); color:var(--muted); }
+    .nh-scale-chip.top { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+
+    /* DIFF MODAL */
+    #diff-modal { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:150;
+      display:none; align-items:center; justify-content:center; padding:20px; }
+    #diff-modal.open { display:flex; }
+    .diff-box { background:var(--surface); border:1px solid var(--border2); border-radius:10px;
+      width:min(900px,100%); max-height:85vh; display:flex; flex-direction:column; overflow:hidden; }
+    .diff-hdr { display:flex; align-items:center; gap:12px; padding:12px 16px;
+      border-bottom:1px solid var(--border); flex-shrink:0; }
+    .diff-title { font-size:14px; font-weight:700; flex:1; }
+    .diff-score { font-size:12px; padding:2px 8px; border-radius:4px; background:var(--surface2); color:var(--muted); }
+    #diff-meta { display:none; grid-template-columns:90px 1fr 1fr; gap:2px 12px;
+      padding:8px 16px; border-bottom:1px solid var(--border); font-size:11px; flex-shrink:0; }
+    #diff-meta.on { display:grid; }
+    .dm-lbl { color:var(--muted); text-transform:uppercase; font-size:9px; letter-spacing:1px; padding-top:1px; }
+    .dm-val { font-variant-numeric:tabular-nums; }
+    .dm-val.diff { color:var(--warn); }
+    .diff-sec-hdr { padding:8px 14px 4px; font-size:10px; font-weight:700; letter-spacing:1.5px;
+      text-transform:uppercase; color:var(--muted); border-top:1px solid var(--border); }
+    .diff-cols { display:grid; grid-template-columns:1fr 1fr; flex:1; overflow:hidden; min-height:0; }
+    .diff-col { display:flex; flex-direction:column; overflow:hidden; border-right:1px solid var(--border); }
+    .diff-col:last-child { border-right:none; }
+    .diff-col-hdr { padding:9px 14px; background:var(--surface2); border-bottom:1px solid var(--border);
+      font-size:12px; font-weight:600; flex-shrink:0; }
+    .diff-col-hdr input { background:transparent; border:none; outline:none; color:var(--text);
+      font-family:inherit; font-size:12px; width:100%; }
+    .diff-col-hdr input::placeholder { color:var(--muted); }
+    .diff-col-body { overflow-y:auto; flex:1; }
+    .diff-row { display:flex; align-items:center; gap:8px; padding:6px 14px;
+      border-bottom:1px solid var(--border); font-size:12px; }
+    .diff-row.shared { background:#0d2213; }
+    .diff-row.unique { background:#1c0a0a; }
+    .diff-row.samp { font-size:11px; font-family:monospace; word-break:break-all; }
+    .diff-pick-item { padding:7px 14px; border-bottom:1px solid var(--border);
+      font-size:12px; cursor:pointer; transition:background .1s; }
+    .diff-pick-item:hover { background:var(--surface2); }
+
+    /* SAMPLE USAGE MODAL */
+    #samp-modal { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:150;
+      display:none; align-items:center; justify-content:center; padding:20px; }
+    #samp-modal.open { display:flex; }
+    .samp-box { background:var(--surface); border:1px solid var(--border2); border-radius:10px;
+      width:min(540px,100%); max-height:70vh; display:flex; flex-direction:column; overflow:hidden; }
+    .samp-hdr { display:flex; align-items:flex-start; gap:10px; padding:12px 16px;
+      border-bottom:1px solid var(--border); flex-shrink:0; }
+    .samp-path-txt { font-size:11px; font-family:monospace; color:var(--accent); flex:1;
+      word-break:break-all; line-height:1.5; }
+    .samp-body { overflow-y:auto; flex:1; padding:8px 0; }
+    .samp-grp-hdr { padding:8px 16px 4px; font-size:10px; font-weight:700;
+      letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+    .samp-item { padding:5px 16px; font-size:12px; display:flex; align-items:center; gap:6px; }
+    .samp-item-name { color:var(--text); font-weight:500; cursor:pointer; }
+    .samp-item-name:hover { color:var(--accent); }
+
+    /* GLOBAL SEARCH */
+    #search-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:200;
+      display:none; align-items:flex-start; justify-content:center; padding-top:80px; }
+    #search-overlay.open { display:flex; }
+    .srch-box { background:var(--surface); border:1px solid var(--border2);
+      border-radius:10px; width:min(580px,90%); max-height:65vh; display:flex; flex-direction:column; overflow:hidden; }
+    .srch-input-row { display:flex; align-items:center; gap:10px; padding:12px 16px;
+      border-bottom:1px solid var(--border); flex-shrink:0; }
+    #srch-input { background:transparent; border:none; outline:none; color:var(--text);
+      font-family:inherit; font-size:16px; flex:1; min-width:0; }
+    #srch-input::placeholder { color:var(--muted); }
+    .srch-kbd { font-size:10px; color:var(--border2); background:var(--surface2);
+      border:1px solid var(--border); border-radius:3px; padding:1px 5px; cursor:pointer; }
+    .srch-results { overflow-y:auto; flex:1; }
+    .sr-group { padding:8px 16px 4px; font-size:10px; font-weight:700; letter-spacing:1.5px;
+      text-transform:uppercase; color:var(--muted); border-top:1px solid var(--border); }
+    .sr-group:first-child { border-top:none; }
+    .sr-item { display:flex; align-items:center; gap:10px; padding:8px 16px;
+      cursor:pointer; transition:background .1s; }
+    .sr-item:hover,.sr-item.sr-focus { background:var(--surface2); }
+    .sr-icon { width:26px; height:26px; border-radius:6px; display:flex; align-items:center;
+      justify-content:center; font-size:13px; flex-shrink:0; background:var(--surface2); }
+    .sr-text { flex:1; min-width:0; }
+    .sr-name { font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .sr-meta { font-size:11px; color:var(--muted); }
+    .sr-empty { color:var(--muted); padding:24px; text-align:center; }
+
+    /* MISC */
+    .spinner-wrap { display:flex; align-items:center; gap:10px; color:var(--muted); padding:24px 20px; }
+    .spinner { width:15px; height:15px; border:2px solid var(--border2); border-top-color:var(--accent);
+      border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .no-results { color:var(--muted); padding:36px; text-align:center; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.1.0 Alpha</span></div>
+    <div class="hdr-right">
+      <span id="sd-label">No SD card mounted</span>
+      <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
+      <button class="btn ghost icon" id="btn-search" title="Search  ⌘K" style="display:none">⌕</button>
+      <button class="btn" id="btn-open">OPEN SD CARD</button>
+    </div>
+  </header>
+
+  <div id="empty-state">
+    <div class="empty-icon">▦</div>
+    <div class="empty-title">PICOTRACKER LIBRARIAN</div>
+    <div class="empty-sub">Mount your picoTracker's SD card to browse projects, instruments, samples and themes, find problems, and back everything up. Works with pico and Advance cards.</div>
+    <div id="reconnect-card" class="reconnect-card">
+      <div class="reconnect-lbl">Last opened:</div>
+      <div class="reconnect-name" id="reconnect-name"></div>
+      <button class="btn" id="btn-reconnect">REOPEN</button>
+    </div>
+    <div class="empty-divider" id="empty-divider" style="display:none">— or —</div>
+    <button class="btn secondary" id="btn-open-empty">OPEN SD CARD</button>
+    <div id="browser-warn" class="browser-warn" style="display:none">
+      ⚠ Requires Chrome or Edge — Firefox and Safari do not support the File System Access API.
+    </div>
+  </div>
+
+  <div id="main">
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="projects" title="1">PROJECTS</button>
+      <button class="tab-btn" data-tab="instruments" title="2">INSTRUMENTS</button>
+      <button class="tab-btn" data-tab="samples" title="3">SAMPLES</button>
+      <button class="tab-btn" data-tab="themes" title="4">THEMES</button>
+      <button class="tab-btn" data-tab="grooves" title="5">GROOVES</button>
+      <button class="tab-btn" data-tab="problems" title="6">PROBLEMS</button>
+      <button class="tab-btn" data-tab="renders" title="7">RENDERS</button>
+      <button class="tab-btn" data-tab="sets" title="8">SETS</button>
+      <button class="tab-btn" data-tab="backup" title="9">BACKUP</button>
+      <button class="tab-btn" data-tab="stats" title="0">STATS</button>
+    </div>
+
+    <div id="cache-bar">
+      <span id="cache-msg"></span>
+      <button class="btn sm dim" id="btn-rescan" style="display:none">Full Rescan</button>
+    </div>
+
+    <div id="health-bar">
+      <span class="hstat"><b id="h-projects">0</b> projects</span>
+      <span class="hstat"><b id="h-instrs">0</b> instruments</span>
+      <span class="hstat"><b id="h-samples">0</b> samples</span>
+      <span class="hstat bad clickable" id="h-broken-stat"><b id="h-broken">0</b> missing samples</span>
+      <span class="hstat warn clickable" id="h-unused-stat"><b id="h-unused">0</b> unused pool samples</span>
+      <span class="hstat clickable" id="h-dupes-stat"><b id="h-dupes">0</b> dupes</span>
+    </div>
+
+    <!-- ── PROJECTS ── -->
+    <div class="tab-pane active" id="tab-projects">
+      <div class="toolbar">
+        <input class="search" id="proj-q" type="text" placeholder="filter projects…">
+        <select class="sorter" id="proj-sort">
+          <option value="name-asc">Name A→Z</option>
+          <option value="name-desc">Name Z→A</option>
+          <option value="date-desc">Newest first</option>
+          <option value="date-asc">Oldest first</option>
+          <option value="missing">Most missing</option>
+          <option value="instrs">Most instruments</option>
+          <option value="bpm-desc">BPM (fast first)</option>
+          <option value="bpm-asc">BPM (slow first)</option>
+          <option value="size-desc">Largest first</option>
+        </select>
+        <button class="btn ghost sm" id="proj-miss-btn">⚠ Missing</button>
+        <span class="stat-chip" id="projs-stat" style="margin-left:auto"></span>
+        <div class="vtog-wrap">
+          <button class="vtog active" id="vtog-list" title="List  L">☰</button>
+          <button class="vtog" id="vtog-grid" title="Grid  G">⊞</button>
+        </div>
+      </div>
+      <div id="diff-pick-banner" style="display:none; align-items:center; gap:10px; padding:6px 20px;
+        background:#1f1200; border-bottom:1px solid #4a2e00; font-size:12px; color:var(--warn); flex-shrink:0;">
+        <span>⇌</span>
+        <span id="diff-pick-label">Click ⇌ on another project to compare</span>
+        <button class="btn ghost sm" id="btn-diff-pick-cancel" style="margin-left:auto">✕ Cancel</button>
+      </div>
+      <div class="scroll-area"><div id="projs-list"></div></div>
+    </div>
+
+    <!-- ── INSTRUMENTS ── -->
+    <div class="tab-pane" id="tab-instruments">
+      <div class="toolbar">
+        <input class="search" id="instr-q" type="text" placeholder="filter instruments…">
+        <select class="sorter" id="instr-sort">
+          <option value="name-asc">Name A→Z</option>
+          <option value="name-desc">Name Z→A</option>
+          <option value="type">By type</option>
+          <option value="usage">Most used</option>
+          <option value="missing">Missing first</option>
+        </select>
+        <div id="type-filters" style="display:flex;gap:4px"></div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer">
+          <input type="checkbox" id="instr-inproj" checked style="accent-color:var(--accent)"> project banks
+        </label>
+        <span class="stat-chip" id="instrs-stat" style="margin-left:auto"></span>
+      </div>
+      <div class="scroll-area"><div id="instrs-list"></div></div>
+    </div>
+
+    <!-- ── SAMPLES ── -->
+    <div class="tab-pane" id="tab-samples">
+      <div class="toolbar">
+        <input class="search" id="sampbr-q" type="text" placeholder="filter samples…">
+        <span class="stat-chip" id="sampbr-stat" style="margin-left:auto"></span>
+      </div>
+      <div class="scroll-area"><div id="sampbr-list"></div></div>
+    </div>
+
+    <!-- ── THEMES ── -->
+    <div class="tab-pane" id="tab-themes">
+      <div class="toolbar">
+        <input class="search" id="theme-q" type="text" placeholder="filter themes…">
+        <button class="btn ghost sm" id="btn-theme-reset" title="Back to the default app palette">↺ Reset app theme</button>
+        <span class="stat-chip" id="themes-stat" style="margin-left:auto"></span>
+      </div>
+      <div class="themes-scroll">
+        <div class="themes-grid" id="themes-grid"></div>
+      </div>
+    </div>
+
+    <!-- ── GROOVES ── -->
+    <div class="tab-pane" id="tab-grooves">
+      <div class="toolbar">
+        <span class="stat-chip" id="grooves-stat"></span>
+      </div>
+      <div class="scroll-area"><div id="grooves-list"></div></div>
+    </div>
+
+    <!-- ── PROBLEMS ── -->
+    <div class="tab-pane" id="tab-problems">
+      <div class="prob-nav">
+        <button class="prob-btn active" data-psec="broken">Missing Samples<span class="prob-count" id="pc-broken"></span></button>
+        <button class="prob-btn" data-psec="unusedpool">Unused Pool<span class="prob-count" id="pc-unusedpool"></span></button>
+        <button class="prob-btn" data-psec="unusedinstr">Unused Instrs<span class="prob-count" id="pc-unusedinstr"></span></button>
+        <button class="prob-btn" data-psec="dupesamp">Dupe Samples<span class="prob-count" id="pc-dupesamp"></span></button>
+        <button class="prob-btn" data-psec="dupes">Dupe Names<span class="prob-count" id="pc-dupes"></span></button>
+        <button class="prob-btn" data-psec="autosaves">Autosaves<span class="prob-count" id="pc-autosaves"></span></button>
+        <button class="prob-btn" data-psec="skipped">Unreadable<span class="prob-count" id="pc-skipped"></span></button>
+        <button class="prob-btn" data-psec="backbone">Backbone</button>
+        <button class="prob-btn" data-psec="repairlog">Repair Log<span class="prob-count" id="pc-repairlog"></span></button>
+        <button class="btn sm dim" id="btn-dupescan" title="Byte-level scan for content-identical samples">Scan dupes</button>
+        <button class="btn sm dim" id="btn-export-report" style="margin-left:auto">⬇ Export Report</button>
+      </div>
+      <div class="scroll-area" id="prob-content"></div>
+    </div>
+
+    <!-- ── RENDERS ── -->
+    <div class="tab-pane" id="tab-renders">
+      <div class="toolbar">
+        <span class="stat-chip" id="renders-stat">Open an SD card to browse renders.</span>
+      </div>
+      <div class="scroll-area"><div id="renders-list"></div></div>
+    </div>
+
+    <!-- ── SETS ── -->
+    <div class="tab-pane" id="tab-sets">
+      <div class="toolbar">
+        <input class="search" id="set-q" type="text" placeholder="filter projects…">
+        <input class="search" id="set-name" type="text" placeholder="set name…" style="width:150px">
+        <select class="sorter" id="set-saved"><option value="">— saved sets —</option></select>
+        <button class="btn ghost sm" id="btn-set-save">💾 Save set</button>
+        <button class="btn ghost sm" id="btn-set-delete" title="Delete selected saved set">🗑</button>
+        <span class="stat-chip" id="set-stat" style="margin-left:auto"></span>
+      </div>
+      <div id="set-summary" class="set-summary"></div>
+      <div class="scroll-area"><div id="set-list"></div></div>
+    </div>
+
+    <!-- ── BACKUP ── -->
+    <div class="tab-pane" id="tab-backup">
+      <div class="backup-layout">
+        <div class="backup-panel">
+          <div class="sblock">
+            <div class="sblock-title">Include in Backup</div>
+            <label class="inc-row"><input type="checkbox" id="inc-projects" checked>
+              <span class="inc-label">projects</span><span class="inc-count" id="cnt-projects">—</span></label>
+            <label class="inc-row"><input type="checkbox" id="inc-samples" checked>
+              <span class="inc-label">samples (library)</span><span class="inc-count" id="cnt-samples">—</span></label>
+            <label class="inc-row"><input type="checkbox" id="inc-instruments" checked>
+              <span class="inc-label">instruments</span><span class="inc-count" id="cnt-instruments">—</span></label>
+            <label class="inc-row"><input type="checkbox" id="inc-themes" checked>
+              <span class="inc-label">themes</span><span class="inc-count" id="cnt-themes">—</span></label>
+            <label class="inc-row"><input type="checkbox" id="inc-renders">
+              <span class="inc-label">renders</span><span class="inc-count" id="cnt-renders">—</span></label>
+            <label class="inc-row"><input type="checkbox" id="inc-recordings">
+              <span class="inc-label">recordings</span><span class="inc-count" id="cnt-recordings">—</span></label>
+          </div>
+          <div class="backup-info">
+            Creates <span style="color:var(--accent)">PT_BACKUP_YYYYMMDD_HHMM</span> in a folder you choose
+            (device config <span style="font-family:monospace">.config.xml</span> is always included).<br>
+            <span style="font-size:11px">The card opens read-only. Writes happen only through repairs or exports you explicitly confirm.</span>
+          </div>
+          <button class="btn" id="btn-backup">CREATE BACKUP</button>
+          <button class="btn secondary" id="btn-backup-zip">DOWNLOAD AS ZIP</button>
+        </div>
+        <div class="backup-log" id="backup-log">
+          <div class="log-line">Ready. Select what to include, then press CREATE BACKUP.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STATS ── -->
+    <div class="tab-pane" id="tab-stats">
+      <div class="stats-scroll"><div class="stats-grid" id="stats-grid"></div></div>
+    </div>
+
+  </div><!-- #main -->
+</div><!-- #app -->
+
+<!-- Project modal -->
+<div id="proj-modal" class="proj-modal-overlay" style="display:none">
+  <div class="proj-modal-box">
+    <div class="proj-modal-hdr">
+      <button class="modal-nav-btn" id="btn-modal-prev" title="Previous project (←)">‹</button>
+      <span class="proj-modal-title" id="modal-title"></span>
+      <span class="proj-modal-meta" id="modal-meta"></span>
+      <button class="btn ghost sm" id="btn-modal-patterns">▦ Patterns</button>
+      <button class="btn ghost sm" id="btn-modal-midi" title="Export as a Standard MIDI File">⬇ MIDI</button>
+      <button class="btn ghost sm" id="btn-modal-diff">⇌ Compare</button>
+      <button class="modal-nav-btn" id="btn-modal-next" title="Next project (→)">›</button>
+      <button class="btn ghost sm" id="btn-modal-close">✕</button>
+    </div>
+    <div class="proj-modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Diff modal -->
+<div id="diff-modal">
+  <div class="diff-box">
+    <div class="diff-hdr">
+      <span class="diff-title">Project Comparison</span>
+      <span class="diff-score" id="diff-score"></span>
+      <button class="btn ghost sm" id="btn-diff-close">✕</button>
+    </div>
+    <div id="diff-meta"></div>
+    <div class="diff-cols">
+      <div class="diff-col">
+        <div class="diff-col-hdr" id="diff-hdr-a">—</div>
+        <div class="diff-col-body" id="diff-body-a"></div>
+      </div>
+      <div class="diff-col">
+        <div class="diff-col-hdr">
+          <input id="diff-srch" placeholder="Pick a project to compare…" autocomplete="off">
+        </div>
+        <div class="diff-col-body" id="diff-body-b"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sample usage modal -->
+<div id="samp-modal">
+  <div class="samp-box">
+    <div class="samp-hdr">
+      <span class="samp-path-txt" id="samp-path"></span>
+      <button class="btn ghost sm" id="btn-samp-close">✕</button>
+    </div>
+    <div class="samp-body" id="samp-body"></div>
+  </div>
+</div>
+
+<!-- Fix (repair) modal -->
+<div id="fix-modal">
+  <div class="fix-box">
+    <div class="fix-hdr">
+      <span class="fix-title" id="fix-title"></span>
+      <button class="btn ghost sm" id="btn-fix-close">✕</button>
+    </div>
+    <div class="fix-body" id="fix-body"></div>
+    <div class="fix-ftr">
+      <span class="fix-status" id="fix-status"></span>
+      <button class="btn ghost sm" id="btn-fix-cancel">Cancel</button>
+      <button class="btn" id="btn-fix-apply" disabled>Apply Repair</button>
+    </div>
+  </div>
+</div>
+
+<!-- Global search overlay -->
+<div id="search-overlay">
+  <div class="srch-box">
+    <div class="srch-input-row">
+      <span style="font-size:16px;color:var(--muted)">⌕</span>
+      <input id="srch-input" placeholder="Search projects, instruments, samples, themes…" autocomplete="off">
+      <span class="srch-kbd" id="srch-esc-kbd">Esc</span>
+    </div>
+    <div class="srch-results" id="srch-results"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════════════════
+// PT — picoTracker XML PARSER
+// Format knowledge derived from the xiphonics/picoTracker firmware
+// source (BSD-3-Clause): PersistencyService, HexBuffers, Song/Chain/
+// Phrase models, instrument classes, Config theme writer.
+// Works in browser and Node (no DOMParser dependency).
+// ══════════════════════════════════════════════════════════
+const PT = (() => {
+
+  // ── Minimal XML parser ─────────────────────────────────
+  // picoTracker files are simple: no namespaces, no CDATA, no comments
+  // in practice (we skip them anyway), no processing instructions beyond
+  // an optional declaration. Returns {name, attrs:{}, children:[], text}.
+  function decodeEntities(s) {
+    if (s.indexOf('&') === -1) return s;
+    return s.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (m, e) => {
+      if (e[0] === '#') {
+        const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        return isNaN(code) ? m : String.fromCodePoint(code);
+      }
+      return {amp:'&', lt:'<', gt:'>', quot:'"', apos:"'"}[e] ?? m;
+    });
+  }
+
+  function parseXml(text) {
+    let i = 0;
+    const n = text.length;
+    function err(msg) { throw new Error(`XML parse error at ${i}: ${msg}`); }
+    function skipWs() { while (i < n && (text[i]===' '||text[i]==='\n'||text[i]==='\r'||text[i]==='\t')) i++; }
+    function skipMisc() {
+      for (;;) {
+        skipWs();
+        if (text.startsWith('<?', i)) { const e = text.indexOf('?>', i); if (e < 0) err('unterminated PI'); i = e+2; continue; }
+        if (text.startsWith('<!--', i)) { const e = text.indexOf('-->', i); if (e < 0) err('unterminated comment'); i = e+3; continue; }
+        if (text.startsWith('<!', i)) { const e = text.indexOf('>', i); if (e < 0) err('unterminated doctype'); i = e+1; continue; }
+        break;
+      }
+    }
+    function parseName() {
+      const start = i;
+      while (i < n && !' \t\r\n/>=<'.includes(text[i])) i++;
+      if (i === start) err('expected name');
+      return text.slice(start, i);
+    }
+    function parseElement() {
+      if (text[i] !== '<') err('expected <');
+      i++;
+      const name = parseName();
+      const el = { name, attrs:{}, children:[], text:'' };
+      for (;;) {
+        skipWs();
+        if (i >= n) err('unexpected EOF in tag');
+        if (text[i] === '/') {
+          if (text[i+1] !== '>') err('expected />');
+          i += 2; return el;
+        }
+        if (text[i] === '>') { i++; break; }
+        const an = parseName();
+        skipWs();
+        if (text[i] !== '=') err('expected = after attribute name');
+        i++; skipWs();
+        const q = text[i];
+        if (q !== '"' && q !== "'") err('expected quoted attribute value');
+        i++;
+        const vEnd = text.indexOf(q, i);
+        if (vEnd < 0) err('unterminated attribute value');
+        el.attrs[an] = decodeEntities(text.slice(i, vEnd));
+        i = vEnd + 1;
+      }
+      // content
+      for (;;) {
+        if (i >= n) err(`unterminated element <${name}>`);
+        if (text[i] === '<') {
+          if (text.startsWith('<!--', i)) { const e = text.indexOf('-->', i); if (e < 0) err('unterminated comment'); i = e+3; continue; }
+          if (text[i+1] === '/') {
+            i += 2;
+            const closeName = parseName();
+            skipWs();
+            if (text[i] !== '>') err('expected > in close tag');
+            i++;
+            if (closeName !== name) err(`mismatched close tag: <${name}> vs </${closeName}>`);
+            return el;
+          }
+          el.children.push(parseElement());
+        } else {
+          const lt = text.indexOf('<', i);
+          if (lt < 0) err(`unterminated element <${name}>`);
+          el.text += decodeEntities(text.slice(i, lt));
+          i = lt;
+        }
+      }
+    }
+    skipMisc();
+    if (i >= n || text[i] !== '<') err('no root element');
+    const root = parseElement();
+    return root;
+  }
+
+  const childrenOf = (el, name) => el.children.filter(c => c.name === name);
+  const firstChild = (el, name) => el.children.find(c => c.name === name) || null;
+
+  // ── Hex buffer decode (HexBuffers.cpp) ─────────────────
+  // Children named DATA: either run-length <DATA VALUE="d" LENGTH="n"/>
+  // (decimal) or hex text <DATA>AABBCC…</DATA>. Concatenate in order.
+  function decodeHexBuffer(el, expectedLen, fill = 0) {
+    const out = [];
+    // Newer (Advance) firmware wraps the chunk list in an extra <DATA>
+    // element (<GROOVES><DATA><DATA>..hex..</DATA>...</DATA></GROOVES>);
+    // flatten any wrapper DATA that carries children instead of payload.
+    const chunks = [];
+    const collect = node => {
+      for (const d of childrenOf(node, 'DATA')) {
+        if (d.children.length) collect(d);
+        else chunks.push(d);
+      }
+    };
+    collect(el);
+    for (const d of chunks) {
+      if (d.attrs.VALUE !== undefined && d.attrs.LENGTH !== undefined) {
+        const v = parseInt(d.attrs.VALUE, 10) & 0xFF;
+        const len = parseInt(d.attrs.LENGTH, 10);
+        for (let k = 0; k < len; k++) out.push(v);
+      } else {
+        const hex = d.text.trim();
+        for (let k = 0; k + 1 < hex.length; k += 2) {
+          out.push(parseInt(hex.slice(k, k+2), 16));
+        }
+      }
+    }
+    // Truncated buffers keep the firmware's initialised default (e.g. 0xFF
+    // = empty) for the remainder, matching how restoreHexBuffer overlays
+    // onto a pre-initialised array.
+    const u8 = new Uint8Array(expectedLen ?? out.length).fill(fill);
+    u8.set(out.slice(0, u8.length));
+    return u8;
+  }
+  function u16leFrom(u8) {
+    const out = new Uint16Array(u8.length >> 1);
+    for (let k = 0; k < out.length; k++) out[k] = u8[k*2] | (u8[k*2+1] << 8);
+    return out;
+  }
+
+  // ── Geometry constants (Song.h / Chain.h / Phrase.h) ───
+  const SONG_ROWS = 128, CHANNELS = 8;
+  const CHAIN_COUNT = 255, STEPS = 16;
+  const PHRASE_COUNT = 128;
+  const TABLE_COUNT = 32, GROOVE_COUNT = 32;
+  const EMPTY = 0xFF, NOTE_OFF = 0xFE;
+  const SLICE_NOTE_BASE = 48, MAX_SLICES = 16;
+
+  // ── FourCC command bytes (Types.h — values are frozen) ─
+  const CMD_NONE = 0x2D;
+  const COMMANDS = {
+    0x00:'ARP', 0x02:'CSH', 0x04:'DLY', 0x14:'FCT', 0x16:'FLT', 0x19:'FRS',
+    0x1A:'GRV', 0x1B:'HOP', 0x1D:'IRT', 0x1E:'KIL', 0x1F:'LEG', 0x24:'LOF',
+    0x26:'MCC', 0x27:'MPC', 0x2A:'PAN', 0x2C:'PFT', 0x2D:'---', 0x2E:'POF',
+    0x30:'PSL', 0x34:'RTG', 0x37:'STP', 0x3A:'TBL', 0x3E:'TPO', 0x42:'VEL',
+    0x45:'VOL', 0x5C:'GOF', 0x8F:'MCH',
+  };
+  const hx2 = v => v.toString(16).toUpperCase().padStart(2,'0');
+  const hx4 = v => v.toString(16).toUpperCase().padStart(4,'0');
+  function cmdName(c) { return COMMANDS[c] ?? (c===undefined?'---':hx2(c)+'?'); }
+  function fxStr(cmd, param) {
+    if (cmd === CMD_NONE || cmd === undefined) return '------';
+    return `${cmdName(cmd)} ${hx4(param ?? 0)}`;
+  }
+
+  // ── Notes (char.cpp: octave = v/12 - 2) ────────────────
+  const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  function noteStr(v) {
+    if (v === EMPTY || v === undefined) return '---';
+    if (v === NOTE_OFF) return 'OFF';
+    const octave = Math.floor(v / 12) - 2;
+    const name = NOTE_NAMES[v % 12];
+    return (name.length === 1 ? name + '-' : name) + octave;
+  }
+
+  const INSTRUMENT_TYPES = ['NONE','SAMPLE','MIDI','SID','OPAL','SAMPLESOURCE'];
+  const TYPE_SHORT = { SAMPLE:'SMP', MIDI:'MID', SID:'SID', OPAL:'OPL', SAMPLESOURCE:'SRC', NONE:'—' };
+
+  // ── Project file (lgptsav.dat) ─────────────────────────
+  function parseProject(text) {
+    let root;
+    try { root = parseXml(text); } catch (e) { return null; }
+    if (root.name !== 'PICOTRACKER') return null;
+
+    const out = {
+      version:null, tableRatio:1, params:{},
+      tempo:null, master:null, transpose:0, scale:null, scaleRoot:null,
+      channelVols:[], wrap:null,
+      grid:null, chains:null, transposes:null,
+      phrases:null, // {notes, instr, cmd1, param1, cmd2, param2}
+      instruments:[], tables:[], grooves:[],
+      warnings:[],
+    };
+
+    const projEl = firstChild(root, 'PROJECT');
+    if (projEl) {
+      out.version = projEl.attrs.VERSION ?? null;
+      if (projEl.attrs.TABLERATIO) out.tableRatio = parseInt(projEl.attrs.TABLERATIO, 10) || 1;
+      for (const p of childrenOf(projEl, 'PARAMETER')) {
+        const nm = p.attrs.NAME, val = p.attrs.VALUE;
+        if (nm === undefined) continue;
+        out.params[nm] = val;
+      }
+      const num = k => out.params[k] !== undefined ? parseInt(out.params[k], 10) : null;
+      out.tempo = num('tempo');
+      out.master = num('master');
+      const tr = num('transpose');
+      out.transpose = tr === null ? 0 : (tr > 0x80 ? tr - 256 : tr);
+      out.scale = out.params.scale ?? null;
+      out.scaleRoot = (out.params.scaleroot ?? '').trim() || null;
+      out.wrap = out.params.wrap === 'true';
+      for (let c = 1; c <= 8; c++) out.channelVols.push(num('channel'+c+'vol'));
+    } else out.warnings.push('no PROJECT element');
+
+    const songEl = firstChild(root, 'SONG');
+    if (songEl) {
+      // Geometry is inferred from the buffers themselves rather than
+      // hardcoded: the original pico writes a 128x8 grid and 128 phrases;
+      // the Advance writes a 256x8 grid, 255 phrases, and some beta
+      // firmware serialized command columns 2 bytes wide.
+      const rawLen = el => {
+        if (!el) return 0;
+        let n = 0;
+        const walk = node => {
+          for (const d of node.children.filter(c => c.name === 'DATA')) {
+            if (d.children.length) walk(d);
+            else if (d.attrs.LENGTH !== undefined) n += parseInt(d.attrs.LENGTH, 10);
+            else n += Math.floor(d.text.trim().length / 2);
+          }
+        };
+        walk(el);
+        return n;
+      };
+      const grid = firstChild(songEl, 'SONG');
+      const notes = firstChild(songEl, 'NOTES');
+      const instr = firstChild(songEl, 'INSTRUMENTS');
+      const cmd1 = firstChild(songEl, 'COMMAND1');
+      const par1 = firstChild(songEl, 'PARAM1');
+      const cmd2 = firstChild(songEl, 'COMMAND2');
+      const par2 = firstChild(songEl, 'PARAM2');
+      const songRows = Math.max(SONG_ROWS, Math.min(1024, Math.round(rawLen(grid) / CHANNELS) || SONG_ROWS));
+      const phraseCount = Math.max(PHRASE_COUNT, Math.min(1024, Math.round(rawLen(notes) / STEPS) || PHRASE_COUNT));
+      const P = phraseCount * STEPS;
+      const cmdWidth = rawLen(cmd1) >= P * 2 ? 2 : 1;
+      out.geometry = { songRows, channels: CHANNELS, phraseCount, cmdWidth };
+      if (cmdWidth === 2)
+        out.warnings.push('legacy beta command encoding (2-byte) — some FX commands may display as hex');
+      out.grid = grid ? decodeHexBuffer(grid, songRows * CHANNELS, EMPTY) : new Uint8Array(songRows*CHANNELS).fill(EMPTY);
+      const ch = firstChild(songEl, 'CHAINS');
+      out.chains = ch ? decodeHexBuffer(ch, CHAIN_COUNT * STEPS, EMPTY) : new Uint8Array(CHAIN_COUNT*STEPS).fill(EMPTY);
+      const tsp = firstChild(songEl, 'TRANSPOSES');
+      out.transposes = tsp ? decodeHexBuffer(tsp, CHAIN_COUNT * STEPS) : new Uint8Array(CHAIN_COUNT*STEPS);
+      // 2-byte command entries: keep the low byte when the high byte is a
+      // padding value (0x00 / 0x2D as seen in Advance beta saves); an
+      // all-zero entry means "no command". Anything else is preserved and
+      // displayed as hex.
+      const decodeCmds = el2 => {
+        if (!el2) return new Uint8Array(P).fill(CMD_NONE);
+        if (cmdWidth === 1) return decodeHexBuffer(el2, P, CMD_NONE);
+        const wide = u16leFrom(decodeHexBuffer(el2, P*2));
+        const outA = new Uint16Array(P);
+        for (let k = 0; k < P; k++) {
+          const v = wide[k], hi = v >> 8;
+          outA[k] = v === 0 ? CMD_NONE : (hi === 0 || hi === 0x2D ? (v & 0xFF) : v);
+        }
+        return outA;
+      };
+      out.phrases = {
+        notes: notes ? decodeHexBuffer(notes, P, EMPTY) : new Uint8Array(P).fill(EMPTY),
+        instr: instr ? decodeHexBuffer(instr, P, EMPTY) : new Uint8Array(P).fill(EMPTY),
+        cmd1:  decodeCmds(cmd1),
+        param1: par1 ? u16leFrom(decodeHexBuffer(par1, P*2)) : new Uint16Array(P),
+        cmd2:  decodeCmds(cmd2),
+        param2: par2 ? u16leFrom(decodeHexBuffer(par2, P*2)) : new Uint16Array(P),
+      };
+    } else out.warnings.push('no SONG element');
+
+    const bankEl = firstChild(root, 'INSTRUMENTBANK');
+    if (bankEl) {
+      for (const iEl of childrenOf(bankEl, 'INSTRUMENT')) {
+        out.instruments.push(parseInstrumentEl(iEl));
+      }
+      out.instruments.sort((a,b) => a.id - b.id);
+    }
+
+    const tablesEl = firstChild(root, 'TABLES');
+    if (tablesEl) {
+      for (const tEl of childrenOf(tablesEl, 'TABLE')) {
+        const id = parseInt(tEl.attrs.ID ?? '0', 16);
+        const get = (nm, len, wide) => {
+          const c = firstChild(tEl, nm);
+          if (!c) return null;
+          const raw = decodeHexBuffer(c, wide ? len*2 : len, wide ? 0 : CMD_NONE);
+          return wide ? u16leFrom(raw) : raw;
+        };
+        const t = {
+          id,
+          cmd:   [get('CMD1', STEPS), get('CMD2', STEPS), get('CMD3', STEPS)],
+          param: [get('PARAM1', STEPS, true), get('PARAM2', STEPS, true), get('PARAM3', STEPS, true)],
+        };
+        t.empty = t.cmd.every(c => !c || [...c].every(v => v === CMD_NONE)) &&
+                  t.param.every(p => !p || [...p].every(v => v === 0));
+        out.tables.push(t);
+      }
+    }
+
+    const groovesEl = firstChild(root, 'GROOVES');
+    if (groovesEl) {
+      const g = decodeHexBuffer(groovesEl, GROOVE_COUNT * STEPS, EMPTY);
+      for (let i = 0; i < GROOVE_COUNT; i++) {
+        const steps = [];
+        for (let s = 0; s < STEPS; s++) {
+          const v = g[i*STEPS + s];
+          if (v === EMPTY) break;
+          steps.push(v);
+        }
+        out.grooves.push(steps);
+      }
+    }
+
+    return out;
+  }
+
+  function parseInstrumentEl(iEl) {
+    const idHex = iEl.attrs.ID;
+    const type = (iEl.attrs.TYPE ?? 'SAMPLE').toUpperCase();
+    const known = INSTRUMENT_TYPES.includes(type);
+    const inst = {
+      id: idHex !== undefined ? parseInt(idHex, 16) : -1,
+      idHex: idHex ?? '--',
+      version: iEl.attrs.VERSION ?? null,
+      type: known ? type : 'UNK',
+      rawType: type,
+      typeShort: TYPE_SHORT[known ? type : 'NONE'] ?? type.slice(0,3),
+      name: '',
+      sample: null,       // bare filename incl .wav, or null
+      params: {},         // NAME → VALUE, insertion order preserved
+      slices: [],         // {index, offset}
+    };
+    for (const p of childrenOf(iEl, 'PARAM')) {
+      const nm = p.attrs.NAME, val = p.attrs.VALUE ?? '';
+      if (nm === undefined) continue;
+      if (nm === 'InstrumentName') { inst.name = val; continue; }
+      const sl = /^SL(\d{2})$/.exec(nm);
+      if (sl) {
+        const off = parseInt(val, 10);
+        if (off > 0) inst.slices.push({ index: parseInt(sl[1], 10), offset: off });
+        continue;
+      }
+      if (nm === 'sample' && val !== '') inst.sample = val;
+      inst.params[nm] = val;
+    }
+    // Loader also tolerates SLnn as attributes (firmware quirk)
+    for (const [k, v] of Object.entries(iEl.attrs)) {
+      const sl = /^SL(\d{2})$/.exec(k);
+      if (sl) {
+        const off = parseInt(v, 10);
+        if (off > 0) inst.slices.push({ index: parseInt(sl[1], 10), offset: off });
+      }
+    }
+    inst.slices.sort((a,b) => a.index - b.index);
+    if (!inst.name) inst.name = inst.sample ? inst.sample.replace(/\.wav$/i,'') : `${inst.type} ${inst.idHex}`;
+    return inst;
+  }
+
+  // ── .pti instrument export files ───────────────────────
+  function parsePti(text) {
+    let root;
+    try { root = parseXml(text); } catch { return null; }
+    if (root.name !== 'INSTRUMENT') return null;
+    return parseInstrumentEl(root);
+  }
+
+  // ── .ptt theme files (Config.cpp: lowercase name/value, #RGB hex
+  //    with no zero padding) ───────────────────────────────
+  const THEME_COLOR_NAMES = ['BACKGROUND','FOREGROUND','HICOLOR1','HICOLOR2','CONSOLECOLOR',
+    'CURSORCOLOR','INFOCOLOR','WARNCOLOR','ERRORCOLOR','ACCENTCOLOR','ACCENTALTCOLOR','EMPHASISCOLOR'];
+  function parseColorVal(v) {
+    if (v === undefined || v === null) return null;
+    let s = String(v).trim();
+    if (s.startsWith('#')) s = s.slice(1);
+    if (/^[0-9a-fA-F]{1,6}$/.test(s)) return parseInt(s, 16) & 0xFFFFFF;
+    if (/^\d+$/.test(s)) return parseInt(s, 10) & 0xFFFFFF; // legacy decimal
+    return null;
+  }
+  function parseTheme(text) {
+    let root;
+    try { root = parseXml(text); } catch { return null; }
+    if (root.name !== 'THEME') return null;
+    const out = { font: 0, colors: {} };
+    const f = firstChild(root, 'Font');
+    if (f) out.font = parseInt(String(f.attrs.value ?? '0').replace(/^#/, ''), 10) || 0;
+    for (const c of childrenOf(root, 'Color')) {
+      const nm = c.attrs.name, v = parseColorVal(c.attrs.value);
+      if (nm && v !== null) out.colors[nm] = v;
+    }
+    return out;
+  }
+  function colorHex(v) { return '#' + (v ?? 0).toString(16).padStart(6, '0'); }
+
+  // ── .config.xml (device config; CHAR_LIST stored as index) ──
+  function parseConfig(text) {
+    let root;
+    try { root = parseXml(text); } catch { return null; }
+    if (root.name !== 'CONFIG') return null;
+    const out = { version: root.attrs.VERSION ?? null, values: {}, colors: {} };
+    for (const c of root.children) {
+      if (c.name === 'Color') {
+        const v = parseColorVal(c.attrs.value);
+        if (c.attrs.name && v !== null) out.colors[c.attrs.name] = v;
+      } else if (c.attrs.VALUE !== undefined) {
+        out.values[c.name] = c.attrs.VALUE;
+      }
+    }
+    return out;
+  }
+
+  // ── WAV header parser (for sample metadata) ────────────
+  function parseWavHeader(u8, totalSize) {
+    if (u8.length < 36) return null;
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    const tag = o => String.fromCharCode(u8[o],u8[o+1],u8[o+2],u8[o+3]);
+    if (tag(0) !== 'RIFF' || tag(8) !== 'WAVE') return null;
+    let off = 12, fmt = null, dataSize = null;
+    while (off + 8 <= u8.length) {
+      const id = tag(off), size = dv.getUint32(off + 4, true);
+      if (id === 'fmt ' && off + 24 <= u8.length) {
+        fmt = {
+          channels: dv.getUint16(off + 10, true),
+          sampleRate: dv.getUint32(off + 12, true),
+          byteRate: dv.getUint32(off + 16, true),
+          bits: dv.getUint16(off + 22, true),
+        };
+      } else if (id === 'data') { dataSize = size; }
+      off += 8 + size + (size % 2);
+    }
+    if (!fmt || !fmt.sampleRate || !fmt.byteRate) return null;
+    const bytes = dataSize ?? (totalSize != null ? Math.max(0, totalSize - 44) : null);
+    return { channels:fmt.channels, sampleRate:fmt.sampleRate, bits:fmt.bits,
+      duration: bytes != null ? bytes / fmt.byteRate : null };
+  }
+
+  // ── Song helpers ───────────────────────────────────────
+  function geom(proj) { return proj.geometry ?? { songRows: SONG_ROWS, channels: CHANNELS, phraseCount: PHRASE_COUNT, cmdWidth: 1 }; }
+  function gridCell(proj, row, ch) { return proj.grid[row * CHANNELS + ch]; }
+  function chainStep(proj, chain, step) {
+    return { phrase: proj.chains[chain*STEPS + step],
+             transpose: (proj.transposes[chain*STEPS + step] << 24) >> 24 };
+  }
+  function phraseStep(proj, phrase, step) {
+    const k = phrase*STEPS + step;
+    return { note: proj.phrases.notes[k], instr: proj.phrases.instr[k],
+      cmd1: proj.phrases.cmd1[k], param1: proj.phrases.param1[k],
+      cmd2: proj.phrases.cmd2[k], param2: proj.phrases.param2[k] };
+  }
+  function lastSongRow(proj) {
+    for (let r = geom(proj).songRows-1; r >= 0; r--)
+      for (let c = 0; c < CHANNELS; c++)
+        if (gridCell(proj, r, c) !== EMPTY) return r;
+    return -1;
+  }
+  function usedChains(proj) {
+    const s = new Set();
+    for (let r = 0; r < geom(proj).songRows; r++)
+      for (let c = 0; c < CHANNELS; c++) {
+        const v = gridCell(proj, r, c);
+        if (v !== EMPTY) s.add(v);
+      }
+    return s;
+  }
+  function usedPhrases(proj) {
+    const s = new Set();
+    for (const c of usedChains(proj))
+      for (let st = 0; st < STEPS; st++) {
+        const p = proj.chains[c*STEPS + st];
+        if (p !== EMPTY && p < geom(proj).phraseCount) s.add(p);
+      }
+    return s;
+  }
+  function usedInstrumentIds(proj) {
+    const s = new Set();
+    for (const p of usedPhrases(proj))
+      for (let st = 0; st < STEPS; st++) {
+        const v = proj.phrases.instr[p*STEPS + st];
+        if (v !== EMPTY) s.add(v);
+      }
+    return s;
+  }
+
+  // ── Scale detection ────────────────────────────────────
+  const SCALES = [
+    {n:'Major',       iv:[0,2,4,5,7,9,11]},
+    {n:'Nat. Minor',  iv:[0,2,3,5,7,8,10]},
+    {n:'Harm. Minor', iv:[0,2,3,5,7,8,11]},
+    {n:'Dorian',      iv:[0,2,3,5,7,9,10]},
+    {n:'Mixolydian',  iv:[0,2,4,5,7,9,10]},
+    {n:'Phrygian',    iv:[0,1,3,5,7,8,10]},
+    {n:'Lydian',      iv:[0,2,4,6,7,9,11]},
+    {n:'Pentat. Maj', iv:[0,2,4,7,9]},
+    {n:'Pentat. Min', iv:[0,3,5,7,10]},
+  ];
+  function detectScales(proj) {
+    const bins = new Array(12).fill(0);
+    let total = 0;
+    for (const p of usedPhrases(proj))
+      for (let st = 0; st < STEPS; st++) {
+        const v = proj.phrases.notes[p*STEPS + st];
+        if (v !== EMPTY && v !== NOTE_OFF && v <= 119) { bins[v % 12]++; total++; }
+      }
+    if (total === 0) return { bins, total, candidates: [] };
+    const maxBin = Math.max(...bins, 1);
+    const norm = bins.map(v => v / maxBin);
+    const candidates = [];
+    for (const {n, iv} of SCALES) {
+      for (let rootN = 0; rootN < 12; rootN++) {
+        const mask = new Array(12).fill(0);
+        for (const k of iv) mask[(rootN+k)%12] = 1;
+        const inScore  = iv.reduce((s,k) => s + norm[(rootN+k)%12], 0) / iv.length;
+        const outCount = 12 - iv.length;
+        const outScore = outCount > 0 ? norm.reduce((s,v,k) => mask[k] ? s : s+v, 0) / outCount : 0;
+        candidates.push({root:NOTE_NAMES[rootN], scale:n, label:`${NOTE_NAMES[rootN]} ${n}`, score: inScore - outScore*0.6});
+      }
+    }
+    candidates.sort((a,b) => b.score - a.score);
+    return { bins, total, candidates };
+  }
+
+  // ── MIDI export ────────────────────────────────────────
+  // SMF type 1 at 24 PPQ; groove 0 drives step timing (default 6 ticks
+  // per step, i.e. 4 steps per quarter). Chain transpose applied per
+  // step (matching player semantics: it shifts the note for non-sliced
+  // sample and midi instruments). picoTracker note value 60 displays as
+  // C3; we map the stored value directly onto the MIDI note number.
+  // Notes end at the next note, OFF (0xFE) or a KIL command.
+  function midiVlq(n) {
+    const out = [n & 0x7F];
+    while ((n >>= 7) > 0) out.unshift((n & 0x7F) | 0x80);
+    return out;
+  }
+  function buildMidi(proj, name) {
+    const last = lastSongRow(proj);
+    if (last < 0) return null;
+    const CMD_KIL = 0x1E;
+    let gSteps = (proj.grooves[0] || []).filter(v => v > 0 && v <= 0x80);
+    if (!gSteps.length) gSteps = [6];
+
+    const tracks = [];
+    for (let t = 0; t < CHANNELS; t++) {
+      const ev = [];
+      let tick = 0, stepIdx = 0, open = null;
+      const noteOff = at => { if (open !== null) { ev.push({tick: at, data: [0x80 | t, open, 0x40]}); open = null; } };
+      for (let row = 0; row <= last; row++) {
+        const c = gridCell(proj, row, t);
+        if (c === EMPTY) continue;
+        for (let cs = 0; cs < STEPS; cs++) {
+          const { phrase, transpose } = chainStep(proj, c, cs);
+          if (phrase === EMPTY || phrase >= geom(proj).phraseCount) continue;
+          for (let ps = 0; ps < STEPS; ps++) {
+            const st = phraseStep(proj, phrase, ps);
+            const dur = gSteps[stepIdx % gSteps.length];
+            if (st.cmd1 === CMD_KIL || st.cmd2 === CMD_KIL || st.note === NOTE_OFF) noteOff(tick);
+            if (st.note !== EMPTY && st.note !== NOTE_OFF && st.note <= 119) {
+              const note = st.note + transpose + proj.transpose;
+              if (note >= 0 && note <= 127) {
+                noteOff(tick);
+                ev.push({tick, data: [0x90 | t, note, 100]});
+                open = note;
+              }
+            }
+            tick += dur;
+            stepIdx++;
+          }
+        }
+      }
+      noteOff(tick);
+      if (ev.length) tracks.push({idx: t, ev});
+    }
+    if (!tracks.length) return null;
+
+    const enc = typeof TextEncoder !== 'undefined' ? new TextEncoder() : { encode: s => Uint8Array.from(s, ch => ch.charCodeAt(0)) };
+    function chunk(tag, bodyBytes) {
+      return [...enc.encode(tag),
+        (bodyBytes.length >>> 24) & 0xFF, (bodyBytes.length >>> 16) & 0xFF,
+        (bodyBytes.length >>> 8) & 0xFF, bodyBytes.length & 0xFF, ...bodyBytes];
+    }
+    function meta(type, dataBytes) { return [0xFF, type, ...midiVlq(dataBytes.length), ...dataBytes]; }
+    function trackChunk(events) {
+      const body = [];
+      let lastTick = 0;
+      for (const e of events) { body.push(...midiVlq(e.tick - lastTick), ...e.data); lastTick = e.tick; }
+      body.push(...midiVlq(0), 0xFF, 0x2F, 0x00);
+      return chunk('MTrk', body);
+    }
+    const bpm = proj.tempo && proj.tempo > 0 ? proj.tempo : 120;
+    const usPerQ = Math.round(60000000 / bpm);
+    const t0 = [
+      {tick: 0, data: meta(0x03, [...enc.encode(name || 'PT PROJECT')])},
+      {tick: 0, data: meta(0x51, [(usPerQ >> 16) & 0xFF, (usPerQ >> 8) & 0xFF, usPerQ & 0xFF])},
+      {tick: 0, data: meta(0x58, [4, 2, 24, 8])},
+    ];
+    const ntrks = 1 + tracks.length;
+    const head = chunk('MThd', [0, 1, (ntrks >> 8) & 0xFF, ntrks & 0xFF, 0, 24]);
+    const out = [...head, ...trackChunk(t0)];
+    for (const tr of tracks) {
+      const nameEv = {tick: 0, data: meta(0x03, [...enc.encode(`PT CH${tr.idx + 1}`)])};
+      out.push(...trackChunk([nameEv, ...tr.ev]));
+    }
+    return new Uint8Array(out);
+  }
+
+  // ── Repair: rewrite a sample reference inside project XML ──
+  // Replaces the VALUE of <PARAM NAME="sample" VALUE="old.wav"/> for the
+  // instrument with the given ID attribute, preserving every other byte.
+  // Works on the raw text so an unknown/future element never gets lost.
+  function escapeAttr(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function rewriteSampleRef(text, instrIdHex, oldName, newName) {
+    // Locate the INSTRUMENT open tag with this ID
+    const idRe = new RegExp(`<INSTRUMENT\\b[^>]*\\bID="${escapeRe(instrIdHex)}"[^>]*>`);
+    const m = idRe.exec(text);
+    if (!m) return { ok:false, error:`instrument ID="${instrIdHex}" not found` };
+    const start = m.index;
+    const end = text.indexOf('</INSTRUMENT>', start);
+    if (end < 0) return { ok:false, error:'unterminated INSTRUMENT element' };
+    const block = text.slice(start, end);
+    const paramRe = new RegExp(`(<PARAM\\s+NAME="sample"\\s+VALUE=")${escapeRe(escapeAttr(oldName))}(")`);
+    if (!paramRe.test(block)) return { ok:false, error:`sample PARAM with VALUE="${oldName}" not found in instrument ${instrIdHex}` };
+    const newBlock = block.replace(paramRe, `$1${escapeAttr(newName)}$2`);
+    return { ok:true, text: text.slice(0, start) + newBlock + text.slice(end) };
+  }
+
+  return {
+    parseXml, decodeHexBuffer, u16leFrom,
+    parseProject, parsePti, parseTheme, parseConfig, parseInstrumentEl,
+    parseWavHeader, rewriteSampleRef,
+    noteStr, cmdName, fxStr, hx2, hx4, colorHex, detectScales, buildMidi,
+    geom, gridCell, chainStep, phraseStep, lastSongRow, usedChains, usedPhrases, usedInstrumentIds,
+    SONG_ROWS, CHANNELS, CHAIN_COUNT, PHRASE_COUNT, STEPS, TABLE_COUNT, GROOVE_COUNT,
+    EMPTY, NOTE_OFF, CMD_NONE, SLICE_NOTE_BASE, MAX_SLICES,
+    INSTRUMENT_TYPES, TYPE_SHORT, THEME_COLOR_NAMES, COMMANDS,
+  };
+})();
+
+// ══════════════════════════════════════════════════════════
+// LIBRARY CACHE  (IndexedDB)
+// ══════════════════════════════════════════════════════════
+const Cache = (() => {
+  const DB = 'ptlibrarian', LIB = 'libraries', HDL = 'handles', VER = 1, CACHE_VER = 1;
+
+  function openDB() {
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(DB, VER);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(LIB)) db.createObjectStore(LIB, {keyPath:'key'});
+        if (!db.objectStoreNames.contains(HDL)) db.createObjectStore(HDL, {keyPath:'key'});
+      };
+      req.onsuccess = e => res(e.target.result);
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+  async function tx(store, mode, fn) {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const t = db.transaction(store, mode);
+      const req = fn(t.objectStore(store));
+      t.oncomplete = () => res(req?.result ?? undefined);
+      t.onerror    = () => rej(t.error);
+    });
+  }
+  async function load(key) {
+    try {
+      const data = await tx(LIB, 'readonly', s => s.get(key));
+      if (!data || data.cacheVer !== CACHE_VER) return null;
+      return data;
+    } catch { return null; }
+  }
+  async function save(data) {
+    try { await tx(LIB, 'readwrite', s => s.put({...data, cacheVer:CACHE_VER})); }
+    catch(e) { console.warn('Cache.save:', e); }
+  }
+  async function remove(key) {
+    try { await tx(LIB, 'readwrite', s => s.delete(key)); } catch {}
+  }
+  async function saveHandle(handle) {
+    try { await tx(HDL, 'readwrite', s => s.put({key:'last', handle, name:handle.name})); }
+    catch(e) { console.warn('saveHandle:', e); }
+  }
+  async function loadHandle() {
+    try { return await tx(HDL, 'readonly', s => s.get('last')); }
+    catch { return null; }
+  }
+  function ageStr(ts) {
+    const m = Math.round((Date.now()-ts)/60000);
+    if (m < 2) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.round(m/60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.round(h/24)}d ago`;
+  }
+  return { load, save, remove, saveHandle, loadHandle, ageStr };
+})();
+
+
+// ══════════════════════════════════════════════════════════
+// SCANNER — walks the picoTracker SD card layout:
+//   /projects/<name>/lgptsav.dat + samples/*.wav (+ autosave.dat)
+//   /samples/** (library) /instruments/*.pti /themes/*.ptt
+//   /renders/*.wav /recordings/*.wav /.config.xml
+// ══════════════════════════════════════════════════════════
+const Scanner = (() => {
+  async function subDir(root, name) {
+    try { return await root.getDirectoryHandle(name); } catch { return null; }
+  }
+  async function* walkFiles(dir, pfx) {
+    for await (const [name, h] of dir) {
+      const fp = pfx ? `${pfx}/${name}` : name;
+      if (h.kind === 'file') yield {name, path:fp, handle:h};
+      else yield* walkFiles(h, fp);
+    }
+  }
+  async function readHead(handle, bytes) {
+    const f = await handle.getFile();
+    const buf = await f.slice(0, bytes).arrayBuffer();
+    return { u8: new Uint8Array(buf), size: f.size, lastModified: f.lastModified };
+  }
+
+  // Digest the heavy parse result into what the UI/cache needs.
+  // Full pattern data is NOT cached (re-read on demand for the pattern
+  // viewer / MIDI export) — the digest keeps the cache light.
+  function digestProject(parsed) {
+    const usedIds = PT.usedInstrumentIds(parsed);
+    const cmdCounts = {};
+    for (const arr of [parsed.phrases.cmd1, parsed.phrases.cmd2]) {
+      for (let k = 0; k < arr.length; k++) {
+        const c = arr[k];
+        if (c !== PT.CMD_NONE) cmdCounts[c] = (cmdCounts[c] || 0) + 1;
+      }
+    }
+    let noteCount = 0;
+    for (let k = 0; k < parsed.phrases.notes.length; k++) {
+      const v = parsed.phrases.notes[k];
+      if (v !== PT.EMPTY && v !== PT.NOTE_OFF) noteCount++;
+    }
+    const grooves = parsed.grooves
+      .map((steps, i) => ({i, steps}))
+      .filter(g => g.steps.length && !(g.steps.length === 2 && g.steps[0] === 6 && g.steps[1] === 6));
+    return {
+      version: parsed.version, tempo: parsed.tempo, master: parsed.master,
+      transpose: parsed.transpose, scale: parsed.scale, scaleRoot: parsed.scaleRoot,
+      instruments: parsed.instruments.map(i => ({...i, used: usedIds.has(i.id)})),
+      songRows: PT.lastSongRow(parsed) + 1,
+      chainsUsed: PT.usedChains(parsed).size,
+      phrasesUsed: PT.usedPhrases(parsed).size,
+      tablesUsed: parsed.tables.filter(t => !t.empty).length,
+      grooves, cmdCounts, noteCount,
+      geometry: parsed.geometry ?? null,
+    };
+  }
+
+  async function scanProjectsDir(dir, ctx, onProgress) {
+    const projects = [];
+    const entries = [];
+    for await (const [name, h] of dir) if (h.kind === 'directory') entries.push({name, h});
+    entries.sort((a,b) => a.name.localeCompare(b.name));
+    let done = 0;
+    for (const {name, h} of entries) {
+      done++;
+      onProgress?.(`Scanning projects… ${done}/${entries.length}`);
+      let datHandle = null, datName = null;
+      for (const cand of ['ptsav.dat', 'lgptsav.dat']) {
+        try { datHandle = await h.getFileHandle(cand); datName = cand; break; } catch {}
+      }
+      if (!datHandle) {
+        // future-proofing: accept any *.dat/*.xml that parses as a project
+        for await (const [fn, fh] of h) {
+          if (fh.kind === 'file' && /\.(dat|xml)$/i.test(fn) && !/^autosave/i.test(fn)) {
+            try {
+              const head = await (await fh.getFile()).slice(0, 64).text();
+              if (head.includes('<PICOTRACKER')) { datHandle = fh; datName = fn; break; }
+            } catch {}
+          }
+        }
+      }
+      if (!datHandle) { ctx.skipped.push({path:`projects/${name}`, kind:'project', reason:'no project data file found'}); continue; }
+
+      let hasAutosave = false, autosaveNewer = false;
+      let autoMtime = 0;
+      try {
+        const af = await (await h.getFileHandle('autosave.dat')).getFile();
+        hasAutosave = true; autoMtime = af.lastModified;
+      } catch {}
+
+      // Pool samples
+      const pool = [];
+      const sdir = await subDir(h, 'samples');
+      if (sdir) {
+        for await (const [fn, fh] of sdir) {
+          if (fh.kind !== 'file' || !fn.toLowerCase().endsWith('.wav')) continue;
+          try {
+            const head = await readHead(fh, 4096);
+            pool.push({ name: fn, size: head.size, lastModified: head.lastModified,
+              meta: PT.parseWavHeader(head.u8, head.size) });
+          } catch { pool.push({ name: fn, size: 0, lastModified: 0, meta: null }); }
+        }
+        pool.sort((a,b) => a.name.localeCompare(b.name));
+      }
+
+      try {
+        const file = await datHandle.getFile();
+        const prev = ctx.prev.get(name);
+        if (prev && prev.lastModified === file.lastModified && prev.fileSize === file.size) {
+          // pool may still have changed — recompute pool-derived fields
+          const proj = {...prev, pool, hasAutosave, autosaveNewer: hasAutosave && autoMtime > file.lastModified};
+          computeSampleHealth(proj);
+          projects.push(proj);
+          ctx.stats.reused++;
+          continue;
+        }
+        const text = await file.text();
+        const parsed = PT.parseProject(text);
+        if (!parsed) {
+          ctx.skipped.push({path:`projects/${name}/${datName}`, kind:'project', reason:'not a valid picoTracker project file'});
+          continue;
+        }
+        const proj = {
+          name, dirName: name, datName,
+          fileSize: file.size, lastModified: file.lastModified,
+          hasAutosave, autosaveNewer: hasAutosave && autoMtime > file.lastModified,
+          pool,
+          ...digestProject(parsed),
+          warnings: parsed.warnings,
+        };
+        computeSampleHealth(proj);
+        projects.push(proj);
+        ctx.stats.parsed++;
+      } catch(e) {
+        console.warn('Project parse error:', name, e);
+        ctx.skipped.push({path:`projects/${name}/${datName}`, kind:'project', reason:e.message||'read error'});
+      }
+    }
+    return projects;
+  }
+
+  // missing = instrument sample refs not present in the pool
+  // unusedPool = pool wavs no instrument references
+  function computeSampleHealth(proj) {
+    const poolNames = new Set(proj.pool.map(s => s.name));
+    const refs = new Map(); // sample name -> [instrument]
+    for (const inst of proj.instruments) {
+      if (inst.sample) {
+        if (!refs.has(inst.sample)) refs.set(inst.sample, []);
+        refs.get(inst.sample).push(inst);
+      }
+    }
+    proj.sampleRefs = refs.size;
+    proj.missing = [...refs.keys()].filter(nm => !poolNames.has(nm)).sort();
+    proj.unusedPool = proj.pool.filter(s => !refs.has(s.name)).map(s => s.name).sort();
+    proj.poolBytes = proj.pool.reduce((n,s) => n+s.size, 0);
+    proj.unusedPoolBytes = proj.pool.filter(s => !refs.has(s.name)).reduce((n,s) => n+s.size, 0);
+  }
+
+  async function scanKindDir(dir, ext, kind, parseText, out, prevMap, ctx) {
+    if (!dir) return;
+    for await (const entry of walkFiles(dir, '')) {
+      if (!entry.name.toLowerCase().endsWith(ext)) continue;
+      try {
+        const file = await entry.handle.getFile();
+        const p = prevMap.get(entry.path);
+        if (p && p.lastModified === file.lastModified && p.fileSize === file.size) {
+          out.push(p); ctx.stats.reused++; continue;
+        }
+        const parsed = parseText(await file.text());
+        if (parsed) {
+          out.push({...parsed, fileName:entry.name, filePath:entry.path,
+            fileSize:file.size, lastModified:file.lastModified});
+          ctx.stats.parsed++;
+        } else {
+          ctx.skipped.push({path:`${kind}s/${entry.path}`, kind, reason:`not a valid ${ext} file`});
+        }
+      } catch(e) {
+        ctx.skipped.push({path:`${kind}s/${entry.path}`, kind, reason:e.message||'read error'});
+      }
+    }
+    out.sort((a,b) => a.filePath.localeCompare(b.filePath));
+  }
+
+  async function scanLibrarySamples(dir, prevMap, ctx, onProgress) {
+    const out = [];
+    if (!dir) return out;
+    let count = 0;
+    for await (const entry of walkFiles(dir, '')) {
+      if (!entry.name.toLowerCase().endsWith('.wav')) continue;
+      count++;
+      if (count % 50 === 0) onProgress?.(`Scanning sample library… ${count}`);
+      try {
+        const p = prevMap.get(entry.path);
+        const f = await entry.handle.getFile();
+        if (p && p.lastModified === f.lastModified && p.size === f.size) { out.push(p); continue; }
+        const head = new Uint8Array(await f.slice(0, 4096).arrayBuffer());
+        out.push({ name: entry.name, path: entry.path, size: f.size,
+          lastModified: f.lastModified, meta: PT.parseWavHeader(head, f.size) });
+      } catch(e) {
+        ctx.skipped.push({path:`samples/${entry.path}`, kind:'sample', reason:e.message||'read error'});
+      }
+    }
+    out.sort((a,b) => a.path.localeCompare(b.path));
+    return out;
+  }
+
+  async function scan(root, onProgress, prev) {
+    const skipped = [], stats = {reused:0, parsed:0};
+    const byKey = (arr, key) => new Map((arr||[]).map(x => [x[key], x]));
+    const ctx = { skipped, stats, prev: byKey(prev?.projects, 'dirName') };
+
+    const [projDir, sampDir, instrDir, themeDir] = await Promise.all([
+      subDir(root, 'projects'), subDir(root, 'samples'),
+      subDir(root, 'instruments'), subDir(root, 'themes'),
+    ]);
+
+    onProgress?.('Scanning projects…');
+    const projects = projDir ? await scanProjectsDir(projDir, ctx, onProgress) : [];
+
+    onProgress?.('Scanning sample library…');
+    const library = await scanLibrarySamples(sampDir, byKey(prev?.library, 'path'), ctx, onProgress);
+
+    onProgress?.('Scanning instruments…');
+    const ptis = [];
+    await scanKindDir(instrDir, '.pti', 'instrument', PT.parsePti, ptis, byKey(prev?.ptis, 'filePath'), ctx);
+
+    onProgress?.('Scanning themes…');
+    const themes = [];
+    await scanKindDir(themeDir, '.ptt', 'theme', PT.parseTheme, themes, byKey(prev?.themes, 'filePath'), ctx);
+
+    // Device config
+    let config = null;
+    try { config = PT.parseConfig(await (await (await root.getFileHandle('.config.xml')).getFile()).text()); }
+    catch {}
+    let currentProject = null;
+    try { currentProject = (await (await (await root.getFileHandle('.current')).getFile()).text()).trim(); }
+    catch {}
+
+    return { projects, library, ptis, themes, config, currentProject, skipped, stats };
+  }
+
+  async function scanRenders(root, dirName) {
+    const out = [];
+    const dir = await subDir(root, dirName);
+    if (!dir) return out;
+    for await (const entry of walkFiles(dir, '')) {
+      if (!entry.name.toLowerCase().endsWith('.wav')) continue;
+      try {
+        const f = await entry.handle.getFile();
+        out.push({ fileName: entry.name, filePath: entry.path,
+          fileSize: f.size, lastModified: f.lastModified });
+      } catch {}
+    }
+    out.sort((a,b) => b.lastModified - a.lastModified);
+    return out;
+  }
+
+  // ── Cross-project sample linking ───────────────────────
+  // Pool samples are copies; link identical FILENAMES across pools and
+  // the library. (Content-identical detection is the separate dupe scan.)
+  function buildSampleNameMap(projects, library) {
+    const m = new Map(); // lowercase name → {projects:[{proj, used}], library:[paths]}
+    const touch = nm => {
+      const k = nm.toLowerCase();
+      if (!m.has(k)) m.set(k, {name:nm, projects:[], library:[]});
+      return m.get(k);
+    };
+    for (const p of projects) {
+      const refs = new Set(p.instruments.filter(i => i.sample).map(i => i.sample));
+      for (const s of p.pool) touch(s.name).projects.push({proj:p.name, used:refs.has(s.name), size:s.size});
+    }
+    for (const s of library) touch(s.name).library.push(s.path);
+    return m;
+  }
+
+  function buildInstrDupeMap(ptis) {
+    const m = new Map();
+    for (const i of ptis) {
+      const k = i.name.toLowerCase();
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(i);
+    }
+    const out = new Map();
+    for (const [k,v] of m) if (v.length > 1) out.set(k, v);
+    return out;
+  }
+
+  // Jaccard similarity by shared pool sample names
+  function jaccardSim(a, b) {
+    const sa = new Set(a.pool.map(s => s.name.toLowerCase()));
+    const sb = new Set(b.pool.map(s => s.name.toLowerCase()));
+    if (sa.size === 0 && sb.size === 0) return 0;
+    const inter = [...sa].filter(x => sb.has(x)).length;
+    const union = new Set([...sa, ...sb]).size;
+    return union === 0 ? 0 : inter / union;
+  }
+
+  function fmtBytes(n) {
+    if (n == null) return '—';
+    if (n < 1024) return n+'B';
+    if (n < 1024*1024) return (n/1024).toFixed(0)+'KB';
+    if (n < 1024*1024*1024) return (n/1024/1024).toFixed(1)+'MB';
+    return (n/1024/1024/1024).toFixed(2)+'GB';
+  }
+  function fmtDate(ts) { return ts ? new Date(ts).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'2-digit'}) : '—'; }
+  function fmtDur(s) {
+    if (s == null) return '—';
+    if (s < 60) return s.toFixed(1)+'s';
+    return Math.floor(s/60)+':'+String(Math.round(s%60)).padStart(2,'0');
+  }
+
+  return { scan, scanRenders, subDir, walkFiles,
+    buildSampleNameMap, buildInstrDupeMap, jaccardSim,
+    fmtBytes, fmtDate, fmtDur };
+})();
+
+
+// ══════════════════════════════════════════════════════════
+// BACKUP (folder copy + ZIP)
+// ══════════════════════════════════════════════════════════
+async function copyDir(src, dest, onFile) {
+  for await (const [name, h] of src) {
+    if (h.kind==='directory') {
+      await copyDir(h, await dest.getDirectoryHandle(name,{create:true}), onFile);
+    } else {
+      const file=await h.getFile();
+      const w=await (await dest.getFileHandle(name,{create:true})).createWritable();
+      await w.write(await file.arrayBuffer()); await w.close();
+      onFile?.(name);
+    }
+  }
+}
+async function copyRootFile(sdHandle, name, destDir) {
+  try {
+    const f = await (await sdHandle.getFileHandle(name)).getFile();
+    const w = await (await destDir.getFileHandle(name, {create:true})).createWritable();
+    await w.write(await f.arrayBuffer()); await w.close();
+    return true;
+  } catch { return false; }
+}
+async function createBackup(sdHandle, dirs, onLog, onDone, onError) {
+  let dest;
+  try { dest=await window.showDirectoryPicker({mode:'readwrite'}); }
+  catch(e) { if (e.name!=='AbortError') onError?.(e.message); return; }
+  try {
+    const rel = await sdHandle.resolve(dest);
+    if (rel !== null) { onError?.('Backup destination is inside the SD card — choose a folder on your computer instead.'); return; }
+  } catch {
+    try { if (await sdHandle.isSameEntry(dest)) { onError?.('Backup destination is the SD card itself — choose a folder on your computer.'); return; } } catch {}
+  }
+  const now=new Date(), p=n=>String(n).padStart(2,'0');
+  const bname=`PT_BACKUP_${now.getFullYear()}${p(now.getMonth()+1)}${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
+  try {
+    onLog?.('head',`Creating ${bname}…`);
+    const bd=await dest.getDirectoryHandle(bname,{create:true});
+    let count=0;
+    for (const dir of dirs) {
+      let s; try { s=await sdHandle.getDirectoryHandle(dir); } catch { continue; }
+      onLog?.('ok',`Copying ${dir}/…`);
+      await copyDir(s, await bd.getDirectoryHandle(dir,{create:true}),
+        n=>{ count++; if (count % 25 === 0) onLog?.('log',`  ${count} files…`); });
+    }
+    for (const rf of ['.config.xml', '.current']) {
+      if (await copyRootFile(sdHandle, rf, bd)) { count++; onLog?.('ok',`Copied ${rf}`); }
+    }
+    onDone?.(count, bname);
+  } catch(e) { onError?.(e.message); }
+}
+
+const Zip = (() => {
+  const CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(u8) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function dosDateTime(ms) {
+    const d = new Date(ms || Date.now());
+    return {
+      time: (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1),
+      date: (Math.max(0, d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(),
+    };
+  }
+  const LIMIT = 0xFFFFFFFF;
+  class Writer {
+    constructor(sink) { this.sink = sink; this.offset = 0; this.entries = []; }
+    async _write(u8) { await this.sink.write(u8); this.offset += u8.length; }
+    _u16(v) { return new Uint8Array([v & 0xFF, (v >> 8) & 0xFF]); }
+    _u32(v) { return new Uint8Array([v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF]); }
+    async add(name, data, mtimeMs) {
+      const nameBytes = new TextEncoder().encode(name);
+      const crc = crc32(data);
+      const {time, date} = dosDateTime(mtimeMs);
+      const cdBudget = this.entries.reduce((n,e)=>n+46+e.nameBytes.length, 0) + 46 + nameBytes.length + 22;
+      if (this.offset + 30 + nameBytes.length + data.length + cdBudget > LIMIT || this.entries.length >= 0xFFFF)
+        throw new Error('Backup too large for ZIP (4GB / 65k file limit) — use the folder backup instead.');
+      const hdrOffset = this.offset;
+      const parts = [
+        this._u32(0x04034B50), this._u16(20), this._u16(0x0800), this._u16(0),
+        this._u16(time), this._u16(date), this._u32(crc),
+        this._u32(data.length), this._u32(data.length), this._u16(nameBytes.length), this._u16(0),
+      ];
+      for (const p of parts) await this._write(p);
+      await this._write(nameBytes);
+      await this._write(data);
+      this.entries.push({nameBytes, crc, size:data.length, time, date, hdrOffset});
+    }
+    async finish() {
+      const cdStart = this.offset;
+      if (cdStart > LIMIT) throw new Error('ZIP exceeded 4GB — archive would be corrupt, refusing to finalise.');
+      for (const e of this.entries) {
+        const parts = [
+          this._u32(0x02014B50), this._u16(20), this._u16(20), this._u16(0x0800), this._u16(0),
+          this._u16(e.time), this._u16(e.date), this._u32(e.crc),
+          this._u32(e.size), this._u32(e.size), this._u16(e.nameBytes.length),
+          this._u16(0), this._u16(0), this._u16(0), this._u16(0), this._u32(0), this._u32(e.hdrOffset),
+        ];
+        for (const p of parts) await this._write(p);
+        await this._write(e.nameBytes);
+      }
+      const cdSize = this.offset - cdStart;
+      const parts = [
+        this._u32(0x06054B50), this._u16(0), this._u16(0),
+        this._u16(this.entries.length), this._u16(this.entries.length),
+        this._u32(cdSize), this._u32(cdStart), this._u16(0),
+      ];
+      for (const p of parts) await this._write(p);
+    }
+  }
+  return { Writer };
+})();
+
+async function createBackupZip(sdHandle, dirs, onLog, onDone, onError) {
+  const now = new Date(), p = n => String(n).padStart(2,'0');
+  const stamp = `${now.getFullYear()}${p(now.getMonth()+1)}${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
+  let writable, blobParts = null;
+  if (window.showSaveFilePicker) {
+    let fh;
+    try {
+      fh = await window.showSaveFilePicker({
+        suggestedName: `PT_BACKUP_${stamp}.zip`,
+        types: [{description:'ZIP archive', accept:{'application/zip':['.zip']}}],
+      });
+    } catch(e) { if (e.name !== 'AbortError') onError?.(e.message); return; }
+    writable = await fh.createWritable();
+  } else {
+    blobParts = [];
+    writable = { write: async u8 => { blobParts.push(u8); }, close: async () => {}, abort: async () => { blobParts = null; } };
+    onLog?.('log', 'No save dialog support — building ZIP in memory.');
+  }
+  const zip = new Zip.Writer(writable);
+  try {
+    onLog?.('head', `Creating PT_BACKUP_${stamp}.zip…`);
+    let count = 0;
+    async function addDir(dir, prefix) {
+      for await (const [name, h] of dir) {
+        const rel = `${prefix}/${name}`;
+        if (h.kind === 'directory') await addDir(h, rel);
+        else {
+          const file = await h.getFile();
+          await zip.add(rel, new Uint8Array(await file.arrayBuffer()), file.lastModified);
+          count++;
+          if (count % 20 === 0) onLog?.('log', `  ${count} files…`);
+        }
+      }
+    }
+    for (const dirName of dirs) {
+      let s; try { s = await sdHandle.getDirectoryHandle(dirName); } catch { continue; }
+      onLog?.('ok', `Adding ${dirName}/…`);
+      await addDir(s, dirName);
+    }
+    for (const rf of ['.config.xml', '.current']) {
+      try {
+        const f = await (await sdHandle.getFileHandle(rf)).getFile();
+        await zip.add(rf, new Uint8Array(await f.arrayBuffer()), f.lastModified);
+        count++;
+      } catch {}
+    }
+    await zip.finish();
+    await writable.close();
+    if (blobParts) {
+      const blob = new Blob(blobParts, {type:'application/zip'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `PT_BACKUP_${stamp}.zip`;
+      a.click(); URL.revokeObjectURL(a.href);
+    }
+    onDone?.(count, `PT_BACKUP_${stamp}.zip`);
+  } catch(e) {
+    try { await (writable.abort ? writable.abort() : writable.close()); } catch {}
+    onError?.(e.message);
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════
+// AUDIO PLAYER
+// ══════════════════════════════════════════════════════════
+const AudioPlayer = (() => {
+  let actx = null, src = null, playingBtn = null;
+  function getCtx() {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    return actx;
+  }
+  function stopCurrent() {
+    if (src) { try { src.stop(); } catch {} src = null; }
+    if (playingBtn) {
+      playingBtn.textContent = '▶';
+      playingBtn.classList.remove('playing');
+      playingBtn = null;
+    }
+  }
+  async function playBuffer(arrayBuf, btnEl) {
+    stopCurrent();
+    if (!arrayBuf) return;
+    try {
+      btnEl.textContent = '…'; btnEl.disabled = true;
+      const ctx = getCtx();
+      const decoded = await ctx.decodeAudioData(arrayBuf);
+      const canvas = btnEl.closest('.render-row')?.querySelector('.render-wave');
+      if (canvas) drawWaveform(canvas, decoded);
+      src = ctx.createBufferSource();
+      src.buffer = decoded;
+      src.connect(ctx.destination);
+      src.start();
+      playingBtn = btnEl;
+      btnEl.textContent = '■'; btnEl.disabled = false; btnEl.classList.add('playing');
+      src.onended = () => {
+        btnEl.textContent = '▶'; btnEl.classList.remove('playing');
+        if (playingBtn === btnEl) playingBtn = null;
+        src = null;
+      };
+    } catch(e) {
+      btnEl.textContent = '▶'; btnEl.disabled = false;
+      console.warn('AudioPlayer: decode failed', e);
+    }
+  }
+  async function playPath(sdRoot, relativePath, btnEl) {
+    if (playingBtn === btnEl) { stopCurrent(); return; }
+    try {
+      const parts = relativePath.replace(/\\/g, '/').replace(/^\//, '').split('/');
+      let dir = sdRoot;
+      for (let i = 0; i < parts.length - 1; i++) dir = await dir.getDirectoryHandle(parts[i]);
+      const fh = await dir.getFileHandle(parts[parts.length - 1]);
+      const file = await fh.getFile();
+      const buf = await file.arrayBuffer();
+      await playBuffer(buf, btnEl);
+    } catch(e) {
+      btnEl.textContent = '▶'; btnEl.disabled = false;
+      console.warn('AudioPlayer: play failed', e);
+    }
+  }
+  function drawWaveform(canvas, audioBuffer) {
+    const ctx2d = canvas.getContext('2d');
+    const W = canvas.width || canvas.offsetWidth || 140;
+    const H = canvas.height || 28;
+    canvas.width = W; canvas.height = H;
+    ctx2d.fillStyle = '#101314';
+    ctx2d.fillRect(0, 0, W, H);
+    const data = audioBuffer.getChannelData(0);
+    const step = Math.ceil(data.length / W);
+    ctx2d.strokeStyle = '#2dd4bf';
+    ctx2d.lineWidth = 1;
+    ctx2d.beginPath();
+    for (let x = 0; x < W; x++) {
+      let min = 1, max = -1;
+      const start = x * step;
+      for (let j = 0; j < step; j++) { const v = data[start+j]||0; if(v<min)min=v; if(v>max)max=v; }
+      const y1 = ((1-max)/2*H), y2 = ((1-min)/2*H);
+      x === 0 ? ctx2d.moveTo(0, (y1+y2)/2) : (ctx2d.lineTo(x,y1), ctx2d.lineTo(x,y2));
+    }
+    ctx2d.stroke();
+  }
+  return { playPath, playBuffer, stopCurrent, drawWaveform };
+})();
+
+
+// ══════════════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════════════
+const UI = (() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const debounce = (fn, ms=120) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+  const fmtBytes = Scanner.fmtBytes, fmtDate = Scanner.fmtDate, fmtDur = Scanner.fmtDur;
+
+  // ── State ──────────────────────────────────────────────
+  let sd = null;                 // SD card root directory handle
+  let lib = null;                // scan result
+  let renders = [], recordings = [];
+  let sampleNameMap = new Map(); // lowercase name → {projects, library}
+  let dupeNameMap = new Map();   // pti name dupes
+  let dupeContent = null;        // content-identical scan result (lazy)
+  let repairLog = [];            // persisted in cache
+  let savedSets = {};            // name → [project dirNames], persisted in cache
+  let curTab = 'projects';
+  let projView = 'list';
+  let projFilter = '', projSort = 'name-asc', projMissOnly = false;
+  let instrFilter = '', instrSort = 'name-asc', instrTypeFilter = new Set(), instrInProj = true;
+  let sampFilter = '', themeFilter = '', setFilter = '', probSec = 'broken';
+  let setSel = new Set();
+  let diffA = null, diffPending = null;
+  let modalProj = null, modalList = [];
+  let sampbrRows = [], sampbrSelIdx = -1;
+  let writeMode = false;
+
+  const cacheKey = () => sd ? `card:${sd.name}` : null;
+
+  // ── Boot / open ────────────────────────────────────────
+  async function openCard(handle) {
+    try {
+      sd = handle || await window.showDirectoryPicker({mode:'read'});
+    } catch(e) { if (e.name !== 'AbortError') console.warn(e); return; }
+    $('sd-label').textContent = sd.name;
+    $('ro-badge').style.display = 'inline';
+    $('btn-search').style.display = 'inline-block';
+    Cache.saveHandle(sd);
+    $('empty-state').style.display = 'none';
+    $('main').classList.add('visible');
+
+    // Try cache first for instant paint
+    const cached = await Cache.load(cacheKey());
+    if (cached?.lib) {
+      lib = cached.lib;
+      repairLog = cached.repairLog || [];
+      savedSets = cached.savedSets || {};
+      afterScan(true, cached.savedAt);
+    }
+    await rescan(cached?.lib);
+  }
+
+  async function rescan(prev) {
+    setCacheBar('Scanning card…', true);
+    try {
+      lib = await Scanner.scan(sd, m => setCacheBar(m, true), prev);
+      renders = await Scanner.scanRenders(sd, 'renders');
+      recordings = await Scanner.scanRenders(sd, 'recordings');
+      afterScan(false);
+      await persist();
+    } catch(e) {
+      console.error('scan failed', e);
+      setCacheBar('Scan failed: ' + (e.message||e), false);
+    }
+  }
+  async function persist() {
+    await Cache.save({ key: cacheKey(), lib, repairLog, savedSets, savedAt: Date.now() });
+  }
+  function setCacheBar(msg, busy) {
+    const bar = $('cache-bar');
+    bar.style.display = 'flex';
+    $('cache-msg').innerHTML = busy ? `<span class="spinner" style="display:inline-block;vertical-align:-3px;margin-right:6px"></span>${esc(msg)}` : esc(msg);
+    $('btn-rescan').style.display = busy ? 'none' : 'inline-block';
+  }
+
+  function afterScan(fromCache, savedAt) {
+    sampleNameMap = Scanner.buildSampleNameMap(lib.projects, lib.library);
+    dupeNameMap = Scanner.buildInstrDupeMap(lib.ptis);
+    renderHealth();
+    renderCurrent();
+    if (!fromCache) {
+      const s = lib.stats;
+      setCacheBar(`Scan complete — ${s.parsed} parsed, ${s.reused} unchanged. Cached for instant reopen.`, false);
+    } else {
+      setCacheBar(`Loaded from cache (${Cache.ageStr(savedAt)}) — rescanning…`, true);
+    }
+  }
+
+  function renderCurrent() {
+    renderProjects(); renderInstruments(); renderSamples(); renderThemes();
+    renderGrooves(); renderProblems(); renderRenders(); renderSets();
+    renderBackupCounts(); renderStats();
+  }
+
+  function renderHealth() {
+    $('health-bar').classList.add('visible');
+    $('h-projects').textContent = lib.projects.length;
+    const bankInstr = lib.projects.reduce((n,p) => n+p.instruments.length, 0);
+    $('h-instrs').textContent = `${lib.ptis.length}+${bankInstr}`;
+    $('h-samples').textContent = lib.library.length + lib.projects.reduce((n,p) => n+p.pool.length, 0);
+    const broken = lib.projects.reduce((n,p) => n+p.missing.length, 0);
+    $('h-broken').textContent = broken;
+    $('h-broken-stat').style.display = 'flex';
+    const unused = lib.projects.reduce((n,p) => n+p.unusedPool.length, 0);
+    $('h-unused').textContent = unused;
+    $('h-dupes').textContent = dupeNameMap.size;
+  }
+
+  // ── Tabs ───────────────────────────────────────────────
+  function switchTab(tab) {
+    curTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-'+tab));
+  }
+
+  // ── PROJECTS ───────────────────────────────────────────
+  function filteredProjects() {
+    let list = [...lib.projects];
+    const q = projFilter.toLowerCase();
+    if (q) list = list.filter(p => p.name.toLowerCase().includes(q));
+    if (projMissOnly) list = list.filter(p => p.missing.length);
+    const cmp = {
+      'name-asc':  (a,b) => a.name.localeCompare(b.name),
+      'name-desc': (a,b) => b.name.localeCompare(a.name),
+      'date-desc': (a,b) => b.lastModified - a.lastModified,
+      'date-asc':  (a,b) => a.lastModified - b.lastModified,
+      'missing':   (a,b) => b.missing.length - a.missing.length || a.name.localeCompare(b.name),
+      'instrs':    (a,b) => b.instruments.length - a.instruments.length,
+      'bpm-desc':  (a,b) => (b.tempo||0) - (a.tempo||0),
+      'bpm-asc':   (a,b) => (a.tempo||999) - (b.tempo||999),
+      'size-desc': (a,b) => (b.poolBytes+b.fileSize) - (a.poolBytes+a.fileSize),
+    }[projSort] || ((a,b) => a.name.localeCompare(b.name));
+    list.sort(cmp);
+    return list;
+  }
+
+  function missBadge(p, cls) {
+    if (p.sampleRefs === 0) return `<span class="${cls} none">no samples</span>`;
+    if (p.missing.length) return `<span class="${cls} bad">${p.missing.length} missing</span>`;
+    return `<span class="${cls} good">✓ complete</span>`;
+  }
+
+  function renderProjects() {
+    const list = filteredProjects();
+    $('projs-stat').textContent = `${list.length} of ${lib.projects.length} projects`;
+    const host = $('projs-list');
+    if (!list.length) { host.innerHTML = '<div class="no-results">No projects match.</div>'; return; }
+    if (projView === 'grid') {
+      host.innerHTML = `<div class="proj-grid">` + list.map(p => `
+        <div class="proj-card" data-proj="${esc(p.dirName)}">
+          <div class="pc-bar ${p.missing.length?'bad':'good'}"></div>
+          <div class="pc-body">
+            <div class="pc-name">${esc(p.name)}${p.autosaveNewer?'<span class="p-auto">autosave</span>':''}</div>
+            <div class="pc-meta">${p.tempo??'—'} BPM · ${fmtDate(p.lastModified)} · ${fmtBytes(p.poolBytes)}</div>
+            <div class="pc-foot">
+              <span class="pc-ic">${p.instruments.length} instr · ${p.pool.length} smp</span>
+              ${missBadge(p, 'pc-badge')}
+            </div>
+          </div>
+        </div>`).join('') + `</div>`;
+      host.querySelectorAll('.proj-card').forEach(el =>
+        el.addEventListener('click', () => openProjModal(el.dataset.proj)));
+      return;
+    }
+    host.innerHTML = list.map(p => `
+      <div class="proj-item" data-proj="${esc(p.dirName)}">
+        <div class="proj-row">
+          <span class="p-chev">▶</span>
+          <span class="p-name">${esc(p.name)}${p.autosaveNewer?'<span class="p-auto">autosave</span>':''}${lib.currentProject===p.dirName?' <span style="color:var(--accent);font-size:10px">●</span>':''}</span>
+          <span class="p-meta">${p.tempo??'—'} BPM</span>
+          <span class="p-meta">${p.instruments.length} inst</span>
+          <span class="p-meta">${p.pool.length} smp</span>
+          <span class="p-meta">${fmtBytes(p.poolBytes)}</span>
+          <span class="p-meta">${fmtDate(p.lastModified)}</span>
+          ${missBadge(p, 'p-miss')}
+        </div>
+        <div class="proj-detail"></div>
+      </div>`).join('');
+    host.querySelectorAll('.proj-item').forEach(el => {
+      el.querySelector('.proj-row').addEventListener('click', () => toggleProjDetail(el));
+    });
+  }
+
+  function projByDir(dirName) { return lib.projects.find(p => p.dirName === dirName); }
+
+  function toggleProjDetail(el) {
+    const wasOpen = el.classList.contains('open');
+    el.classList.toggle('open');
+    if (wasOpen) return;
+    const p = projByDir(el.dataset.proj);
+    const det = el.querySelector('.proj-detail');
+    if (!p) return;
+    const sims = lib.projects
+      .filter(x => x !== p && (x.pool.length || p.pool.length))
+      .map(x => ({x, sim: Scanner.jaccardSim(p, x)}))
+      .filter(o => o.sim >= 0.25)
+      .sort((a,b) => b.sim - a.sim).slice(0, 6);
+    det.innerHTML = `
+      <div class="sd-cols">
+        <div class="sd-col">
+          <div class="det-title">Instruments (${p.instruments.length})</div>
+          <div class="iblock">${p.instruments.map(i => `
+            <span class="ichip" title="${esc(i.type)} ${esc(i.idHex)}${i.used?'':' — not placed in song'}">
+              <span class="ichip-slot">${esc(i.idHex)}</span>
+              <span class="tb ${esc(i.type)}">${esc(i.typeShort)}</span>
+              <span class="ichip-name" style="${i.used?'':'opacity:.45'}">${esc(i.name)}</span>
+            </span>`).join('') || '<span style="color:var(--muted);font-size:11px">none</span>'}
+          </div>
+          <div class="det-title" style="margin-top:12px">Project</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.8">
+            ${p.tempo??'—'} BPM · master ${p.master??'—'} · transpose ${p.transpose>0?'+':''}${p.transpose}<br>
+            scale: ${esc(p.scale??'—')}${p.scaleRoot?' ('+esc(p.scaleRoot)+')':''}<br>
+            ${p.songRows} song rows · ${p.chainsUsed} chains · ${p.phrasesUsed} phrases · ${p.tablesUsed} tables<br>
+            firmware ${esc(p.version??'?')} · saved ${fmtDate(p.lastModified)}${p.hasAutosave?' · has autosave':''}
+          </div>
+        </div>
+        <div class="sd-col">
+          <div class="det-title">Sample pool (${p.pool.length}, ${fmtBytes(p.poolBytes)})</div>
+          ${p.missing.map(nm => `<div class="spr miss"><span class="spr-ic">✕</span><span class="spr-path">${esc(nm)} <span style="opacity:.6">— referenced, not in pool</span></span></div>`).join('')}
+          ${p.pool.map(s => {
+            const un = p.unusedPool.includes(s.name);
+            return `<div class="spr ok"><span class="spr-ic">${un?'○':'♪'}</span>
+              <span class="spr-path" style="${un?'opacity:.55':''}">${esc(s.name)}${un?' <span style="opacity:.6">— unused</span>':''}</span>
+              <span class="spr-meta">${s.meta?fmtDur(s.meta.duration):''} ${fmtBytes(s.size)}</span></div>`;
+          }).join('') || '<span style="color:var(--muted);font-size:11px">empty pool</span>'}
+          ${sims.length ? `<div class="similar-section"><div class="det-title">Similar projects (shared samples)</div>
+            ${sims.map(o => `<span class="sim-item" data-proj="${esc(o.x.dirName)}">${esc(o.x.name)} <span class="sim-pct">${Math.round(o.sim*100)}%</span></span>`).join('')}
+          </div>` : ''}
+        </div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn ghost sm btn-det-open">⤢ Details & patterns</button>
+        <button class="btn ghost sm btn-det-diff">⇌ Compare</button>
+        ${p.missing.length && `<button class="btn sm btn-det-fix">🔧 Repair ${p.missing.length} missing</button>` || ''}
+      </div>`;
+    det.querySelector('.btn-det-open')?.addEventListener('click', e => { e.stopPropagation(); openProjModal(p.dirName); });
+    det.querySelector('.btn-det-diff')?.addEventListener('click', e => { e.stopPropagation(); startDiff(p); });
+    det.querySelector('.btn-det-fix')?.addEventListener('click', e => { e.stopPropagation(); openFixModal(p); });
+    det.querySelectorAll('.sim-item').forEach(s =>
+      s.addEventListener('click', e => { e.stopPropagation(); openProjModal(s.dataset.proj); }));
+  }
+
+  // ── Project modal (full detail + pattern viewer) ──────
+  async function readProjectFull(p) {
+    const dir = await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(p.dirName);
+    const fh = await dir.getFileHandle(p.datName);
+    const file = await fh.getFile();
+    return { parsed: PT.parseProject(await file.text()), file, fh, dir };
+  }
+
+  async function openProjModal(dirName) {
+    const p = projByDir(dirName);
+    if (!p) return;
+    modalProj = p;
+    modalList = filteredProjects();
+    $('proj-modal').style.display = 'flex';
+    $('modal-title').textContent = p.name;
+    $('modal-meta').textContent = `${p.tempo??'—'} BPM · fw ${p.version??'?'} · ${fmtDate(p.lastModified)}`;
+    const body = $('modal-body');
+    body.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>Reading project…</div>';
+    let full = null;
+    try { full = await readProjectFull(p); } catch(e) { body.innerHTML = `<div class="no-results">Could not read project: ${esc(e.message||e)}</div>`; return; }
+    const parsed = full.parsed;
+    if (!parsed) { body.innerHTML = '<div class="no-results">Could not parse project file.</div>'; return; }
+    modalProj._full = parsed;
+    const hist = PT.detectScales(parsed);
+    body.innerHTML = `
+      <div class="sd-cols">
+        <div class="sd-col">
+          <div class="det-title">Instruments</div>
+          <div class="iblock">${p.instruments.map(i => `
+            <span class="ichip ichip-instr" data-id="${i.id}" title="click for parameters">
+              <span class="ichip-slot">${esc(i.idHex)}</span>
+              <span class="tb ${esc(i.type)}">${esc(i.typeShort)}</span>
+              <span class="ichip-name" style="${i.used?'':'opacity:.45'}">${esc(i.name)}</span>
+            </span>`).join('') || '<span style="color:var(--muted);font-size:11px">none</span>'}
+          </div>
+          <div id="modal-instr-detail"></div>
+        </div>
+        <div class="sd-col">
+          <div class="det-title">Samples</div>
+          ${p.missing.map(nm => `<div class="spr miss"><span class="spr-ic">✕</span><span class="spr-path">${esc(nm)}</span></div>`).join('')}
+          ${p.pool.map(s => `<div class="spr ok"><span class="spr-ic">♪</span><span class="spr-path">${esc(s.name)}</span>
+            <span class="spr-meta">${s.meta?`${fmtDur(s.meta.duration)} · ${s.meta.sampleRate}Hz ${s.meta.bits}bit`:''}</span></div>`).join('')}
+        </div>
+      </div>
+      <div class="nh-wrap">
+        <div class="nh-title">Note distribution — ${hist.total} notes</div>
+        <div class="nh-bins">${hist.bins.map((v,i) => {
+          const h = hist.total ? Math.round(v / Math.max(...hist.bins,1) * 48) : 0;
+          return `<div class="nh-bin"><div class="nh-bar" style="height:${h}px"></div><div class="nh-lbl">${PT.NOTE_NAMES ? '' : ''}${esc(['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][i])}</div></div>`;
+        }).join('')}</div>
+        ${hist.candidates.length ? `<div class="nh-scale-row">${hist.candidates.slice(0,5).map((c,i) =>
+          `<span class="nh-scale-chip ${i===0?'top':''}">${esc(c.label)}</span>`).join('')}
+          ${p.scale && p.scale !== 'None (Chromatic)' ? `<span class="nh-scale-chip" style="margin-left:auto">project scale: ${esc(p.scale)}</span>` : ''}</div>` : ''}
+      </div>
+      <div id="modal-pattern-section" class="pv-section" style="display:none"></div>`;
+    body.querySelectorAll('.ichip-instr').forEach(ch =>
+      ch.addEventListener('click', () => showInstrParams(p, parseInt(ch.dataset.id, 10))));
+    updateModalNav();
+  }
+
+  function showInstrParams(p, id) {
+    const i = p.instruments.find(x => x.id === id);
+    const host = $('modal-instr-detail');
+    if (!i) { host.innerHTML = ''; return; }
+    host.innerHTML = `
+      <div class="det-title" style="margin-top:12px">${esc(i.idHex)} — ${esc(i.name)} <span class="tb ${esc(i.type)}">${esc(i.rawType)}</span></div>
+      <div class="ipwrap">
+        ${Object.entries(i.params).map(([k,v]) =>
+          `<span class="ipchip"><span class="ipk">${esc(k)}</span><span class="ipv">${esc(v===''?'—':v)}</span></span>`).join('')}
+        ${i.slices.map(s => `<span class="ipchip mod"><span class="ipk">SL${String(s.index).padStart(2,'0')}</span><span class="ipv">${s.offset}</span></span>`).join('')}
+      </div>`;
+  }
+
+  function updateModalNav() {
+    const idx = modalList.indexOf(modalProj);
+    $('btn-modal-prev').disabled = idx <= 0;
+    $('btn-modal-next').disabled = idx < 0 || idx >= modalList.length - 1;
+  }
+  function modalNav(delta) {
+    const idx = modalList.indexOf(modalProj);
+    const next = modalList[idx + delta];
+    if (next) openProjModal(next.dirName);
+  }
+  function closeProjModal() { $('proj-modal').style.display = 'none'; modalProj = null; }
+
+  // ── Pattern viewer ─────────────────────────────────────
+  const CHAIN_PALETTE = ['#2dd4bf','#60a5fa','#a78bfa','#f472b6','#fcd34d','#34d399','#fb923c','#f87171',
+    '#38bdf8','#c084fc','#facc15','#4ade80','#e879f9','#fca5a5','#93c5fd','#5eead4'];
+
+  function togglePatternView() {
+    const sec = $('modal-pattern-section');
+    if (!modalProj?._full) return;
+    if (sec.style.display !== 'none') { sec.style.display = 'none'; return; }
+    sec.style.display = 'block';
+    renderPatterns(sec, modalProj, modalProj._full);
+    sec.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  function renderPatterns(host, p, parsed) {
+    const last = PT.lastSongRow(parsed);
+    if (last < 0) { host.innerHTML = '<div class="pv-hdr"><span class="pv-hdr-title">Patterns</span></div><div style="color:var(--muted);font-size:12px">Song grid is empty.</div>'; return; }
+    const chainColor = new Map();
+    let ci = 0;
+    // Timeline SVG
+    const CH = 8, RW = 7, RH = 13, GAP = 1;
+    const W = (last+1) * (RW+GAP) + 40, H = CH * (RH+GAP) + 18;
+    let svg = `<svg class="tl-svg" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+    for (let t = 0; t < CH; t++) {
+      svg += `<text x="0" y="${t*(RH+GAP)+10}" fill="#7b858c" font-size="8" font-family="monospace">${t+1}</text>`;
+      for (let r = 0; r <= last; r++) {
+        const c = PT.gridCell(parsed, r, t);
+        if (c === PT.EMPTY) continue;
+        if (!chainColor.has(c)) chainColor.set(c, CHAIN_PALETTE[ci++ % CHAIN_PALETTE.length]);
+        svg += `<rect x="${20 + r*(RW+GAP)}" y="${t*(RH+GAP)}" width="${RW}" height="${RH}" rx="1.5" fill="${chainColor.get(c)}"/>`;
+      }
+    }
+    for (let r = 0; r <= last; r += 8)
+      svg += `<text x="${20 + r*(RW+GAP)}" y="${H-3}" fill="#3a4046" font-size="7" font-family="monospace">${PT.hx2(r)}</text>`;
+    svg += '</svg>';
+
+    // Song grid table
+    let grid = `<div class="pv-grid" style="grid-template-columns:repeat(${CH+1},30px)">`;
+    grid += `<div class="pv-cell clbl"></div>`;
+    for (let t = 0; t < CH; t++) grid += `<div class="pv-cell clbl">C${t+1}</div>`;
+    for (let r = 0; r <= last; r++) {
+      grid += `<div class="pv-cell rlbl">${PT.hx2(r)}</div>`;
+      for (let t = 0; t < CH; t++) {
+        const c = PT.gridCell(parsed, r, t);
+        grid += c === PT.EMPTY
+          ? `<div class="pv-cell">··</div>`
+          : `<div class="pv-cell chain" data-chain="${c}" style="color:${chainColor.get(c)||'var(--accent)'}">${PT.hx2(c)}</div>`;
+      }
+    }
+    grid += '</div>';
+
+    host.innerHTML = `
+      <div class="pv-hdr"><span class="pv-hdr-title">Timeline — ${last+1} rows</span></div>
+      <div class="tl-svg-wrap">${svg}</div>
+      <div class="tl-legend">${[...chainColor.entries()].slice(0,24).map(([c,col]) =>
+        `<span class="tl-leg-item"><span class="tl-dot" style="background:${col}"></span>chain ${PT.hx2(c)}</span>`).join('')}</div>
+      <div class="pv-hdr" style="margin-top:14px"><span class="pv-hdr-title">Song grid — click a chain</span></div>
+      <div class="pv-grid-wrap">${grid}</div>
+      <div class="pv-detail" id="pv-chain-detail" style="display:none"></div>
+      <div class="pv-detail" id="pv-phrase-detail" style="display:none"></div>`;
+    host.querySelectorAll('.pv-cell.chain').forEach(cell =>
+      cell.addEventListener('click', () => showChain(parsed, parseInt(cell.dataset.chain, 10), host)));
+  }
+
+  function showChain(parsed, c, host) {
+    host.querySelectorAll('.pv-cell.chain').forEach(x => x.classList.toggle('hi', parseInt(x.dataset.chain,10) === c));
+    const det = host.querySelector('#pv-chain-detail');
+    det.style.display = 'block';
+    let rows = '';
+    for (let s = 0; s < PT.STEPS; s++) {
+      const {phrase, transpose} = PT.chainStep(parsed, c, s);
+      rows += `<div class="pv-cstep"><span class="ci">${PT.hx2(s)}</span>` + (phrase === PT.EMPTY
+        ? `<span class="ct">--</span>`
+        : `<span class="cp" data-p="${phrase}">P${PT.hx2(phrase)}</span><span class="ct">${transpose ? 'tsp '+(transpose>0?'+':'')+transpose : ''}</span>`) + `</div>`;
+    }
+    det.innerHTML = `<div class="pv-detail-title">Chain ${PT.hx2(c)}</div>${rows}`;
+    det.querySelectorAll('.cp').forEach(el =>
+      el.addEventListener('click', () => showPhrase(parsed, parseInt(el.dataset.p, 10), host)));
+    host.querySelector('#pv-phrase-detail').style.display = 'none';
+  }
+
+  function showPhrase(parsed, ph, host) {
+    const det = host.querySelector('#pv-phrase-detail');
+    det.style.display = 'block';
+    let rows = '';
+    for (let s = 0; s < PT.STEPS; s++) {
+      const st = PT.phraseStep(parsed, ph, s);
+      const note = PT.noteStr(st.note);
+      rows += `<div class="pv-pstep">
+        <span class="pi">${PT.hx2(s)}</span>
+        <span class="pn ${st.note===PT.EMPTY?'empty':''}">${esc(note)}</span>
+        <span class="pv2">${st.instr===PT.EMPTY?'--':PT.hx2(st.instr)}</span>
+        <span class="pfx">${esc(PT.fxStr(st.cmd1, st.param1))}  ${esc(PT.fxStr(st.cmd2, st.param2))}</span>
+      </div>`;
+    }
+    det.innerHTML = `<div class="pv-detail-title">Phrase ${PT.hx2(ph)}</div>${rows}`;
+    det.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  // ── MIDI export ────────────────────────────────────────
+  async function exportMidi() {
+    if (!modalProj) return;
+    let parsed = modalProj._full;
+    if (!parsed) { try { parsed = (await readProjectFull(modalProj)).parsed; } catch { return; } }
+    const bytes = PT.buildMidi(parsed, modalProj.name);
+    if (!bytes) { alert('Nothing to export — the song grid is empty.'); return; }
+    const blob = new Blob([bytes], {type:'audio/midi'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${modalProj.name}.mid`;
+    a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  // ── Compare / diff ─────────────────────────────────────
+  function startDiff(p) {
+    diffA = p;
+    diffPending = true;
+    closeProjModal();
+    openDiffModal();
+  }
+  function openDiffModal() {
+    $('diff-modal').classList.add('open');
+    $('diff-hdr-a').textContent = diffA.name;
+    renderDiffA();
+    $('diff-srch').value = '';
+    renderDiffPick('');
+    $('diff-srch').focus();
+  }
+  function renderDiffA() {
+    $('diff-body-a').innerHTML = diffSideHtml(diffA, null);
+    $('diff-meta').classList.remove('on');
+    $('diff-score').textContent = '';
+  }
+  function diffSideHtml(p, other) {
+    const otherSamps = other ? new Set(other.pool.map(s => s.name.toLowerCase())) : null;
+    const otherInstrs = other ? new Set(other.instruments.map(i => i.name.toLowerCase())) : null;
+    let html = `<div class="diff-sec-hdr">Instruments (${p.instruments.length})</div>`;
+    html += p.instruments.map(i => {
+      const cls = otherInstrs ? (otherInstrs.has(i.name.toLowerCase()) ? 'shared' : 'unique') : '';
+      return `<div class="diff-row ${cls}"><span class="tb ${esc(i.type)}">${esc(i.typeShort)}</span>${esc(i.name)}</div>`;
+    }).join('');
+    html += `<div class="diff-sec-hdr">Samples (${p.pool.length})</div>`;
+    html += p.pool.map(s => {
+      const cls = otherSamps ? (otherSamps.has(s.name.toLowerCase()) ? 'shared' : 'unique') : '';
+      return `<div class="diff-row samp ${cls}">${esc(s.name)}</div>`;
+    }).join('');
+    return html;
+  }
+  function renderDiffPick(q) {
+    const host = $('diff-body-b');
+    const list = lib.projects.filter(p => p !== diffA && p.name.toLowerCase().includes(q.toLowerCase()));
+    host.innerHTML = list.map(p => `<div class="diff-pick-item" data-proj="${esc(p.dirName)}">${esc(p.name)}</div>`).join('')
+      || '<div class="no-results">No matches.</div>';
+    host.querySelectorAll('.diff-pick-item').forEach(el =>
+      el.addEventListener('click', () => completeDiff(projByDir(el.dataset.proj))));
+  }
+  function completeDiff(b) {
+    if (!b) return;
+    const sim = Scanner.jaccardSim(diffA, b);
+    $('diff-score').textContent = `${Math.round(sim*100)}% shared samples`;
+    $('diff-hdr-a').textContent = diffA.name;
+    $('diff-body-a').innerHTML = diffSideHtml(diffA, b);
+    $('diff-body-b').innerHTML = `<div class="diff-col-hdr" style="border-bottom:1px solid var(--border)">${esc(b.name)}</div>` + diffSideHtml(b, diffA);
+    const rows = [
+      ['BPM', diffA.tempo, b.tempo], ['Transpose', diffA.transpose, b.transpose],
+      ['Scale', diffA.scale, b.scale], ['Firmware', diffA.version, b.version],
+      ['Song rows', diffA.songRows, b.songRows], ['Chains', diffA.chainsUsed, b.chainsUsed],
+      ['Phrases', diffA.phrasesUsed, b.phrasesUsed],
+      ['Pool size', fmtBytes(diffA.poolBytes), fmtBytes(b.poolBytes)],
+      ['Saved', fmtDate(diffA.lastModified), fmtDate(b.lastModified)],
+    ];
+    const dm = $('diff-meta');
+    dm.classList.add('on');
+    dm.innerHTML = rows.map(([l, va, vb]) =>
+      `<span class="dm-lbl">${esc(l)}</span><span class="dm-val ${String(va)!==String(vb)?'diff':''}">${esc(va??'—')}</span><span class="dm-val ${String(va)!==String(vb)?'diff':''}">${esc(vb??'—')}</span>`).join('');
+  }
+  function closeDiff() { $('diff-modal').classList.remove('open'); diffA = null; diffPending = null; }
+
+  // ── INSTRUMENTS ────────────────────────────────────────
+  function allInstruments() {
+    const out = [];
+    for (const i of lib.ptis)
+      out.push({...i, source:'library', srcLabel:'instruments/'+i.filePath, key:'pti:'+i.filePath});
+    if (instrInProj)
+      for (const p of lib.projects)
+        for (const i of p.instruments)
+          out.push({...i, source:'project', proj:p, srcLabel:p.name+' · '+i.idHex, key:'proj:'+p.dirName+':'+i.idHex});
+    return out;
+  }
+  function instrUsage(inst) {
+    // For a library .pti: projects containing an instrument of same name.
+    if (inst.source === 'project') return inst.used ? [inst.proj] : [];
+    const nm = inst.name.toLowerCase();
+    return lib.projects.filter(p => p.instruments.some(i => i.name.toLowerCase() === nm));
+  }
+  function instrSampleState(inst) {
+    if (!inst.sample) return null;
+    if (inst.source === 'project')
+      return inst.proj.pool.some(s => s.name === inst.sample) ? 'ok' : 'miss';
+    // library pti: sample must exist somewhere (any pool or library) to be importable
+    return sampleNameMap.has(inst.sample.toLowerCase()) ? 'ok' : 'miss';
+  }
+  function renderInstruments() {
+    let list = allInstruments();
+    const q = instrFilter.toLowerCase();
+    if (q) list = list.filter(i => i.name.toLowerCase().includes(q) || (i.sample||'').toLowerCase().includes(q));
+    if (instrTypeFilter.size) list = list.filter(i => instrTypeFilter.has(i.type));
+    const cmp = {
+      'name-asc':  (a,b) => a.name.localeCompare(b.name),
+      'name-desc': (a,b) => b.name.localeCompare(a.name),
+      'type':      (a,b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name),
+      'usage':     (a,b) => instrUsage(b).length - instrUsage(a).length,
+      'missing':   (a,b) => (instrSampleState(b)==='miss'?1:0) - (instrSampleState(a)==='miss'?1:0),
+    }[instrSort];
+    list.sort(cmp);
+    $('instrs-stat').textContent = `${list.length} instruments (${lib.ptis.length} library, ${list.length - (instrTypeFilter.size||q?0:lib.ptis.length) >= 0 ? '' : ''}${instrInProj?'incl. project banks':'library only'})`;
+    const host = $('instrs-list');
+    if (!list.length) { host.innerHTML = '<div class="no-results">No instruments match.</div>'; return; }
+    host.innerHTML = list.map((i, idx) => {
+      const ss = instrSampleState(i);
+      const usage = instrUsage(i);
+      return `
+      <div class="instr-item" data-idx="${idx}">
+        <div class="instr-row">
+          <span class="i-chev">▶</span>
+          <span><span class="tb ${esc(i.type)}">${esc(i.typeShort)}</span></span>
+          <span class="i-lname">${esc(i.name)}${dupeNameMap.has(i.name.toLowerCase()) && i.source==='library' ? ' <span title="duplicate name" style="color:var(--warn)">⚠</span>':''}</span>
+          <span class="i-src">${esc(i.srcLabel)}</span>
+          <span class="samp-c ${ss??''}">${i.sample ? esc(i.sample) : '<span style="opacity:.4">—</span>'}</span>
+          <span class="ubadge ${usage.length?'used':'unused'}">${usage.length ? 'used in '+usage.length : 'unused'}</span>
+        </div>
+        <div class="instr-det"></div>
+      </div>`;
+    }).join('');
+    host.querySelectorAll('.instr-item').forEach(el => {
+      el.querySelector('.instr-row').addEventListener('click', () => {
+        const wasOpen = el.classList.contains('open');
+        el.classList.toggle('open');
+        if (wasOpen) return;
+        const i = list[parseInt(el.dataset.idx, 10)];
+        const usage = instrUsage(i);
+        el.querySelector('.instr-det').innerHTML = `
+          <div class="drow"><span class="dlabel">Params</span>
+            <div class="ipwrap">${Object.entries(i.params).map(([k,v]) =>
+              `<span class="ipchip"><span class="ipk">${esc(k)}</span><span class="ipv">${esc(v===''?'—':v)}</span></span>`).join('') || '<span style="color:var(--muted)">none</span>'}
+            ${i.slices.map(s => `<span class="ipchip mod"><span class="ipk">SL${String(s.index).padStart(2,'0')}</span><span class="ipv">${s.offset}</span></span>`).join('')}
+            </div></div>
+          ${i.sample ? `<div class="drow"><span class="dlabel">Sample</span><span class="dval ${instrSampleState(i)==='miss'?'miss':'dim'}">${esc(i.sample)}${instrSampleState(i)==='miss'?' — not found':''}</span></div>` : ''}
+          <div class="drow"><span class="dlabel">Used in</span><span class="dval dim">${usage.length ? usage.map(p => `<span style="cursor:pointer;color:var(--accent)" class="use-link" data-proj="${esc(p.dirName)}">${esc(p.name)}</span>`).join(' · ') : 'nowhere'}</span></div>
+          ${i.version ? `<div class="drow"><span class="dlabel">Firmware</span><span class="dval dim">${esc(i.version)}</span></div>` : ''}`;
+        el.querySelectorAll('.use-link').forEach(l =>
+          l.addEventListener('click', e => { e.stopPropagation(); switchTab('projects'); openProjModal(l.dataset.proj); }));
+      });
+    });
+  }
+  function renderTypeFilters() {
+    $('type-filters').innerHTML = ['SAMPLE','SAMPLESOURCE','MIDI','SID','OPAL'].map(t =>
+      `<button class="type-pill ${instrTypeFilter.has(t)?'on':''}" data-t="${t}">${t}</button>`).join('');
+    $('type-filters').querySelectorAll('.type-pill').forEach(b =>
+      b.addEventListener('click', () => {
+        instrTypeFilter.has(b.dataset.t) ? instrTypeFilter.delete(b.dataset.t) : instrTypeFilter.add(b.dataset.t);
+        renderTypeFilters(); renderInstruments();
+      }));
+  }
+
+  // ── SAMPLES ────────────────────────────────────────────
+  function renderSamples() {
+    const q = sampFilter.toLowerCase();
+    const host = $('sampbr-list');
+    sampbrRows = [];
+    let html = '';
+    let totalCount = 0, totalBytes = 0;
+
+    // Library tree
+    const dirs = new Map(); // dirPath → files[]
+    for (const s of lib.library) {
+      if (q && !s.path.toLowerCase().includes(q)) continue;
+      const slash = s.path.lastIndexOf('/');
+      const d = slash >= 0 ? s.path.slice(0, slash) : '';
+      if (!dirs.has(d)) dirs.set(d, []);
+      dirs.get(d).push(s);
+    }
+    const sortedDirs = [...dirs.keys()].sort();
+    html += `<div class="grp open"><div class="grp-hdr"><span class="grp-chev">▶</span><span class="grp-name">samples/ (library)</span><span class="grp-cnt">${lib.library.length} files · ${fmtBytes(lib.library.reduce((n,s)=>n+s.size,0))}</span></div><div class="grp-body">`;
+    for (const d of sortedDirs) {
+      const files = dirs.get(d);
+      if (d) html += `<div class="grp open"><div class="grp-hdr" style="padding-left:32px"><span class="grp-chev">▶</span><span class="grp-name">${esc(d)}/</span><span class="grp-cnt">${files.length}</span></div><div class="grp-body">`;
+      for (const s of files) {
+        const nm = sampleNameMap.get(s.name.toLowerCase());
+        const usedIn = nm ? nm.projects.filter(x => x.used).length : 0;
+        const rowIdx = sampbrRows.length;
+        sampbrRows.push({path:'samples/'+s.path, name:s.name});
+        totalCount++; totalBytes += s.size;
+        html += `<div class="sb-file-row" data-row="${rowIdx}">
+          <button class="play-btn" data-path="samples/${esc(s.path)}">▶</button>
+          <span class="sb-fname">${esc(s.name)}</span>
+          <span class="sb-fmeta">${s.meta ? `${fmtDur(s.meta.duration)} · ${s.meta.sampleRate}Hz ${s.meta.bits}bit ${s.meta.channels===2?'st':'mo'}` : ''} · ${fmtBytes(s.size)}</span>
+          <span class="sb-badge ${usedIn?'used':'unused'}" data-name="${esc(s.name)}">${usedIn ? 'in '+usedIn+' proj' : 'unused'}</span>
+        </div>`;
+      }
+      if (d) html += `</div></div>`;
+    }
+    html += `</div></div>`;
+
+    // Project pools
+    for (const p of lib.projects) {
+      const files = p.pool.filter(s => !q || s.name.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
+      if (!files.length) continue;
+      html += `<div class="grp"><div class="grp-hdr"><span class="grp-chev">▶</span><span class="grp-name">projects/${esc(p.name)}/samples/</span><span class="grp-cnt">${p.pool.length} · ${fmtBytes(p.poolBytes)}</span></div><div class="grp-body">`;
+      for (const s of files) {
+        const unused = p.unusedPool.includes(s.name);
+        const rowIdx = sampbrRows.length;
+        sampbrRows.push({path:`projects/${p.dirName}/samples/${s.name}`, name:s.name});
+        html += `<div class="sb-file-row" data-row="${rowIdx}">
+          <button class="play-btn" data-path="projects/${esc(p.dirName)}/samples/${esc(s.name)}">▶</button>
+          <span class="sb-fname">${esc(s.name)}</span>
+          <span class="sb-fmeta">${s.meta ? `${fmtDur(s.meta.duration)} · ${s.meta.sampleRate}Hz ${s.meta.bits}bit` : ''} · ${fmtBytes(s.size)}</span>
+          <span class="sb-badge ${unused?'unused':'used'}" data-name="${esc(s.name)}">${unused?'unused':'used'}</span>
+        </div>`;
+      }
+      html += `</div></div>`;
+    }
+    $('sampbr-stat').textContent = `${totalCount} library samples · ${fmtBytes(totalBytes)}`;
+    host.innerHTML = html || '<div class="no-results">No samples found.</div>';
+    host.querySelectorAll('.grp-hdr').forEach(h =>
+      h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+    host.querySelectorAll('.play-btn').forEach(b =>
+      b.addEventListener('click', e => { e.stopPropagation(); AudioPlayer.playPath(sd, b.dataset.path, b); }));
+    host.querySelectorAll('.sb-badge.used').forEach(b =>
+      b.addEventListener('click', e => { e.stopPropagation(); openSampModal(b.dataset.name); }));
+  }
+
+  function sampbrAudition(delta) {
+    if (!sampbrRows.length) return;
+    sampbrSelIdx = Math.max(0, Math.min(sampbrRows.length-1, sampbrSelIdx + delta));
+    document.querySelectorAll('#sampbr-list .sb-file-row').forEach(r =>
+      r.classList.toggle('sel', parseInt(r.dataset.row,10) === sampbrSelIdx));
+    const row = document.querySelector(`#sampbr-list .sb-file-row[data-row="${sampbrSelIdx}"]`);
+    if (row) {
+      row.scrollIntoView({block:'nearest'});
+      const btn = row.querySelector('.play-btn');
+      AudioPlayer.playPath(sd, btn.dataset.path, btn);
+    }
+  }
+
+  function openSampModal(name) {
+    const entry = sampleNameMap.get(name.toLowerCase());
+    if (!entry) return;
+    $('samp-modal').classList.add('open');
+    $('samp-path').textContent = name;
+    let html = '';
+    const used = entry.projects.filter(x => x.used), unused = entry.projects.filter(x => !x.used);
+    if (used.length) {
+      html += `<div class="samp-grp-hdr">In use (${used.length})</div>`;
+      html += used.map(x => `<div class="samp-item">♪ <span class="samp-item-name" data-proj="${esc(x.proj)}">${esc(x.proj)}</span></div>`).join('');
+    }
+    if (unused.length) {
+      html += `<div class="samp-grp-hdr">In pool, unused (${unused.length})</div>`;
+      html += unused.map(x => `<div class="samp-item">○ <span class="samp-item-name" data-proj="${esc(x.proj)}">${esc(x.proj)}</span></div>`).join('');
+    }
+    if (entry.library.length) {
+      html += `<div class="samp-grp-hdr">Library copies</div>`;
+      html += entry.library.map(p => `<div class="samp-item">▤ <span style="font-family:monospace;font-size:11px">samples/${esc(p)}</span></div>`).join('');
+    }
+    $('samp-body').innerHTML = html || '<div class="no-results">Not referenced anywhere.</div>';
+    $('samp-body').querySelectorAll('.samp-item-name').forEach(el =>
+      el.addEventListener('click', () => {
+        $('samp-modal').classList.remove('open');
+        const p = lib.projects.find(x => x.name === el.dataset.proj);
+        if (p) { switchTab('projects'); openProjModal(p.dirName); }
+      }));
+  }
+
+  // ── THEMES ─────────────────────────────────────────────
+  function themePreviewSvg(t) {
+    const c = n => PT.colorHex(t.colors[n] ?? 0);
+    return `<svg viewBox="0 0 220 118" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block">
+      <rect width="220" height="118" fill="${c('BACKGROUND')}"/>
+      <text x="8" y="16" fill="${c('INFOCOLOR')}" font-size="9" font-family="monospace">SONG</text>
+      <text x="60" y="16" fill="${c('EMPHASISCOLOR')}" font-size="9" font-family="monospace">${esc('bpm 128')}</text>
+      ${[0,1,2,3,4,5].map(r => `
+        <text x="8" y="${32+r*13}" fill="${c('EMPHASISCOLOR')}" font-size="9" font-family="monospace">${PT.hx2(r)}</text>
+        ${[0,1,2,3,4,5].map(col => {
+          const fill = (r===2&&col===1) ? c('BACKGROUND') : (col%3===0 ? c('FOREGROUND') : (r%2 ? c('HICOLOR2') : c('ACCENTCOLOR')));
+          const bg = (r===2&&col===1) ? `<rect x="${28+col*26-2}" y="${23+r*13}" width="20" height="11" fill="${c('CURSORCOLOR')}"/>` : '';
+          return `${bg}<text x="${28+col*26}" y="${32+r*13}" fill="${fill}" font-size="9" font-family="monospace">${(r*7+col*3)%16===0?'--':PT.hx2((r*13+col*29)%128)}</text>`;
+        }).join('')}`).join('')}
+      <rect x="0" y="106" width="220" height="12" fill="${c('HICOLOR1')}"/>
+      <text x="8" y="115" fill="${c('FOREGROUND')}" font-size="8" font-family="monospace">P:PLAY</text>
+      <text x="160" y="115" fill="${c('WARNCOLOR')}" font-size="8" font-family="monospace">▲12%</text>
+    </svg>`;
+  }
+  function renderThemes() {
+    const q = themeFilter.toLowerCase();
+    const list = lib.themes.filter(t => t.fileName.toLowerCase().includes(q));
+    $('themes-stat').textContent = `${list.length} themes`;
+    $('themes-grid').innerHTML = list.map((t, i) => `
+      <div class="theme-card">
+        <div class="theme-preview">${themePreviewSvg(t)}</div>
+        <div class="theme-info">
+          <span class="theme-name">${esc(t.fileName.replace(/\.ptt$/i,''))}</span>
+          <button class="btn ghost sm" data-use="${i}" title="Apply this palette to the Librarian UI">Use</button>
+        </div>
+        <div class="theme-swatches">
+          ${PT.THEME_COLOR_NAMES.filter(n => t.colors[n] !== undefined).slice(0,8).map(n => `
+            <div><div class="swatch-box" style="background:${PT.colorHex(t.colors[n])}"></div>
+            <div class="swatch-lbl">${esc(n.replace('COLOR','').toLowerCase())}</div>
+            <div class="swatch-hex">${PT.colorHex(t.colors[n])}</div></div>`).join('')}
+        </div>
+      </div>`).join('') || '<div class="no-results">No themes found in themes/.</div>';
+    $('themes-grid').querySelectorAll('[data-use]').forEach(b =>
+      b.addEventListener('click', () => applyTheme(list[parseInt(b.dataset.use, 10)])));
+  }
+  function applyTheme(t) {
+    const r = document.documentElement.style;
+    const c = n => t.colors[n] !== undefined ? PT.colorHex(t.colors[n]) : null;
+    const bg = c('BACKGROUND'), fg = c('FOREGROUND'), acc = c('ACCENTCOLOR');
+    if (bg) { r.setProperty('--bg', bg); r.setProperty('--surface', shade(bg, 12)); r.setProperty('--surface2', shade(bg, 24)); r.setProperty('--border', shade(bg, 36)); r.setProperty('--border2', shade(bg, 56)); }
+    if (fg) { r.setProperty('--text', fg); r.setProperty('--muted', mix(fg, bg||'#000', .5)); }
+    if (acc) { r.setProperty('--accent', acc); r.setProperty('--accent-dim', mix(acc, bg||'#000', .82)); r.setProperty('--accent-brd', mix(acc, bg||'#000', .6)); }
+    if (c('ERRORCOLOR')) r.setProperty('--c-miss', c('ERRORCOLOR'));
+    if (c('WARNCOLOR')) r.setProperty('--warn', c('WARNCOLOR'));
+  }
+  function resetTheme() { document.documentElement.removeAttribute('style'); }
+  function shade(hex, amt) {
+    const v = parseInt(hex.slice(1), 16);
+    const f = ch => Math.min(255, ch + amt);
+    return '#' + [f(v>>16&255), f(v>>8&255), f(v&255)].map(x => x.toString(16).padStart(2,'0')).join('');
+  }
+  function mix(a, b, t) {
+    const va = parseInt(a.slice(1), 16), vb = parseInt(b.slice(1), 16);
+    const m = (sa, sb) => Math.round(sa + (sb - sa) * t);
+    return '#' + [m(va>>16&255, vb>>16&255), m(va>>8&255, vb>>8&255), m(va&255, vb&255)]
+      .map(x => x.toString(16).padStart(2,'0')).join('');
+  }
+
+  // ── GROOVES ────────────────────────────────────────────
+  function renderGrooves() {
+    const rows = [];
+    for (const p of lib.projects)
+      for (const g of p.grooves)
+        rows.push({proj:p, idx:g.i, steps:g.steps});
+    $('grooves-stat').textContent = rows.length
+      ? `${rows.length} custom grooves across ${new Set(rows.map(r=>r.proj.dirName)).size} projects (default 6/6 grooves hidden)`
+      : '';
+    $('grooves-list').innerHTML = rows.length ? rows.map(r => `
+      <div class="groove-row">
+        <span class="groove-name" title="${esc(r.proj.name)}">${esc(r.proj.name)} · G${PT.hx2(r.idx)}</span>
+        <div class="groove-steps">${r.steps.map(v =>
+          `<span class="g-step ${v!==6?'accent':''}">${v}</span>`).join('')}</div>
+        <span class="groove-meta">${r.steps.length} steps · ${(r.steps.reduce((a,b)=>a+b,0)/r.steps.length).toFixed(1)} avg ticks</span>
+      </div>`).join('')
+      : '<div class="center-note">No custom grooves found.<br>Grooves live inside each project; only non-default ones are shown here.</div>';
+  }
+
+  // ── RENDERS ────────────────────────────────────────────
+  function renderRenders() {
+    const all = [...renders.map(r => ({...r, dir:'renders'})), ...recordings.map(r => ({...r, dir:'recordings'}))];
+    $('renders-stat').textContent = `${renders.length} renders · ${recordings.length} recordings · ${fmtBytes(all.reduce((n,r)=>n+r.fileSize,0))}`;
+    $('renders-list').innerHTML = all.length ? all.map(r => `
+      <div class="render-row">
+        <button class="play-btn" data-path="${esc(r.dir)}/${esc(r.filePath)}">▶</button>
+        <span class="render-name">${esc(r.dir)}/${esc(r.filePath)}</span>
+        <span class="render-meta">${fmtBytes(r.fileSize)}</span>
+        <span class="render-meta">${fmtDate(r.lastModified)}</span>
+        <canvas class="render-wave" width="140" height="28"></canvas>
+      </div>`).join('')
+      : '<div class="center-note">No renders found.<br>Mixdowns land in renders/ when you render from the project screen.</div>';
+    $('renders-list').querySelectorAll('.play-btn').forEach(b =>
+      b.addEventListener('click', () => AudioPlayer.playPath(sd, b.dataset.path, b)));
+  }
+
+  // ── PROBLEMS ───────────────────────────────────────────
+  function switchProb(sec) {
+    probSec = sec;
+    document.querySelectorAll('.prob-btn').forEach(b => b.classList.toggle('active', b.dataset.psec === sec));
+    renderProblems();
+  }
+  function probCounts() {
+    return {
+      broken: lib.projects.reduce((n,p) => n+p.missing.length, 0),
+      unusedpool: lib.projects.reduce((n,p) => n+p.unusedPool.length, 0),
+      unusedinstr: allInstruments().filter(i => instrUsage(i).length === 0).length,
+      dupes: dupeNameMap.size,
+      dupesamp: dupeContent ? dupeContent.groups.length : null,
+      autosaves: lib.projects.filter(p => p.autosaveNewer).length,
+      skipped: lib.skipped.length,
+      repairlog: repairLog.length,
+    };
+  }
+  function renderProblems() {
+    const c = probCounts();
+    for (const [k,v] of Object.entries(c)) {
+      const el = $('pc-'+k);
+      if (el) el.textContent = v === null ? '' : ` ${v}`;
+    }
+    const host = $('prob-content');
+    const empty = msg => `<div class="prob-empty"><b>✓ All clear</b>${msg}</div>`;
+    if (probSec === 'broken') {
+      const rows = [];
+      for (const p of lib.projects)
+        for (const nm of p.missing) {
+          const insts = p.instruments.filter(i => i.sample === nm);
+          const cands = sampleNameMap.get(nm.toLowerCase());
+          const nCands = cands ? cands.library.length + cands.projects.length : 0;
+          rows.push(`<div class="prob-row clickable" data-proj="${esc(p.dirName)}">
+            <span class="prob-icon">✕</span>
+            <div class="prob-main"><div class="prob-name">${esc(nm)}</div>
+            <div class="prob-sub">${esc(p.name)} — used by ${insts.map(i => esc(i.idHex)+' '+esc(i.name)).join(', ')}</div></div>
+            <span class="prob-right">${nCands ? nCands+' candidate'+(nCands>1?'s':'') : 'no candidates'}</span>
+            <button class="btn sm btn-row-fix" data-proj="${esc(p.dirName)}">🔧 Repair</button>
+          </div>`);
+        }
+      host.innerHTML = rows.join('') || empty('Every referenced sample is present in its project pool.');
+      host.querySelectorAll('.btn-row-fix').forEach(b =>
+        b.addEventListener('click', e => { e.stopPropagation(); openFixModal(projByDir(b.dataset.proj)); }));
+      host.querySelectorAll('.prob-row.clickable').forEach(r =>
+        r.addEventListener('click', () => { switchTab('projects'); openProjModal(r.dataset.proj); }));
+    } else if (probSec === 'unusedpool') {
+      const rows = [];
+      for (const p of lib.projects)
+        for (const nm of p.unusedPool) {
+          const s = p.pool.find(x => x.name === nm);
+          rows.push(`<div class="prob-row clickable" data-proj="${esc(p.dirName)}">
+            <span class="prob-icon">○</span>
+            <div class="prob-main"><div class="prob-name">${esc(nm)}</div>
+            <div class="prob-sub">${esc(p.name)} — in pool, not referenced by any instrument</div></div>
+            <span class="prob-right">${fmtBytes(s?.size)}</span></div>`);
+        }
+      const total = lib.projects.reduce((n,p)=>n+p.unusedPoolBytes,0);
+      host.innerHTML = (rows.length ? `<div class="prob-group-hdr">${fmtBytes(total)} reclaimable</div>` : '') +
+        (rows.join('') || empty('Every pool sample is referenced by an instrument.'));
+      host.querySelectorAll('.prob-row.clickable').forEach(r =>
+        r.addEventListener('click', () => { switchTab('projects'); openProjModal(r.dataset.proj); }));
+    } else if (probSec === 'unusedinstr') {
+      const list = allInstruments().filter(i => instrUsage(i).length === 0);
+      host.innerHTML = list.map(i => `<div class="prob-row">
+        <span class="prob-icon"><span class="tb ${esc(i.type)}">${esc(i.typeShort)}</span></span>
+        <div class="prob-main"><div class="prob-name">${esc(i.name)}</div>
+        <div class="prob-sub">${esc(i.srcLabel)}${i.source==='project'?' — in bank, never placed in the song':''}</div></div>
+      </div>`).join('') || empty('Every instrument is used somewhere.');
+    } else if (probSec === 'dupes') {
+      const rows = [];
+      for (const [nm, list] of dupeNameMap)
+        rows.push(`<div class="prob-row"><span class="prob-icon">≡</span>
+          <div class="prob-main"><div class="prob-name">${esc(list[0].name)}</div>
+          <div class="prob-sub">${list.length} .pti files share this name: ${list.map(i => esc(i.filePath)).join(' · ')}</div></div></div>`);
+      host.innerHTML = rows.join('') || empty('No duplicate instrument names in instruments/.');
+    } else if (probSec === 'dupesamp') {
+      if (!dupeContent) {
+        host.innerHTML = '<div class="center-note">Byte-level duplicate detection reads every sample once.<br>Press <b>Scan dupes</b> above to run it.</div>';
+      } else {
+        const g = dupeContent.groups;
+        host.innerHTML = (g.length ? `<div class="prob-group-hdr">${g.length} duplicate groups · ${fmtBytes(dupeContent.wasted)} duplicated</div>` : '') +
+          (g.map(grp => `<div class="prob-row"><span class="prob-icon">⧉</span>
+            <div class="prob-main"><div class="prob-name">${esc(grp.files[0].split('/').pop())} × ${grp.files.length}</div>
+            <div class="prob-sub">${grp.files.map(esc).join(' · ')}</div></div>
+            <span class="prob-right">${fmtBytes(grp.size)} each</span></div>`).join('')
+          || empty('No content-identical samples found.'));
+      }
+    } else if (probSec === 'autosaves') {
+      const list = lib.projects.filter(p => p.autosaveNewer);
+      host.innerHTML = list.map(p => `<div class="prob-row clickable" data-proj="${esc(p.dirName)}">
+        <span class="prob-icon">⏱</span>
+        <div class="prob-main"><div class="prob-name">${esc(p.name)}</div>
+        <div class="prob-sub">autosave.dat is newer than the explicit save — the device will load the autosave</div></div>
+        <span class="prob-right">${fmtDate(p.lastModified)}</span></div>`).join('')
+        || empty('No project has unsaved autosave state.');
+      host.querySelectorAll('.prob-row.clickable').forEach(r =>
+        r.addEventListener('click', () => { switchTab('projects'); openProjModal(r.dataset.proj); }));
+    } else if (probSec === 'skipped') {
+      host.innerHTML = lib.skipped.map(s => `<div class="prob-row"><span class="prob-icon">⚠</span>
+        <div class="prob-main"><div class="prob-name">${esc(s.path)}</div>
+        <div class="prob-sub">${esc(s.reason)}</div></div>
+        <span class="prob-right">${esc(s.kind)}</span></div>`).join('')
+        || empty('Every file on the card parsed cleanly.');
+    } else if (probSec === 'backbone') {
+      const counts = new Map();
+      for (const [nm, e] of sampleNameMap) {
+        const used = e.projects.filter(x => x.used).length;
+        if (used >= 2) counts.set(e.name, used);
+      }
+      const rows = [...counts.entries()].sort((a,b) => b[1]-a[1]).slice(0, 40);
+      host.innerHTML = (rows.length ? '<div class="prob-group-hdr">Samples used across multiple projects — your backbone sounds</div>' : '') +
+        (rows.map(([nm, n]) => `<div class="prob-row"><span class="prob-icon">★</span>
+          <div class="prob-main"><div class="prob-name">${esc(nm)}</div></div>
+          <span class="prob-right">${n} projects</span></div>`).join('')
+        || '<div class="center-note">No sample is used in more than one project yet.</div>');
+    } else if (probSec === 'repairlog') {
+      host.innerHTML = repairLog.slice().reverse().map(r => `<div class="prob-row">
+        <span class="prob-icon">${r.ok?'✓':'✕'}</span>
+        <div class="prob-main"><div class="prob-name">${esc(r.action)}</div>
+        <div class="prob-sub">${esc(r.detail)}</div></div>
+        <span class="prob-right">${new Date(r.ts).toLocaleString()}</span></div>`).join('')
+        || '<div class="center-note">No repairs have been made in this browser yet.<br>Repairs are also logged to PTLibrarian_Backups/audit-log.txt on the card.</div>';
+    }
+  }
+
+  async function runDupeScan() {
+    const btn = $('btn-dupescan');
+    btn.disabled = true; btn.textContent = 'Scanning…';
+    try {
+      const byKey = new Map(); // size:sha → paths[]
+      let wasted = 0;
+      async function hashFile(dirPath, name, size) {
+        try {
+          const parts = dirPath.split('/').filter(Boolean);
+          let dir = sd;
+          for (const seg of parts) dir = await dir.getDirectoryHandle(seg);
+          const f = await (await dir.getFileHandle(name)).getFile();
+          const buf = await f.arrayBuffer();
+          const dig = await crypto.subtle.digest('SHA-256', buf);
+          const key = size + ':' + [...new Uint8Array(dig)].slice(0,16).map(b=>b.toString(16).padStart(2,'0')).join('');
+          if (!byKey.has(key)) byKey.set(key, {size, files:[]});
+          byKey.get(key).files.push(dirPath + '/' + name);
+        } catch {}
+      }
+      let done = 0;
+      const jobs = [];
+      for (const s of lib.library) {
+        const slash = s.path.lastIndexOf('/');
+        jobs.push(['samples' + (slash>=0 ? '/'+s.path.slice(0,slash) : ''), s.name, s.size]);
+      }
+      for (const p of lib.projects)
+        for (const s of p.pool)
+          jobs.push([`projects/${p.dirName}/samples`, s.name, s.size]);
+      for (const [d, n, sz] of jobs) {
+        await hashFile(d, n, sz);
+        if (++done % 20 === 0) { btn.textContent = `Scanning… ${done}/${jobs.length}`; }
+      }
+      const groups = [...byKey.values()].filter(g => g.files.length > 1)
+        .map(g => { wasted += g.size * (g.files.length-1); return g; })
+        .sort((a,b) => b.size*(b.files.length-1) - a.size*(a.files.length-1));
+      dupeContent = { groups, wasted };
+      switchProb('dupesamp');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Scan dupes';
+    }
+  }
+
+  function exportReport() {
+    const c = probCounts();
+    const lines = [`picoTracker Librarian report — ${new Date().toLocaleString()}`, `Card: ${sd?.name}`, ''];
+    lines.push(`=== MISSING SAMPLES (${c.broken}) ===`);
+    for (const p of lib.projects)
+      for (const nm of p.missing) lines.push(`  ${p.name}: ${nm} (used by ${p.instruments.filter(i=>i.sample===nm).map(i=>i.name).join(', ')})`);
+    lines.push('', `=== UNUSED POOL SAMPLES (${c.unusedpool}) ===`);
+    for (const p of lib.projects)
+      for (const nm of p.unusedPool) lines.push(`  ${p.name}: ${nm}`);
+    lines.push('', `=== PROJECTS WITH NEWER AUTOSAVE (${c.autosaves}) ===`);
+    for (const p of lib.projects.filter(x=>x.autosaveNewer)) lines.push(`  ${p.name}`);
+    lines.push('', `=== DUPLICATE .PTI NAMES (${c.dupes}) ===`);
+    for (const [,list] of dupeNameMap) lines.push(`  ${list[0].name}: ${list.map(i=>i.filePath).join(', ')}`);
+    if (dupeContent) {
+      lines.push('', `=== CONTENT-IDENTICAL SAMPLES (${dupeContent.groups.length} groups, ${fmtBytes(dupeContent.wasted)} duplicated) ===`);
+      for (const g of dupeContent.groups) lines.push(`  ${fmtBytes(g.size)}: ${g.files.join(' | ')}`);
+    }
+    lines.push('', `=== UNREADABLE (${c.skipped}) ===`);
+    for (const s of lib.skipped) lines.push(`  ${s.path}: ${s.reason}`);
+    const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'pt-librarian-report.txt';
+    a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  // ── REPAIR ─────────────────────────────────────────────
+  let fixProj = null, fixChoices = [];
+
+  function openFixModal(p) {
+    if (!p || !p.missing.length) return;
+    fixProj = p;
+    fixChoices = p.missing.map(nm => {
+      const cand = sampleNameMap.get(nm.toLowerCase());
+      const copyOptions = [];
+      if (cand) {
+        for (const lp of cand.library) copyOptions.push({kind:'copy', label:`samples/${lp}`, srcDir:'samples', srcPath:lp});
+        for (const cp of cand.projects) if (cp.proj !== p.name)
+          copyOptions.push({kind:'copy', label:`projects/${cp.proj}/samples/${nm}`, srcDir:`projects`, srcPath:`${lib.projects.find(x=>x.name===cp.proj)?.dirName}/samples/${nm}`});
+      }
+      const repointOptions = p.pool.map(s => ({kind:'repoint', label:`→ ${s.name}`, newName:s.name}));
+      return { name: nm, insts: p.instruments.filter(i => i.sample === nm),
+        options: [...copyOptions, ...repointOptions], selected: copyOptions.length ? 0 : -1 };
+    });
+    $('fix-modal').classList.add('open');
+    $('fix-title').textContent = `Repair ${p.name} — ${p.missing.length} missing sample${p.missing.length>1?'s':''}`;
+    $('fix-status').textContent = '';
+    $('fix-status').className = 'fix-status';
+    renderFixBody();
+  }
+  function renderFixBody() {
+    $('fix-body').innerHTML = fixChoices.map((ch, i) => `
+      <div class="fix-ref">
+        <div class="fix-broken">✕ ${esc(ch.name)} <span style="color:var(--muted)">— ${ch.insts.map(x=>esc(x.idHex)+' '+esc(x.name)).join(', ')}</span></div>
+        <div class="fix-row">
+          <span class="fix-arrow">↳</span>
+          ${ch.options.length ? `<select class="fix-select" data-i="${i}">
+            <option value="-1">— skip this one —</option>
+            ${ch.options.map((o, oi) => `<option value="${oi}" ${ch.selected===oi?'selected':''}>${o.kind==='copy'?'copy from ':'re-point ref '}${esc(o.label)}</option>`).join('')}
+          </select>` : '<span class="fix-nocand">no candidates found anywhere on the card</span>'}
+        </div>
+      </div>`).join('') + `
+      <div class="fix-mode">
+        <div style="font-weight:600">How repairs are written</div>
+        <div class="fix-mode-sub">
+          “copy from” copies the wav into this project's samples/ pool under the referenced name (no project file edit).<br>
+          “re-point ref” rewrites the sample reference inside ${esc(fixProj.datName)} — the original is first backed up to
+          <span style="font-family:monospace">PTLibrarian_Backups/</span> on the card, the write is verified by re-parsing,
+          and rolled back automatically if verification fails. Every repair is appended to the card's audit log.
+        </div>
+      </div>`;
+    $('fix-body').querySelectorAll('.fix-select').forEach(sel =>
+      sel.addEventListener('change', () => { fixChoices[parseInt(sel.dataset.i,10)].selected = parseInt(sel.value,10); updateFixApply(); }));
+    updateFixApply();
+  }
+  function updateFixApply() {
+    $('btn-fix-apply').disabled = !fixChoices.some(ch => ch.selected >= 0);
+  }
+  function closeFixModal() { $('fix-modal').classList.remove('open'); fixProj = null; }
+
+  async function ensureWrite() {
+    if (writeMode) return true;
+    const perm = await sd.requestPermission({mode:'readwrite'});
+    if (perm !== 'granted') return false;
+    writeMode = true;
+    const b = $('ro-badge');
+    b.textContent = '✎ WRITE ENABLED';
+    b.classList.add('rw');
+    return true;
+  }
+
+  async function getPathDir(path, create) {
+    let dir = sd;
+    for (const seg of path.split('/').filter(Boolean))
+      dir = await dir.getDirectoryHandle(seg, {create: !!create});
+    return dir;
+  }
+  async function readCardFile(dirPath, name) {
+    const dir = await getPathDir(dirPath, false);
+    return await (await dir.getFileHandle(name)).getFile();
+  }
+  async function writeCardFile(dirPath, name, data) {
+    const dir = await getPathDir(dirPath, true);
+    const w = await (await dir.getFileHandle(name, {create:true})).createWritable();
+    await w.write(data); await w.close();
+  }
+  async function appendAudit(line) {
+    try {
+      let prev = '';
+      try { prev = await (await readCardFile('PTLibrarian_Backups', 'audit-log.txt')).text(); } catch {}
+      await writeCardFile('PTLibrarian_Backups', 'audit-log.txt', prev + line + '\n');
+    } catch(e) { console.warn('audit log write failed', e); }
+  }
+  function logRepair(ok, action, detail) {
+    repairLog.push({ts: Date.now(), ok, action, detail});
+    appendAudit(`${new Date().toISOString()}  ${ok?'OK ':'ERR'}  ${action}  ${detail}`);
+  }
+
+  async function applyFixes() {
+    const status = $('fix-status');
+    const setStatus = (msg, cls) => { status.textContent = msg; status.className = 'fix-status ' + (cls||''); };
+    if (!await ensureWrite()) { setStatus('Write permission denied.', 'err'); return; }
+    $('btn-fix-apply').disabled = true;
+    const p = fixProj;
+    const projPath = `projects/${p.dirName}`;
+    const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+    const backupPath = `PTLibrarian_Backups/${stamp}/${p.dirName}`;
+    let datBackedUp = false, datOriginal = null;
+
+    try {
+      // mtime guard: refuse if the project changed since the scan
+      const curFile = await readCardFile(projPath, p.datName);
+      if (curFile.lastModified !== p.lastModified || curFile.size !== p.fileSize) {
+        setStatus('Project file changed since the last scan — rescan first (no writes made).', 'err');
+        return;
+      }
+      let text = await curFile.text();
+      let textDirty = false;
+
+      for (const ch of fixChoices) {
+        if (ch.selected < 0) continue;
+        const opt = ch.options[ch.selected];
+        if (opt.kind === 'copy') {
+          setStatus(`Copying ${opt.label}…`);
+          const srcFile = opt.srcDir === 'samples'
+            ? await readCardFile('samples' + (opt.srcPath.includes('/') ? '/'+opt.srcPath.slice(0, opt.srcPath.lastIndexOf('/')) : ''), opt.srcPath.split('/').pop())
+            : await readCardFile('projects/' + opt.srcPath.slice(0, opt.srcPath.lastIndexOf('/')), opt.srcPath.split('/').pop());
+          const bytes = await srcFile.arrayBuffer();
+          await writeCardFile(`${projPath}/samples`, ch.name, bytes);
+          const verify = await readCardFile(`${projPath}/samples`, ch.name);
+          if (verify.size !== bytes.byteLength) throw new Error(`copy verification failed for ${ch.name}`);
+          logRepair(true, 'copy-sample', `${p.name}: ${opt.label} → samples/${ch.name} (${fmtBytes(bytes.byteLength)})`);
+        } else if (opt.kind === 'repoint') {
+          for (const inst of ch.insts) {
+            const res = PT.rewriteSampleRef(text, inst.idHex, ch.name, opt.newName);
+            if (!res.ok) throw new Error(res.error);
+            text = res.text;
+            textDirty = true;
+            logRepair(true, 'repoint-ref', `${p.name}: instrument ${inst.idHex} ${inst.name}: ${ch.name} → ${opt.newName}`);
+          }
+        }
+      }
+
+      if (textDirty) {
+        setStatus('Backing up project file…');
+        datOriginal = await curFile.arrayBuffer();
+        await writeCardFile(backupPath, p.datName, datOriginal);
+        datBackedUp = true;
+        setStatus('Writing project file…');
+        await writeCardFile(projPath, p.datName, text);
+        // verify
+        const reread = await (await readCardFile(projPath, p.datName)).text();
+        const parsed = PT.parseProject(reread);
+        if (!parsed) throw new Error('verification failed: rewritten file does not parse');
+        for (const ch of fixChoices) {
+          if (ch.selected < 0) continue;
+          const opt = ch.options[ch.selected];
+          if (opt.kind !== 'repoint') continue;
+          for (const inst of ch.insts) {
+            const ni = parsed.instruments.find(x => x.idHex === inst.idHex);
+            if (!ni || ni.sample !== opt.newName) throw new Error(`verification failed: ${inst.idHex} still references ${ni?.sample ?? '?'}`);
+          }
+        }
+      }
+
+      setStatus('Repairs applied ✓ — rescanning…', 'ok');
+      closeFixModal();
+      await persist();
+      await rescan(lib);
+    } catch(e) {
+      console.error('repair failed', e);
+      logRepair(false, 'repair', `${p.name}: ${e.message||e}`);
+      if (datBackedUp && datOriginal) {
+        try {
+          await writeCardFile(projPath, p.datName, datOriginal);
+          setStatus(`Failed: ${e.message||e} — original restored from backup.`, 'err');
+        } catch(e2) {
+          setStatus(`Failed: ${e.message||e} — RESTORE ALSO FAILED, backup is at ${backupPath}/${p.datName}`, 'err');
+        }
+      } else {
+        setStatus(`Failed: ${e.message||e} (project file untouched)`, 'err');
+      }
+      $('btn-fix-apply').disabled = false;
+      await persist();
+    }
+  }
+
+  // ── SETS ───────────────────────────────────────────────
+  function setDeps(dirNames) {
+    const projs = dirNames.map(projByDir).filter(Boolean);
+    const bytes = projs.reduce((n,p) => n + p.fileSize + p.poolBytes, 0);
+    const missing = projs.reduce((n,p) => n + p.missing.length, 0);
+    const samples = projs.reduce((n,p) => n + p.pool.length, 0);
+    return { projs, bytes, missing, samples };
+  }
+  function renderSets() {
+    const q = setFilter.toLowerCase();
+    const list = lib.projects.filter(p => p.name.toLowerCase().includes(q));
+    $('set-stat').textContent = `${setSel.size} selected`;
+    const host = $('set-list');
+    host.innerHTML = list.map(p => `
+      <div class="set-row" data-proj="${esc(p.dirName)}">
+        <input type="checkbox" ${setSel.has(p.dirName)?'checked':''}>
+        <span class="set-row-name">${esc(p.name)}</span>
+        <span class="set-row-meta ${p.missing.length?'bad':''}">${p.missing.length?p.missing.length+' missing · ':''}${p.pool.length} smp · ${fmtBytes(p.fileSize + p.poolBytes)}</span>
+      </div>`).join('') || '<div class="no-results">No projects.</div>';
+    host.querySelectorAll('.set-row').forEach(r =>
+      r.addEventListener('click', () => {
+        const d = r.dataset.proj;
+        setSel.has(d) ? setSel.delete(d) : setSel.add(d);
+        renderSets();
+      }));
+    const deps = setDeps([...setSel]);
+    $('set-summary').innerHTML = setSel.size ? `
+      <span class="set-sum-item"><b>${deps.projs.length}</b> projects</span>
+      <span class="set-sum-item"><b>${deps.samples}</b> samples</span>
+      <span class="set-sum-item"><b>${fmtBytes(deps.bytes)}</b> total</span>
+      ${deps.missing ? `<span class="set-sum-item warn"><b>${deps.missing}</b> missing samples will stay missing</span>` : ''}
+      <button class="btn sm" id="btn-set-export">⬇ Export to folder</button>
+      <button class="btn sm secondary" id="btn-set-zip">⬇ ZIP</button>
+      <div class="set-log" id="set-log"></div>` : '<span class="set-sum-item">Tick projects to build a lean export set — each project folder is fully self-contained.</span>';
+    $('btn-set-export')?.addEventListener('click', () => exportSet(false));
+    $('btn-set-zip')?.addEventListener('click', () => exportSet(true));
+  }
+  const setLog = (cls, msg) => {
+    const el = $('set-log');
+    if (el) { el.innerHTML += `<div class="${cls}">${esc(msg)}</div>`; el.scrollTop = el.scrollHeight; }
+  };
+  async function exportSet(asZip) {
+    const name = ($('set-name').value.trim() || 'PT_SET');
+    const dirNames = [...setSel];
+    if (!dirNames.length) return;
+    if (asZip) {
+      let writable;
+      try {
+        const fh = await window.showSaveFilePicker({ suggestedName: `${name}.zip`,
+          types: [{description:'ZIP archive', accept:{'application/zip':['.zip']}}] });
+        writable = await fh.createWritable();
+      } catch(e) { if (e.name !== 'AbortError') setLog('err', e.message); return; }
+      const zip = new Zip.Writer(writable);
+      try {
+        let count = 0;
+        for (const d of dirNames) {
+          setLog('ok', `Adding ${d}…`);
+          const pd = await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(d);
+          for await (const entry of Scanner.walkFiles(pd, `projects/${d}`)) {
+            const f = await entry.handle.getFile();
+            await zip.add(entry.path, new Uint8Array(await f.arrayBuffer()), f.lastModified);
+            count++;
+          }
+        }
+        await zip.finish();
+        await writable.close();
+        setLog('ok', `Done — ${count} files.`);
+      } catch(e) {
+        try { await writable.abort?.(); } catch {}
+        setLog('err', e.message||String(e));
+      }
+      return;
+    }
+    let dest;
+    try { dest = await window.showDirectoryPicker({mode:'readwrite'}); }
+    catch(e) { if (e.name !== 'AbortError') setLog('err', e.message); return; }
+    try {
+      const rel = await sd.resolve(dest);
+      if (rel !== null) { setLog('err', 'Destination is inside the SD card — choose a folder on your computer.'); return; }
+    } catch {}
+    try {
+      const setDir = await dest.getDirectoryHandle(name, {create:true});
+      const projRoot = await setDir.getDirectoryHandle('projects', {create:true});
+      let count = 0;
+      for (const d of dirNames) {
+        setLog('ok', `Copying ${d}…`);
+        const pd = await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(d);
+        await copyDir(pd, await projRoot.getDirectoryHandle(d, {create:true}), () => count++);
+      }
+      setLog('ok', `Done — ${count} files in ${name}/ (card-ready layout).`);
+    } catch(e) { setLog('err', e.message||String(e)); }
+  }
+  function refreshSavedSets() {
+    const sel = $('set-saved');
+    sel.innerHTML = '<option value="">— saved sets —</option>' +
+      Object.keys(savedSets).sort().map(n => `<option value="${esc(n)}">${esc(n)} (${savedSets[n].length})</option>`).join('');
+  }
+
+  // ── BACKUP ─────────────────────────────────────────────
+  const BACKUP_DIRS = ['projects','samples','instruments','themes','renders','recordings'];
+  function backupSelectedDirs() {
+    return BACKUP_DIRS.filter(d => $('inc-'+d)?.checked);
+  }
+  function renderBackupCounts() {
+    $('cnt-projects').textContent = `${lib.projects.length}`;
+    $('cnt-samples').textContent = `${lib.library.length} · ${fmtBytes(lib.library.reduce((n,s)=>n+s.size,0))}`;
+    $('cnt-instruments').textContent = `${lib.ptis.length}`;
+    $('cnt-themes').textContent = `${lib.themes.length}`;
+    $('cnt-renders').textContent = `${renders.length} · ${fmtBytes(renders.reduce((n,r)=>n+r.fileSize,0))}`;
+    $('cnt-recordings').textContent = `${recordings.length}`;
+  }
+  const bkLog = (cls, msg) => {
+    const el = $('backup-log');
+    el.innerHTML += `<div class="log-line ${cls}">${esc(msg)}</div>`;
+    el.scrollTop = el.scrollHeight;
+  };
+
+  // ── STATS ──────────────────────────────────────────────
+  function barChart(entries, fmt) {
+    const max = Math.max(...entries.map(e => e[1]), 1);
+    return `<div class="bar-chart">${entries.map(([label, v]) => `
+      <div class="bar-row"><span class="bar-label" title="${esc(label)}">${esc(label)}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/max*100)}%"></div></div>
+      <span class="bar-val">${fmt ? fmt(v) : v}</span></div>`).join('')}</div>`;
+  }
+  function renderStats() {
+    const projs = lib.projects;
+    const allI = allInstruments();
+    const typeCounts = {};
+    for (const i of allI) typeCounts[i.type] = (typeCounts[i.type]||0)+1;
+    const cmdTotals = {};
+    for (const p of projs)
+      for (const [c, n] of Object.entries(p.cmdCounts || {}))
+        cmdTotals[c] = (cmdTotals[c]||0) + n;
+    const cmdRows = Object.entries(cmdTotals).map(([c,n]) => [PT.cmdName(parseInt(c,10)), n])
+      .sort((a,b) => b[1]-a[1]).slice(0, 12);
+    const fw = {};
+    for (const p of projs) fw[p.version ?? '?'] = (fw[p.version ?? '?']||0)+1;
+    const tempoBuckets = new Map();
+    for (const p of projs) {
+      if (!p.tempo) continue;
+      const b = Math.floor(p.tempo/20)*20;
+      tempoBuckets.set(b, (tempoBuckets.get(b)||0)+1);
+    }
+    const scales = {};
+    for (const p of projs) { const s = p.scale ?? '—'; scales[s] = (scales[s]||0)+1; }
+    const backbone = [...sampleNameMap.values()]
+      .map(e => [e.name, e.projects.filter(x=>x.used).length])
+      .filter(e => e[1] > 0).sort((a,b) => b[1]-a[1]).slice(0, 10);
+    const recent = [...projs].sort((a,b) => b.lastModified - a.lastModified).slice(0, 8);
+    const totalNotes = projs.reduce((n,p) => n+(p.noteCount||0), 0);
+    const cardBytes = projs.reduce((n,p)=>n+p.fileSize+p.poolBytes,0) + lib.library.reduce((n,s)=>n+s.size,0);
+    const cfg = lib.config;
+
+    $('stats-grid').innerHTML = `
+      <div class="stat-card"><div class="stat-card-title">Collection</div>
+        <div class="stat-kpi-row">
+          <div class="stat-kpi"><div class="stat-kpi-val">${projs.length}</div><div class="stat-kpi-lbl">projects</div></div>
+          <div class="stat-kpi"><div class="stat-kpi-val">${allI.length}</div><div class="stat-kpi-lbl">instruments</div></div>
+          <div class="stat-kpi"><div class="stat-kpi-val">${lib.library.length + projs.reduce((n,p)=>n+p.pool.length,0)}</div><div class="stat-kpi-lbl">samples</div></div>
+          <div class="stat-kpi"><div class="stat-kpi-val">${totalNotes}</div><div class="stat-kpi-lbl">notes placed</div></div>
+          <div class="stat-kpi"><div class="stat-kpi-val ${projs.reduce((n,p)=>n+p.missing.length,0)?'bad':''}">${projs.reduce((n,p)=>n+p.missing.length,0)}</div><div class="stat-kpi-lbl">missing refs</div></div>
+          <div class="stat-kpi"><div class="stat-kpi-val">${fmtBytes(cardBytes)}</div><div class="stat-kpi-lbl">music data</div></div>
+        </div></div>
+      <div class="stat-card"><div class="stat-card-title">Instrument types</div>
+        ${barChart(Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]))}</div>
+      <div class="stat-card"><div class="stat-card-title">FX command usage</div>
+        ${cmdRows.length ? barChart(cmdRows) : '<div style="color:var(--muted);font-size:12px">No commands used yet.</div>'}</div>
+      <div class="stat-card"><div class="stat-card-title">Tempo distribution</div>
+        ${tempoBuckets.size ? barChart([...tempoBuckets.entries()].sort((a,b)=>a[0]-b[0]).map(([b,n]) => [`${b}–${b+19} BPM`, n])) : '<div style="color:var(--muted);font-size:12px">—</div>'}</div>
+      <div class="stat-card"><div class="stat-card-title">Scales</div>
+        ${barChart(Object.entries(scales).sort((a,b)=>b[1]-a[1]).slice(0,8))}</div>
+      <div class="stat-card"><div class="stat-card-title">Firmware versions</div>
+        ${barChart(Object.entries(fw).sort((a,b)=>b[1]-a[1]))}</div>
+      <div class="stat-card"><div class="stat-card-title">Backbone samples</div>
+        ${backbone.length ? barChart(backbone, v => v+'p') : '<div style="color:var(--muted);font-size:12px">No cross-project samples yet.</div>'}</div>
+      <div class="stat-card"><div class="stat-card-title">Recently modified</div>
+        <div class="recent-list">${recent.map(p => `
+          <div class="recent-item" data-proj="${esc(p.dirName)}">
+            <span class="recent-name">${esc(p.name)}</span>
+            <span class="recent-date">${fmtDate(p.lastModified)}</span>
+          </div>`).join('')}</div></div>
+      ${cfg ? `<div class="stat-card"><div class="stat-card-title">Device config (.config.xml)</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.9">
+          ${Object.entries(cfg.values).map(([k,v]) => `${esc(k.toLowerCase())}: <span style="color:var(--text)">${esc(v)}</span>`).join('<br>')}
+          ${lib.currentProject ? `<br>current project: <span style="color:var(--accent)">${esc(lib.currentProject)}</span>` : ''}
+        </div></div>` : ''}`;
+    $('stats-grid').querySelectorAll('.recent-item').forEach(el =>
+      el.addEventListener('click', () => { switchTab('projects'); openProjModal(el.dataset.proj); }));
+  }
+
+  // ── GLOBAL SEARCH ──────────────────────────────────────
+  let srchFocus = -1;
+  function openSearch() {
+    $('search-overlay').classList.add('open');
+    $('srch-input').value = '';
+    $('srch-results').innerHTML = '';
+    $('srch-input').focus();
+    srchFocus = -1;
+  }
+  function closeSearch() { $('search-overlay').classList.remove('open'); }
+  function runSearch(q) {
+    if (!lib || q.length < 2) { $('srch-results').innerHTML = q.length ? '<div class="sr-empty">Keep typing…</div>' : ''; return; }
+    const lq = q.toLowerCase();
+    const groups = [];
+    const projs = lib.projects.filter(p => p.name.toLowerCase().includes(lq)).slice(0, 8);
+    if (projs.length) groups.push(['Projects', projs.map(p => ({icon:'▦', name:p.name, meta:`${p.tempo??'—'} BPM · ${p.instruments.length} instr`,
+      go: () => { switchTab('projects'); openProjModal(p.dirName); }}))]);
+    const instrs = allInstruments().filter(i => i.name.toLowerCase().includes(lq)).slice(0, 8);
+    if (instrs.length) groups.push(['Instruments', instrs.map(i => ({icon:'▮', name:i.name, meta:i.srcLabel,
+      go: () => { switchTab('instruments'); $('instr-q').value = i.name; instrFilter = i.name; renderInstruments(); }}))]);
+    const samps = [...sampleNameMap.values()].filter(e => e.name.toLowerCase().includes(lq)).slice(0, 8);
+    if (samps.length) groups.push(['Samples', samps.map(s => ({icon:'♪', name:s.name, meta:`${s.projects.length} pools · ${s.library.length} library`,
+      go: () => openSampModal(s.name)}))]);
+    const themes = lib.themes.filter(t => t.fileName.toLowerCase().includes(lq)).slice(0, 5);
+    if (themes.length) groups.push(['Themes', themes.map(t => ({icon:'▨', name:t.fileName, meta:'themes/',
+      go: () => { switchTab('themes'); $('theme-q').value = t.fileName; themeFilter = t.fileName; renderThemes(); }}))]);
+    let idx = 0;
+    const items = [];
+    $('srch-results').innerHTML = groups.map(([g, list]) => `
+      <div class="sr-group">${esc(g)}</div>` + list.map(item => {
+        items.push(item);
+        return `<div class="sr-item" data-idx="${idx++}">
+          <span class="sr-icon">${item.icon}</span>
+          <div class="sr-text"><div class="sr-name">${esc(item.name)}</div><div class="sr-meta">${esc(item.meta)}</div></div>
+        </div>`;
+      }).join('')).join('') || '<div class="sr-empty">No matches.</div>';
+    srchFocus = -1;
+    $('srch-results').querySelectorAll('.sr-item').forEach(el =>
+      el.addEventListener('click', () => { closeSearch(); items[parseInt(el.dataset.idx,10)].go(); }));
+    $('srch-results')._items = items;
+  }
+
+  // ── WIRING ─────────────────────────────────────────────
+  function init() {
+    const supported = 'showDirectoryPicker' in window;
+    if (!supported) $('browser-warn').style.display = 'block';
+    $('btn-open').addEventListener('click', () => openCard());
+    $('btn-open-empty').addEventListener('click', () => openCard());
+    $('btn-rescan').addEventListener('click', () => rescan(null));
+    Cache.loadHandle().then(rec => {
+      if (rec?.handle) {
+        $('reconnect-card').style.display = 'flex';
+        $('empty-divider').style.display = 'block';
+        $('reconnect-name').textContent = rec.name;
+        $('btn-reconnect').addEventListener('click', async () => {
+          const perm = await rec.handle.requestPermission({mode:'read'});
+          if (perm === 'granted') openCard(rec.handle);
+        });
+      }
+    });
+
+    document.querySelectorAll('.tab-btn').forEach(b =>
+      b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+    // Projects
+    $('proj-q').addEventListener('input', debounce(e => { projFilter = e.target.value; renderProjects(); }));
+    $('proj-sort').addEventListener('change', e => { projSort = e.target.value; renderProjects(); });
+    $('proj-miss-btn').addEventListener('click', () => { projMissOnly = !projMissOnly; $('proj-miss-btn').classList.toggle('on', projMissOnly); renderProjects(); });
+    $('vtog-list').addEventListener('click', () => { projView='list'; $('vtog-list').classList.add('active'); $('vtog-grid').classList.remove('active'); renderProjects(); });
+    $('vtog-grid').addEventListener('click', () => { projView='grid'; $('vtog-grid').classList.add('active'); $('vtog-list').classList.remove('active'); renderProjects(); });
+
+    // Modal
+    $('btn-modal-close').addEventListener('click', closeProjModal);
+    $('proj-modal').addEventListener('click', e => { if (e.target === $('proj-modal')) closeProjModal(); });
+    $('btn-modal-prev').addEventListener('click', () => modalNav(-1));
+    $('btn-modal-next').addEventListener('click', () => modalNav(1));
+    $('btn-modal-patterns').addEventListener('click', togglePatternView);
+    $('btn-modal-midi').addEventListener('click', exportMidi);
+    $('btn-modal-diff').addEventListener('click', () => modalProj && startDiff(modalProj));
+
+    // Diff
+    $('btn-diff-close').addEventListener('click', closeDiff);
+    $('diff-modal').addEventListener('click', e => { if (e.target === $('diff-modal')) closeDiff(); });
+    $('diff-srch').addEventListener('input', debounce(e => renderDiffPick(e.target.value)));
+    $('btn-diff-pick-cancel')?.addEventListener('click', () => { $('diff-pick-banner').style.display='none'; diffPending=null; });
+
+    // Instruments
+    $('instr-q').addEventListener('input', debounce(e => { instrFilter = e.target.value; renderInstruments(); }));
+    $('instr-sort').addEventListener('change', e => { instrSort = e.target.value; renderInstruments(); });
+    $('instr-inproj').addEventListener('change', e => { instrInProj = e.target.checked; renderInstruments(); });
+    renderTypeFilters();
+
+    // Samples
+    $('sampbr-q').addEventListener('input', debounce(e => { sampFilter = e.target.value; renderSamples(); }));
+    $('btn-samp-close').addEventListener('click', () => $('samp-modal').classList.remove('open'));
+    $('samp-modal').addEventListener('click', e => { if (e.target === $('samp-modal')) $('samp-modal').classList.remove('open'); });
+
+    // Themes
+    $('theme-q').addEventListener('input', debounce(e => { themeFilter = e.target.value; renderThemes(); }));
+    $('btn-theme-reset').addEventListener('click', resetTheme);
+
+    // Problems
+    document.querySelectorAll('.prob-btn').forEach(b =>
+      b.addEventListener('click', () => switchProb(b.dataset.psec)));
+    $('btn-dupescan').addEventListener('click', runDupeScan);
+    $('btn-export-report').addEventListener('click', exportReport);
+
+    // Fix modal
+    $('btn-fix-close').addEventListener('click', closeFixModal);
+    $('btn-fix-cancel').addEventListener('click', closeFixModal);
+    $('btn-fix-apply').addEventListener('click', applyFixes);
+
+    // Sets
+    $('set-q').addEventListener('input', debounce(e => { setFilter = e.target.value; renderSets(); }));
+    $('btn-set-save').addEventListener('click', async () => {
+      const nm = $('set-name').value.trim();
+      if (!nm || !setSel.size) return;
+      savedSets[nm] = [...setSel];
+      refreshSavedSets();
+      $('set-saved').value = nm;
+      await persist();
+    });
+    $('set-saved').addEventListener('change', e => {
+      const nm = e.target.value;
+      if (nm && savedSets[nm]) { setSel = new Set(savedSets[nm]); $('set-name').value = nm; renderSets(); }
+    });
+    $('btn-set-delete').addEventListener('click', async () => {
+      const nm = $('set-saved').value;
+      if (nm) { delete savedSets[nm]; refreshSavedSets(); await persist(); }
+    });
+
+    // Backup
+    $('btn-backup').addEventListener('click', async () => {
+      if (!await ensureWrite()) { bkLog('err', 'Write permission needed to read all files reliably was denied.'); }
+      createBackup(sd, backupSelectedDirs(), bkLog,
+        (n, nm) => bkLog('ok', `✓ Backup complete — ${n} files in ${nm}`),
+        m => bkLog('err', '✕ ' + m));
+    });
+    $('btn-backup-zip').addEventListener('click', () =>
+      createBackupZip(sd, backupSelectedDirs(), bkLog,
+        (n, nm) => bkLog('ok', `✓ ZIP complete — ${n} files in ${nm}`),
+        m => bkLog('err', '✕ ' + m)));
+
+    // Search
+    $('btn-search').addEventListener('click', openSearch);
+    $('srch-esc-kbd').addEventListener('click', closeSearch);
+    $('search-overlay').addEventListener('click', e => { if (e.target === $('search-overlay')) closeSearch(); });
+    $('srch-input').addEventListener('input', debounce(e => runSearch(e.target.value), 80));
+    $('srch-input').addEventListener('keydown', e => {
+      const items = $('srch-results')._items || [];
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        srchFocus = Math.max(0, Math.min(items.length-1, srchFocus + (e.key==='ArrowDown'?1:-1)));
+        $('srch-results').querySelectorAll('.sr-item').forEach((el,i) => el.classList.toggle('sr-focus', i===srchFocus));
+        $('srch-results').querySelectorAll('.sr-item')[srchFocus]?.scrollIntoView({block:'nearest'});
+      } else if (e.key === 'Enter' && srchFocus >= 0 && items[srchFocus]) {
+        closeSearch(); items[srchFocus].go();
+      }
+    });
+
+    // Keyboard
+    document.addEventListener('keydown', e => {
+      const inInput = /^(input|select|textarea)$/i.test(e.target.tagName);
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); lib && openSearch(); return; }
+      if (e.key === 'Escape') {
+        closeSearch(); closeDiff(); closeFixModal();
+        $('samp-modal').classList.remove('open');
+        closeProjModal();
+        return;
+      }
+      if (inInput || !lib) return;
+      if ($('proj-modal').style.display !== 'none') {
+        if (e.key === 'ArrowLeft') modalNav(-1);
+        if (e.key === 'ArrowRight') modalNav(1);
+        return;
+      }
+      const tabKeys = {'1':'projects','2':'instruments','3':'samples','4':'themes','5':'grooves','6':'problems','7':'renders','8':'sets','9':'backup','0':'stats'};
+      if (tabKeys[e.key]) { switchTab(tabKeys[e.key]); return; }
+      if (curTab === 'projects') {
+        if (e.key.toLowerCase() === 'l') $('vtog-list').click();
+        if (e.key.toLowerCase() === 'g') $('vtog-grid').click();
+      }
+      if (curTab === 'samples' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        e.preventDefault();
+        sampbrAudition(e.key === 'ArrowDown' ? 1 : -1);
+      }
+    });
+
+    refreshSavedSets();
+  }
+
+  return { init };
+})();
+
+document.addEventListener('DOMContentLoaded', UI.init);
+</script>
+</body>
+</html>
