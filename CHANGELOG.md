@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.3 — scan speed
+- Warm opens no longer re-read every pool/library wav: metadata is
+  cached by size+mtime, so an unchanged card rescans with directory
+  listings only (the status bar now reports how many samples were
+  actually read — expect 0 on a reopen). Remaining reads and project
+  parsing run with bounded concurrency (SD readers hate sequential
+  round-trips). e2e now asserts the 0-reads warm path.
+
 ## v0.4.2 — hardening release (adversarial review pass)
 Three independent reviews of the whole codebase; every confirmed finding
 fixed, each with a regression test where testable:

@@ -35,6 +35,7 @@ const health = await page.evaluate(() => ({
 check('demo: 3 projects', health.projects === 3);
 check('demo: 2 missing samples', health.broken === 2);
 
+
 // ── 2. batch repair fixes the fixable one ──────────────
 await page.click('.tab-btn[data-tab="problems"]');
 await page.waitForTimeout(300);
@@ -204,6 +205,49 @@ const slicesAfter = await page.evaluate(() => {
   }, 400));
 });
 check('slicer: 7 markers persisted to card (8 slices)', slicesAfter === 7);
+
+// ── 9. warm reopen of a (mock) real card reads no wav content ──
+await page.evaluate(() => {
+  function mkFile(name, content, mtime = 1700000000000) {
+    const data = typeof content === 'string' ? new TextEncoder().encode(content) : content;
+    return { kind: 'file', name, getFile: async () => new File([data], name, { lastModified: mtime }),
+      createWritable: async () => ({ write: async () => {}, close: async () => {} }) };
+  }
+  function mkDir(name, entries) {
+    return { kind: 'directory', name, entries,
+      async *[Symbol.asyncIterator]() { for (const [n, h] of Object.entries(entries)) yield [n, h]; },
+      async getDirectoryHandle(n, o) { const h = entries[n]; if (h?.kind === 'directory') return h;
+        if (o?.create) { const d = mkDir(n, {}); entries[n] = d; return d; } throw new DOMException('nf', 'NotFoundError'); },
+      async getFileHandle(n, o) { const h = entries[n]; if (h?.kind === 'file') return h;
+        if (o?.create) { const f = mkFile(n, new Uint8Array()); entries[n] = f; return f; } throw new DOMException('nf', 'NotFoundError'); },
+      async requestPermission() { return 'granted'; },
+      async resolve() { return null; }, async isSameEntry() { return false; } };
+  }
+  const wav = () => { const b = new Uint8Array(100); b.set([82,73,70,70]); b.set([87,65,86,69], 8); return b; };
+  const RUN = (v, l) => `<DATA VALUE="${v}" LENGTH="${l}"/>`;
+  const proj = `<PICOTRACKER><PROJECT VERSION="3.1"><PARAMETER NAME="tempo" VALUE="120"/></PROJECT>
+<SONG><SONG><DATA>00</DATA></SONG><CHAINS><DATA>00</DATA></CHAINS><TRANSPOSES>${RUN(0,16)}</TRANSPOSES>
+<NOTES><DATA>3C</DATA></NOTES><INSTRUMENTS><DATA>00</DATA></INSTRUMENTS>
+<COMMAND1>${RUN(45,16)}</COMMAND1><PARAM1>${RUN(0,32)}</PARAM1><COMMAND2>${RUN(45,16)}</COMMAND2><PARAM2>${RUN(0,32)}</PARAM2></SONG>
+<INSTRUMENTBANK><INSTRUMENT ID="00" TYPE="SAMPLE"><PARAM NAME="sample" VALUE="k.wav"/></INSTRUMENT></INSTRUMENTBANK>
+<TABLES/><GROOVES>${RUN(255,64)}</GROOVES><MIXER/></PICOTRACKER>`;
+  const card = mkDir('WARMCARD', {
+    projects: mkDir('projects', { ONE: mkDir('ONE', {
+      'ptsav.dat': mkFile('ptsav.dat', proj),
+      samples: mkDir('samples', { 'k.wav': mkFile('k.wav', wav()), 'x.wav': mkFile('x.wav', wav()) }),
+    }) }),
+    samples: mkDir('samples', { 'lib.wav': mkFile('lib.wav', wav()) }),
+  });
+  window.showDirectoryPicker = async () => card;
+});
+await page.click('#btn-open');
+await page.waitForTimeout(1200);
+const coldMsg = await page.evaluate(() => document.getElementById('cache-msg').textContent);
+check('cold open reads sample heads', /[1-9]\d* samples? read/.test(coldMsg));
+await page.click('#btn-open');
+await page.waitForTimeout(1500);
+const warmMsg = await page.evaluate(() => document.getElementById('cache-msg').textContent);
+check('warm reopen reads 0 sample heads', warmMsg.includes('0 samples read'));
 
 check('zero console errors across the whole run', errors.length === 0);
 if (errors.length) console.error(errors);

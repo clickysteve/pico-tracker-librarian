@@ -606,7 +606,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.4.2 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.4.3 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -1983,6 +1983,20 @@ const Cache = (() => {
 //   /renders/*.wav /recordings/*.wav /.config.xml
 // ══════════════════════════════════════════════════════════
 const Scanner = (() => {
+  // bounded-concurrency map — SD readers hate thousands of sequential
+  // round trips; 8 in flight is a good balance for FSA
+  async function mapLimit(items, limit, fn) {
+    const out = new Array(items.length);
+    let i = 0;
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+      for (;;) {
+        const k = i++;
+        if (k >= items.length) return;
+        out[k] = await fn(items[k], k);
+      }
+    }));
+    return out;
+  }
   async function subDir(root, name) {
     try { return await root.getDirectoryHandle(name); } catch { return null; }
   }
@@ -1992,11 +2006,6 @@ const Scanner = (() => {
       if (h.kind === 'file') yield {name, path:fp, handle:h};
       else yield* walkFiles(h, fp);
     }
-  }
-  async function readHead(handle, bytes) {
-    const f = await handle.getFile();
-    const buf = await f.slice(0, bytes).arrayBuffer();
-    return { u8: new Uint8Array(buf), size: f.size, lastModified: f.lastModified };
   }
 
   // Digest the heavy parse result into what the UI/cache needs.
@@ -2033,12 +2042,12 @@ const Scanner = (() => {
   }
 
   async function scanProjectsDir(dir, ctx, onProgress) {
-    const projects = [];
     const entries = [];
     for await (const [name, h] of dir) if (h.kind === 'directory') entries.push({name, h});
     entries.sort((a,b) => a.name.localeCompare(b.name));
     let done = 0;
-    for (const {name, h} of entries) {
+    const projects = [];
+    await mapLimit(entries, 4, async ({name, h}) => {
       done++;
       onProgress?.(`Scanning projects… ${done}/${entries.length}`);
       let datHandle = null, datName = null;
@@ -2056,7 +2065,7 @@ const Scanner = (() => {
           }
         }
       }
-      if (!datHandle) { ctx.skipped.push({path:`projects/${name}`, kind:'project', reason:'no project data file found'}); continue; }
+      if (!datHandle) { ctx.skipped.push({path:`projects/${name}`, kind:'project', reason:'no project data file found'}); return; }
 
       let hasAutosave = false, autosaveNewer = false;
       let autoMtime = 0;
@@ -2065,18 +2074,28 @@ const Scanner = (() => {
         hasAutosave = true; autoMtime = af.lastModified;
       } catch {}
 
-      // Pool samples
-      const pool = [];
+      // Pool samples — reuse cached wav metadata when size+mtime are
+      // unchanged (a warm rescan then does zero content reads here),
+      // and read the rest with bounded concurrency
+      const prevPool = new Map((ctx.prev.get(name)?.pool ?? []).map(x => [x.name, x]));
+      let pool = [];
       const sdir = await subDir(h, 'samples');
       if (sdir) {
-        for await (const [fn, fh] of sdir) {
-          if (fh.kind !== 'file' || !fn.toLowerCase().endsWith('.wav')) continue;
+        const wavEntries = [];
+        for await (const [fn, fh] of sdir)
+          if (fh.kind === 'file' && fn.toLowerCase().endsWith('.wav')) wavEntries.push([fn, fh]);
+        pool = await mapLimit(wavEntries, 8, async ([fn, fh]) => {
           try {
-            const head = await readHead(fh, 4096);
-            pool.push({ name: fn, size: head.size, lastModified: head.lastModified,
-              meta: PT.parseWavHeader(head.u8, head.size) });
-          } catch { pool.push({ name: fn, size: 0, lastModified: 0, meta: null }); }
-        }
+            const f = await fh.getFile();
+            const prev = prevPool.get(fn);
+            if (prev && prev.size === f.size && prev.lastModified === f.lastModified)
+              return { name: fn, size: f.size, lastModified: f.lastModified, meta: prev.meta };
+            ctx.stats.headReads++;
+            const u8 = new Uint8Array(await f.slice(0, 4096).arrayBuffer());
+            return { name: fn, size: f.size, lastModified: f.lastModified,
+              meta: PT.parseWavHeader(u8, f.size) };
+          } catch { return { name: fn, size: 0, lastModified: 0, meta: null }; }
+        });
         pool.sort((a,b) => a.name.localeCompare(b.name));
       }
 
@@ -2089,13 +2108,13 @@ const Scanner = (() => {
           computeSampleHealth(proj);
           projects.push(proj);
           ctx.stats.reused++;
-          continue;
+          return;
         }
         const text = await file.text();
         const parsed = PT.parseProject(text);
         if (!parsed) {
           ctx.skipped.push({path:`projects/${name}/${datName}`, kind:'project', reason:'not a valid picoTracker project file'});
-          continue;
+          return;
         }
         const proj = {
           name, dirName: name, datName,
@@ -2112,7 +2131,8 @@ const Scanner = (() => {
         console.warn('Project parse error:', name, e);
         ctx.skipped.push({path:`projects/${name}/${datName}`, kind:'project', reason:e.message||'read error'});
       }
-    }
+    });
+    projects.sort((a, b) => a.name.localeCompare(b.name));
     return projects;
   }
 
@@ -2165,30 +2185,33 @@ const Scanner = (() => {
   }
 
   async function scanLibrarySamples(dir, prevMap, ctx, onProgress) {
-    const out = [];
-    if (!dir) return out;
-    let count = 0;
-    for await (const entry of walkFiles(dir, '')) {
-      if (!entry.name.toLowerCase().endsWith('.wav')) continue;
-      count++;
-      if (count % 50 === 0) onProgress?.(`Scanning sample library… ${count}`);
+    if (!dir) return [];
+    const entries = [];
+    for await (const entry of walkFiles(dir, ''))
+      if (entry.name.toLowerCase().endsWith('.wav')) entries.push(entry);
+    let done = 0;
+    const out = (await mapLimit(entries, 8, async entry => {
+      done++;
+      if (done % 100 === 0) onProgress?.(`Scanning sample library… ${done}/${entries.length}`);
       try {
         const p = prevMap.get(entry.path);
         const f = await entry.handle.getFile();
-        if (p && p.lastModified === f.lastModified && p.size === f.size) { out.push(p); continue; }
+        if (p && p.lastModified === f.lastModified && p.size === f.size) return p;
+        ctx.stats.headReads++;
         const head = new Uint8Array(await f.slice(0, 4096).arrayBuffer());
-        out.push({ name: entry.name, path: entry.path, size: f.size,
-          lastModified: f.lastModified, meta: PT.parseWavHeader(head, f.size) });
+        return { name: entry.name, path: entry.path, size: f.size,
+          lastModified: f.lastModified, meta: PT.parseWavHeader(head, f.size) };
       } catch(e) {
         ctx.skipped.push({path:`samples/${entry.path}`, kind:'sample', reason:e.message||'read error'});
+        return null;
       }
-    }
+    })).filter(Boolean);
     out.sort((a,b) => a.path.localeCompare(b.path));
     return out;
   }
 
   async function scan(root, onProgress, prev) {
-    const skipped = [], stats = {reused:0, parsed:0};
+    const skipped = [], stats = {reused:0, parsed:0, headReads:0};
     const byKey = (arr, key) => new Map((arr||[]).map(x => [x[key], x]));
     const ctx = { skipped, stats, prev: byKey(prev?.projects, 'dirName') };
 
@@ -3312,9 +3335,10 @@ const UI = (() => {
   const cacheKey = () => sd ? `card:${sd.name}` : null;
 
   // ── Boot / open ────────────────────────────────────────
-  let demoMode = false;
+  let demoMode = false, demoMsgShown = false;
   async function openCard(handle, opts) {
     demoMode = !!opts?.demo;
+    demoMsgShown = false;
     try {
       sd = handle || await window.showDirectoryPicker({mode:'read'});
     } catch(e) { if (e.name !== 'AbortError') console.warn(e); return; }
@@ -3371,9 +3395,10 @@ const UI = (() => {
     renderCurrent();
     if (!fromCache) {
       const s = lib.stats;
-      setCacheBar(demoMode
-        ? 'Demo card — everything here is synthetic (the audio too). Repairs work but only touch memory. Open your own SD card to see your music.'
-        : `Scan complete — ${s.parsed} parsed, ${s.reused} unchanged. Cached for instant reopen.`, false);
+      const statsMsg = `Scan complete — ${s.parsed} parsed, ${s.reused} unchanged, ${s.headReads ?? 0} sample${(s.headReads ?? 0) === 1 ? '' : 's'} read. Cached for instant reopen.`;
+      setCacheBar(demoMode && !demoMsgShown
+        ? (demoMsgShown = true, 'Demo card — everything here is synthetic (the audio too). Repairs work but only touch memory. Open your own SD card to see your music.')
+        : statsMsg, false);
     } else {
       setCacheBar(`Loaded from cache (${Cache.ageStr(savedAt)}) — rescanning…`, true);
     }
