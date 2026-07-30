@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.5.0 — real-device feedback round
+- USB mirror now fits the window (responsive canvas) and has a full-screen
+  mode. Remote input is disabled: the Advance visibly reacts to the
+  proposed opcode, so nothing is sent until there's firmware-side
+  agreement (see ROADMAP).
+- Patterns got a build-out: cell-size zoom, an Expand button that grows
+  the window, per-chain custom colours (remembered per card), chain
+  usage ("used at 04·C2 …"), two-column chain steps, and chain preview —
+  play any single chain from its legend chip or detail header.
+- Problems → Unused Pool: preview buttons, per-row and bulk "move to
+  card trash" (PTLibrarian_Trash/ on the card — reversible, never a
+  delete), with the usual verification and audit trail.
+- Grooves screen rebuilt: grouped by project, proportional tick bars,
+  swing percentage, and an explainer.
+- Theme cards: preview now mirrors the device screen's colour roles,
+  buttons uncramped, and a card-size slider.
+- UI text size control (Aa button in the header, remembered).
+- Samples tab count was lying (it counted rendered rows); now reports
+  library and pools separately and honestly.
+- More breathing room in project details and instrument params; tooltip
+  on the "current project on device" dot.
+
 ## v0.4.3 — scan speed
 - Warm opens no longer re-read every pool/library wav: metadata is
   cached by size+mtime, so an unchanged card rescans with directory

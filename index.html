@@ -19,6 +19,8 @@
     }
     html,body { height:100%; background:var(--bg); color:var(--text);
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-size:13px; }
+    .p-name,.i-lname,.prob-name,.sb-fname,.set-row-name,.render-name { font-size:1em !important; }
+    .p-meta,.i-src,.samp-c,.prob-sub,.sb-fmeta,.spr,.dval,.backup-log { font-size:.85em !important; }
     #app { display:flex; flex-direction:column; height:100vh; }
 
     /* HEADER */
@@ -178,15 +180,15 @@
     .pc-badge.good { background:#0e2a1a; color:var(--c-found); border:1px solid #1a4a2a; }
 
     /* PROJECT DETAIL (expand) */
-    .proj-detail { display:none; padding:14px 20px 14px 48px;
-      background:var(--surface); border-top:1px solid var(--border); }
+    .proj-detail { display:none; padding:18px 24px 18px 48px;
+      background:var(--surface); border-top:1px solid var(--border); line-height:1.6; }
     .proj-item.open .proj-detail { display:block; }
-    .sd-cols { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .sd-cols { display:grid; grid-template-columns:1fr 1fr; gap:28px; }
     .sd-col { min-width:0; }
     .det-title { font-size:10px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase;
       color:var(--muted); margin-bottom:8px; }
     .iblock { display:flex; flex-wrap:wrap; gap:4px; }
-    .ichip { display:inline-flex; align-items:center; gap:5px; padding:3px 8px;
+    .ichip { display:inline-flex; align-items:center; gap:6px; padding:5px 10px;
       background:var(--surface2); border:1px solid var(--border); border-radius:4px;
       cursor:pointer; transition:border-color .1s; }
     .ichip:hover { border-color:var(--accent); }
@@ -199,7 +201,7 @@
     .tb.OPAL   { background:#3a1428; color:var(--c-opl); }
     .tb.SAMPLESOURCE { background:#132c40; color:#60a5fa; }
     .tb.NONE, .tb.UNK { background:var(--surface2); color:var(--muted); }
-    .spr { display:flex; align-items:flex-start; gap:8px; padding:2px 0; font-size:12px; }
+    .spr { display:flex; align-items:flex-start; gap:8px; padding:3px 0; font-size:12px; }
     .spr-ic   { flex-shrink:0; width:14px; font-size:11px; }
     .spr-path { flex:1; word-break:break-all; line-height:1.4; }
     .spr.miss .spr-path { color:var(--c-miss); }
@@ -219,7 +221,13 @@
       display:flex; align-items:center; justify-content:center; padding:24px; }
     .proj-modal-box { background:var(--surface); border:1px solid var(--border2);
       border-radius:10px; width:min(760px,100%); max-height:86vh;
-      display:flex; flex-direction:column; overflow:hidden; }
+      display:flex; flex-direction:column; overflow:hidden; transition:width .15s; }
+    .proj-modal-box.pv-max { width:96vw; max-height:96vh; }
+    .pv-legend-item { display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--muted);
+      background:var(--surface2); border:1px solid var(--border); border-radius:14px; padding:2px 9px 2px 4px; }
+    .pv-legend-item input[type=color] { width:16px; height:16px; border:none; padding:0; background:none; cursor:pointer; border-radius:50%; }
+    .pv-legend-item .cp-play { cursor:pointer; color:var(--muted); }
+    .pv-legend-item .cp-play:hover { color:var(--accent); }
     .proj-modal-hdr { display:flex; align-items:center; gap:10px; padding:13px 16px;
       border-bottom:1px solid var(--border); flex-shrink:0; }
     .proj-modal-title { font-size:14px; font-weight:700; flex:1; min-width:0;
@@ -253,8 +261,8 @@
     .ubadge { font-size:11px; font-weight:500; padding:2px 9px; border-radius:20px; white-space:nowrap; justify-self:end; }
     .ubadge.used   { background:#1c2f1c; color:var(--c-found); border:1px solid #2a4a2a; }
     .ubadge.unused { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
-    .instr-det { display:none; padding:12px 20px 12px 90px;
-      background:var(--surface); border-top:1px solid var(--border); flex-direction:column; gap:8px; }
+    .instr-det { display:none; padding:16px 24px 16px 90px;
+      background:var(--surface); border-top:1px solid var(--border); flex-direction:column; gap:12px; }
     .instr-item.open .instr-det { display:flex; }
     .drow   { display:flex; align-items:flex-start; gap:8px; font-size:12px; }
     .dlabel { font-size:10px; font-weight:600; letter-spacing:1px; text-transform:uppercase;
@@ -263,11 +271,11 @@
     .dval.miss { color:var(--c-miss); }
     .dval.dim  { color:var(--muted); }
     .ipwrap { display:flex; flex-wrap:wrap; gap:4px; flex:1; }
-    .ipchip { display:inline-flex; align-items:baseline; gap:5px; padding:2px 7px;
-      background:var(--surface2); border:1px solid var(--border); border-radius:4px; }
+    .ipchip { display:inline-flex; align-items:baseline; gap:6px; padding:4px 9px;
+      background:var(--surface2); border:1px solid var(--border); border-radius:5px; margin-bottom:2px; }
     .ipchip.mod { border-color:var(--accent-brd); }
-    .ipk { font-size:9px; color:var(--muted); letter-spacing:.5px; }
-    .ipv { font-size:11px; font-family:monospace; color:var(--text); }
+    .ipk { font-size:10px; color:var(--muted); letter-spacing:.5px; }
+    .ipv { font-size:12px; font-family:monospace; color:var(--text); }
 
     /* GROUP HEADERS (trees) */
     .grp-hdr { display:flex; align-items:center; gap:8px;
@@ -288,7 +296,7 @@
     .sb-fmeta { font-size:10px; color:var(--muted); flex-shrink:0; }
     .sb-badge { font-size:10px; font-weight:600; padding:1px 7px; border-radius:4px; flex-shrink:0; white-space:nowrap; }
     .sb-badge.used   { background:#1c2f1c; color:var(--c-found); border:1px solid #2a4a2a; cursor:pointer; }
-    .sb-badge.unused { background:var(--surface2); color:var(--border2); border:1px solid var(--border); }
+    .sb-badge.unused { background:var(--surface2); color:var(--muted); border:1px solid var(--border); cursor:pointer; }
     .sb-file-row.sel { background:var(--accent-dim); box-shadow:inset 3px 0 0 var(--accent); }
     .play-btn { background:transparent; border:none; cursor:pointer; padding:0 4px;
       font-size:11px; color:var(--muted); line-height:1; transition:color .1s; flex-shrink:0; }
@@ -299,13 +307,14 @@
     .themes-scroll { flex:1; overflow-y:auto; padding:16px 20px; }
     .themes-scroll::-webkit-scrollbar { width:5px; }
     .themes-scroll::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
-    .themes-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
+    .themes-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--theme-card,230px),1fr)); gap:12px; }
     .theme-card { background:var(--surface); border:1px solid var(--border); border-radius:8px;
       overflow:hidden; transition:border-color .15s; }
     .theme-card:hover { border-color:var(--border2); }
     .theme-preview { height:118px; overflow:hidden; }
-    .theme-info { padding:10px 12px; display:flex; align-items:center; gap:8px; }
-    .theme-name { font-size:13px; font-weight:600; flex:1; }
+    .theme-info { padding:10px 12px 4px; display:flex; align-items:center; gap:8px; }
+    .theme-name { font-size:13px; font-weight:600; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .theme-actions { display:flex; gap:6px; padding:0 12px 10px; flex-wrap:wrap; }
     .theme-swatches { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:0 12px 12px; }
     .swatch-box { height:20px; border-radius:3px; border:1px solid rgba(255,255,255,.08); }
     .swatch-lbl { font-size:8px; color:var(--muted); letter-spacing:.3px; margin-top:3px; }
@@ -462,8 +471,8 @@
       text-transform:uppercase; color:var(--muted); flex:1; }
     .pv-grid-wrap { overflow-x:auto; padding-bottom:4px; }
     .pv-grid { display:grid; gap:1px; width:max-content; }
-    .pv-cell { width:30px; height:22px; display:flex; align-items:center; justify-content:center;
-      font-size:10px; font-family:monospace; border-radius:3px;
+    .pv-cell { width:var(--pvw,30px); height:var(--pvh,22px); display:flex; align-items:center; justify-content:center;
+      font-size:calc(var(--pvw,30px) * .34); font-family:monospace; border-radius:3px;
       background:var(--surface2); color:var(--border2); cursor:default; user-select:none; }
     .pv-cell.chain { background:var(--accent-dim); color:var(--accent); cursor:pointer; }
     .pv-cell.chain:hover { background:#1a3a5c; }
@@ -599,6 +608,8 @@
     .spinner { width:15px; height:15px; border:2px solid var(--border2); border-top-color:var(--accent);
       border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
     @keyframes spin { to { transform:rotate(360deg); } }
+    #usb-stage:fullscreen { border:none; border-radius:0; }
+    #usb-stage:fullscreen canvas { max-height:100vh; height:100vh; width:auto; }
     .no-results { color:var(--muted); padding:36px; text-align:center; }
   </style>
 </head>
@@ -606,10 +617,11 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.4.3 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.5.0 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
+      <button class="btn ghost icon" id="btn-fontsize" title="UI text size">Aa</button>
       <button class="btn ghost icon" id="btn-search" title="Search  ⌘K" style="display:none">⌕</button>
       <button class="btn" id="btn-open">OPEN SD CARD</button>
     </div>
@@ -728,6 +740,7 @@
         <input class="search" id="theme-q" type="text" placeholder="filter themes…">
         <button class="btn ghost sm" id="btn-theme-reset" title="Back to the default app palette">↺ Reset preview</button>
         <button class="btn ghost sm" id="btn-theme-fromdev" title="Save the colours currently in the device's .config.xml as a new .ptt file">⬇ Save device colours as .ptt</button>
+        <input id="theme-size" type="range" min="180" max="420" value="230" style="width:110px;accent-color:var(--accent)" title="card size">
         <span class="stat-chip" id="themes-stat" style="margin-left:auto"></span>
       </div>
       <div class="themes-scroll">
@@ -827,11 +840,14 @@
         <button class="btn" id="btn-usb-connect">CONNECT USB</button>
         <button class="btn ghost sm" id="btn-usb-refresh" disabled>↺ Refresh screen</button>
         <button class="btn ghost sm" id="btn-usb-png" disabled>⬇ PNG</button>
-        <button class="btn ghost sm" id="btn-usb-input" disabled title="Send button presses to the device (proposed protocol — needs firmware support; stock firmware ignores it)">⌨ Input (experimental)</button>
+        <button class="btn ghost sm" id="btn-usb-input" disabled style="display:none" title="Disabled: the Advance reacts unexpectedly to the proposed input opcode — needs firmware-side agreement first">⌨ Input (experimental)</button>
+        <button class="btn ghost sm" id="btn-usb-full" disabled title="Show only the mirrored screen">⛶ Full screen</button>
         <span class="stat-chip" id="usb-status" style="margin-left:auto">Not connected</span>
       </div>
-      <div class="scroll-area" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:20px">
-        <canvas id="usb-canvas" width="960" height="720" style="width:min(90%,960px);image-rendering:pixelated;border:1px solid var(--border2);border-radius:8px;background:#000"></canvas>
+      <div class="scroll-area" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:16px">
+        <div id="usb-stage" style="display:flex;align-items:center;justify-content:center;background:#000;border:1px solid var(--border2);border-radius:8px;max-width:100%">
+          <canvas id="usb-canvas" width="960" height="720" style="max-width:100%;max-height:calc(100vh - 300px);aspect-ratio:4/3;image-rendering:pixelated;display:block"></canvas>
+        </div>
         <div id="usb-pad" style="display:none;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center">
           <div style="display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,34px);gap:4px;margin-right:14px">
             <span></span><button class="btn dim usb-key" data-bit="3" title="Up (↑)">▲</button><span></span>
@@ -845,7 +861,7 @@
           <button class="btn dim usb-key" data-bit="7" title="NAV (key S)">NAV</button>
           <button class="btn dim usb-key" data-bit="8" title="PLAY (Space)">PLAY</button>
           <span class="stat-chip" id="usb-input-note" style="width:100%;text-align:center;margin-top:4px">
-            Keys: arrows · Z=ENTER · X=EDIT · A=ALT · S=NAV · Space=PLAY — sent as proposed opcode FE 03; stock firmware ignores it.
+            Keys: arrows · Z=ENTER · X=EDIT · A=ALT · S=NAV · Space=PLAY
           </span>
         </div>
         <div style="font-size:11px;color:var(--muted);max-width:640px;text-align:center;line-height:1.7">
@@ -1785,9 +1801,9 @@ const PT = (() => {
 
   // ── Event timeline for playback (player semantics, matching
   //    moveToNextStep / getChannelHop / GRV handling) ─────
-  function buildEventTimeline(proj) {
+  function buildEventTimeline(proj, opts = {}) {
     const last = lastSongRow(proj);
-    if (last < 0) return null;
+    if (opts.chain == null && last < 0) return null;
     const CMD_KIL = 0x1E, CMD_HOP = 0x1B, CMD_GRV = 0x1A, CMD_VOL = 0x45, CMD_PAN = 0x2A;
     const bpm = proj.tempo && proj.tempo > 0 ? proj.tempo : 120;
     const tickSec = 60 / (bpm * 24);       // 24 ticks per beat, default step = 6 ticks
@@ -1797,10 +1813,13 @@ const PT = (() => {
     };
     const events = [];
     let endTick = 0;
-    for (let t = 0; t < CHANNELS; t++) {
+    // opts.chain: preview a single chain (played once, on channel 0)
+    const chanCount = opts.chain != null ? 1 : CHANNELS;
+    for (let t = 0; t < chanCount; t++) {
       let tick = 0, gSteps = grooveOf(0), gPos = 0, hopEntry = 0;
-      for (let row = 0; row <= last; row++) {
-        const c = gridCell(proj, row, t);
+      const lastRow = opts.chain != null ? 0 : last;
+      for (let row = 0; row <= lastRow; row++) {
+        const c = opts.chain != null ? opts.chain : gridCell(proj, row, t);
         if (c === EMPTY) continue;
         for (let cs = 0; cs < STEPS; cs++) {
           const { phrase, transpose } = chainStep(proj, c, cs);
@@ -2728,6 +2747,7 @@ const Demo = (() => {
         if (opts?.create) { const f = mkFile(n, new Uint8Array(), Date.now()); entries[n] = f; return f; }
         throw new DOMException('not found', 'NotFoundError');
       },
+      async removeEntry(n) { if (!(n in entries)) throw new DOMException('nf', 'NotFoundError'); delete entries[n]; },
       async requestPermission() { return 'granted'; },
       async resolve() { return null; },
       async isSameEntry() { return false; } };
@@ -3187,10 +3207,10 @@ const SongPlayer = (() => {
   }
 
   let playToken = 0;
-  async function play(sd, proj, parsed, onProgress, onEnd) {
+  async function play(sd, proj, parsed, onProgress, onEnd, opts) {
     stop();
     const token = ++playToken;
-    const tl = PT.buildEventTimeline(parsed);
+    const tl = PT.buildEventTimeline(parsed, opts);
     if (!tl) { onEnd?.(); return false; }
     const { actx, buffers } = await loadBuffers(sd, proj.dirName, parsed);
     if (token !== playToken) { try { actx.close(); } catch {} return false; }  // stopped/replaced during load
@@ -3318,6 +3338,7 @@ const UI = (() => {
   let dupeNameMap = new Map();   // pti name dupes
   let dupeContent = null;        // content-identical scan result (lazy)
   let repairLog = [];            // persisted in cache
+  let chainColors = {};          // `${dirName}:${chain}` → '#hex', persisted in cache
   let savedSets = {};            // name → [project dirNames], persisted in cache
   let curTab = 'projects';
   let projView = 'list';
@@ -3355,6 +3376,7 @@ const UI = (() => {
       lib = cached.lib;
       repairLog = cached.repairLog || [];
       savedSets = cached.savedSets || {};
+      chainColors = cached.chainColors || {};
       afterScan(true, cached.savedAt);
     }
     await rescan(cached?.lib);
@@ -3375,7 +3397,7 @@ const UI = (() => {
   }
   async function persist() {
     if (demoMode) return;
-    await Cache.save({ key: cacheKey(), lib, repairLog, savedSets, savedAt: Date.now() });
+    await Cache.save({ key: cacheKey(), lib, repairLog, savedSets, chainColors, savedAt: Date.now() });
   }
   function setCacheBar(msg, busy) {
     const bar = $('cache-bar');
@@ -3486,7 +3508,7 @@ const UI = (() => {
       <div class="proj-item" data-proj="${esc(p.dirName)}">
         <div class="proj-row">
           <span class="p-chev">▶</span>
-          <span class="p-name">${esc(p.name)}${p.autosaveNewer?'<span class="p-auto">autosave</span>':''}${lib.currentProject===p.dirName?' <span style="color:var(--accent);font-size:10px">●</span>':''}</span>
+          <span class="p-name">${esc(p.name)}${p.autosaveNewer?'<span class="p-auto">autosave</span>':''}${lib.currentProject===p.dirName?' <span style="color:var(--accent);font-size:10px" title="last project opened on the device (.current)">●</span>':''}</span>
           <span class="p-meta">${p.tempo??'—'} BPM</span>
           <span class="p-meta">${p.instruments.length} inst</span>
           <span class="p-meta">${p.pool.length} smp</span>
@@ -3662,6 +3684,9 @@ const UI = (() => {
     sec.scrollIntoView({behavior:'smooth', block:'start'});
   }
 
+  function chainColorOf(p, c, fallback) {
+    return chainColors[`${p.dirName}:${c}`] ?? fallback;
+  }
   function renderPatterns(host, p, parsed) {
     const last = PT.lastSongRow(parsed);
     if (last < 0) { host.innerHTML = '<div class="pv-hdr"><span class="pv-hdr-title">Patterns</span></div><div style="color:var(--muted);font-size:12px">Song grid is empty.</div>'; return; }
@@ -3676,7 +3701,7 @@ const UI = (() => {
       for (let r = 0; r <= last; r++) {
         const c = PT.gridCell(parsed, r, t);
         if (c === PT.EMPTY) continue;
-        if (!chainColor.has(c)) chainColor.set(c, CHAIN_PALETTE[ci++ % CHAIN_PALETTE.length]);
+        if (!chainColor.has(c)) chainColor.set(c, chainColorOf(p, c, CHAIN_PALETTE[ci++ % CHAIN_PALETTE.length]));
         svg += `<rect x="${20 + r*(RW+GAP)}" y="${t*(RH+GAP)}" width="${RW}" height="${RH}" rx="1.5" fill="${chainColor.get(c)}"/>`;
       }
     }
@@ -3700,31 +3725,74 @@ const UI = (() => {
     grid += '</div>';
 
     host.innerHTML = `
-      <div class="pv-hdr"><span class="pv-hdr-title">Timeline — ${last+1} rows</span></div>
+      <div class="pv-hdr">
+        <span class="pv-hdr-title">Timeline — ${last+1} rows</span>
+        <input id="pv-zoom" type="range" min="22" max="52" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--pvw')) || 30}" style="width:100px;accent-color:var(--accent)" title="cell size">
+        <button class="btn ghost sm" id="btn-pv-expand" title="Grow the window to nearly full screen">⛶ Expand</button>
+      </div>
       <div class="tl-svg-wrap">${svg}</div>
-      <div class="tl-legend">${[...chainColor.entries()].slice(0,24).map(([c,col]) =>
-        `<span class="tl-leg-item"><span class="tl-dot" style="background:${col}"></span>chain ${PT.hx2(c)}</span>`).join('')}</div>
+      <div class="tl-legend">${[...chainColor.entries()].slice(0,32).map(([c,col]) =>
+        `<span class="pv-legend-item" data-chain="${c}">
+          <input type="color" value="${col}" data-chain="${c}" title="pick a colour for chain ${PT.hx2(c)}">
+          <span class="cp-play" data-chain="${c}" title="preview this chain">▶</span>
+          <span style="cursor:pointer" class="cp-open" data-chain="${c}">chain ${PT.hx2(c)}</span>
+        </span>`).join('')}</div>
       <div class="pv-hdr" style="margin-top:14px"><span class="pv-hdr-title">Song grid — click a chain</span></div>
       <div class="pv-grid-wrap">${grid}</div>
       <div class="pv-detail" id="pv-chain-detail" style="display:none"></div>
       <div class="pv-detail" id="pv-phrase-detail" style="display:none"></div>`;
     host.querySelectorAll('.pv-cell.chain').forEach(cell =>
       cell.addEventListener('click', () => showChain(parsed, parseInt(cell.dataset.chain, 10), host)));
+    host.querySelector('#pv-zoom').addEventListener('input', e => {
+      document.documentElement.style.setProperty('--pvw', e.target.value + 'px');
+      document.documentElement.style.setProperty('--pvh', Math.round(e.target.value * 0.73) + 'px');
+    });
+    host.querySelector('#btn-pv-expand').addEventListener('click', () =>
+      document.querySelector('.proj-modal-box').classList.toggle('pv-max'));
+    host.querySelectorAll('.pv-legend-item input[type=color]').forEach(inp =>
+      inp.addEventListener('change', async () => {
+        chainColors[`${p.dirName}:${inp.dataset.chain}`] = inp.value;
+        await persist();
+        renderPatterns(host, p, parsed);
+      }));
+    host.querySelectorAll('.cp-open').forEach(el =>
+      el.addEventListener('click', () => showChain(parsed, parseInt(el.dataset.chain, 10), host)));
+    host.querySelectorAll('.pv-legend-item .cp-play').forEach(el =>
+      el.addEventListener('click', () => previewChain(p, parsed, parseInt(el.dataset.chain, 10), el)));
     updateSaveBar(host);
   }
 
+  function previewChain(p, parsed, c, el) {
+    if (SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
+    const orig = el.textContent;
+    el.textContent = '…';
+    SongPlayer.play(sd, p, parsed, null, () => { el.textContent = '▶'; }, { chain: c })
+      .then(ok => { el.textContent = ok ? '■' : orig; });
+  }
   function showChain(parsed, c, host) {
     host.querySelectorAll('.pv-cell.chain').forEach(x => x.classList.toggle('hi', parseInt(x.dataset.chain,10) === c));
     const det = host.querySelector('#pv-chain-detail');
     det.style.display = 'block';
+    // usage: where in the song does this chain appear?
+    const uses = [];
+    for (let r = 0; r <= PT.lastSongRow(parsed); r++)
+      for (let ch = 0; ch < PT.CHANNELS; ch++)
+        if (PT.gridCell(parsed, r, ch) === c) uses.push(`${PT.hx2(r)}·C${ch+1}`);
     let rows = '';
-    for (let s = 0; s < PT.STEPS; s++) {
-      const {phrase, transpose} = PT.chainStep(parsed, c, s);
-      rows += `<div class="pv-cstep"><span class="ci">${PT.hx2(s)}</span>` + (phrase === PT.EMPTY
+    for (let st = 0; st < PT.STEPS; st++) {
+      const {phrase, transpose} = PT.chainStep(parsed, c, st);
+      rows += `<div class="pv-cstep"><span class="ci">${PT.hx2(st)}</span>` + (phrase === PT.EMPTY
         ? `<span class="ct">--</span>`
         : `<span class="cp" data-p="${phrase}">P${PT.hx2(phrase)}</span><span class="ct">${transpose ? 'tsp '+(transpose>0?'+':'')+transpose : ''}</span>`) + `</div>`;
     }
-    det.innerHTML = `<div class="pv-detail-title">Chain ${PT.hx2(c)}</div>${rows}`;
+    const pRef = modalProj;
+    det.innerHTML = `<div class="pv-detail-title" style="display:flex;align-items:center;gap:10px">
+        Chain ${PT.hx2(c)}
+        <span class="cp-play" style="cursor:pointer;font-size:13px" title="preview this chain">▶</span>
+        <span style="font-weight:400;letter-spacing:0;text-transform:none">used at ${uses.length} spot${uses.length===1?'':'s'}: ${uses.slice(0,12).map(esc).join('  ')}${uses.length>12?' …':''}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px">${rows}</div>`;
+    det.querySelector('.cp-play').addEventListener('click', e => previewChain(pRef, parsed, c, e.target));
     det.querySelectorAll('.cp').forEach(el =>
       el.addEventListener('click', () => showPhrase(parsed, parseInt(el.dataset.p, 10), host)));
     host.querySelector('#pv-phrase-detail').style.display = 'none';
@@ -4142,13 +4210,16 @@ const UI = (() => {
       }
       html += `</div></div>`;
     }
-    $('sampbr-stat').textContent = `${totalCount} library samples · ${fmtBytes(totalBytes)}`;
+    const libBytes = lib.library.reduce((n, x) => n + x.size, 0);
+    const poolCount = lib.projects.reduce((n, p) => n + p.pool.length, 0);
+    const poolBytes = lib.projects.reduce((n, p) => n + p.poolBytes, 0);
+    $('sampbr-stat').textContent = `library: ${lib.library.length} (${fmtBytes(libBytes)}) · pools: ${poolCount} (${fmtBytes(poolBytes)})${q ? ` · showing matches for “${q}”` : ''}`;
     host.innerHTML = html || '<div class="no-results">No samples found.</div>';
     host.querySelectorAll('.grp-hdr').forEach(h =>
       h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
     host.querySelectorAll('.play-btn').forEach(b =>
       b.addEventListener('click', e => { e.stopPropagation(); AudioPlayer.playPath(sd, b.dataset.path, b); }));
-    host.querySelectorAll('.sb-badge.used').forEach(b =>
+    host.querySelectorAll('.sb-badge').forEach(b =>
       b.addEventListener('click', e => { e.stopPropagation(); openSampModal(b.dataset.name); }));
   }
 
@@ -4196,20 +4267,27 @@ const UI = (() => {
   // ── THEMES ─────────────────────────────────────────────
   function themePreviewSvg(t) {
     const c = n => PT.colorHex(t.colors[n] ?? 0);
+    // roles mirror the device song screen: FOREGROUND for cell text,
+    // EMPHASIS for row labels, CURSORCOLOR block behind the cursor cell,
+    // HICOLOR2 for the playing row, INFO/WARN/ERROR in the status area
     return `<svg viewBox="0 0 220 118" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block">
       <rect width="220" height="118" fill="${c('BACKGROUND')}"/>
-      <text x="8" y="16" fill="${c('INFOCOLOR')}" font-size="9" font-family="monospace">SONG</text>
-      <text x="60" y="16" fill="${c('EMPHASISCOLOR')}" font-size="9" font-family="monospace">${esc('bpm 128')}</text>
+      <text x="8" y="15" fill="${c('INFOCOLOR')}" font-size="9" font-family="monospace">SONG</text>
+      <text x="150" y="15" fill="${c('FOREGROUND')}" font-size="9" font-family="monospace">138 BPM</text>
+      <rect x="4" y="${21+2*13}" width="212" height="12" fill="${c('HICOLOR2')}" opacity=".35"/>
       ${[0,1,2,3,4,5].map(r => `
-        <text x="8" y="${32+r*13}" fill="${c('EMPHASISCOLOR')}" font-size="9" font-family="monospace">${PT.hx2(r)}</text>
+        <text x="8" y="${31+r*13}" fill="${c('EMPHASISCOLOR')}" font-size="9" font-family="monospace">${PT.hx2(r)}</text>
         ${[0,1,2,3,4,5].map(col => {
-          const fill = (r===2&&col===1) ? c('BACKGROUND') : (col%3===0 ? c('FOREGROUND') : (r%2 ? c('HICOLOR2') : c('ACCENTCOLOR')));
-          const bg = (r===2&&col===1) ? `<rect x="${28+col*26-2}" y="${23+r*13}" width="20" height="11" fill="${c('CURSORCOLOR')}"/>` : '';
-          return `${bg}<text x="${28+col*26}" y="${32+r*13}" fill="${fill}" font-size="9" font-family="monospace">${(r*7+col*3)%16===0?'--':PT.hx2((r*13+col*29)%128)}</text>`;
+          const isCursor = r === 2 && col === 1;
+          const bg = isCursor ? `<rect x="${30+col*28-2}" y="${22+r*13}" width="22" height="11" fill="${c('CURSORCOLOR')}"/>` : '';
+          const empty = (r*7+col*5) % 5 === 0;
+          return `${bg}<text x="${30+col*28}" y="${31+r*13}" fill="${empty ? c('EMPHASISCOLOR') : c('FOREGROUND')}" font-size="9" font-family="monospace">${empty?'--':PT.hx2((r*13+col*29)%128)}</text>`;
         }).join('')}`).join('')}
-      <rect x="0" y="106" width="220" height="12" fill="${c('HICOLOR1')}"/>
-      <text x="8" y="115" fill="${c('FOREGROUND')}" font-size="8" font-family="monospace">P:PLAY</text>
-      <text x="160" y="115" fill="${c('WARNCOLOR')}" font-size="8" font-family="monospace">▲12%</text>
+      <text x="8" y="112" fill="${c('ACCENTCOLOR')}" font-size="8" font-family="monospace">▶ 02</text>
+      <text x="48" y="112" fill="${c('WARNCOLOR')}" font-size="8" font-family="monospace">WARN</text>
+      <text x="88" y="112" fill="${c('ERRORCOLOR')}" font-size="8" font-family="monospace">ERR</text>
+      <text x="126" y="112" fill="${c('ACCENTALTCOLOR')}" font-size="8" font-family="monospace">ALT</text>
+      <text x="162" y="112" fill="${c('CONSOLECOLOR')}" font-size="8" font-family="monospace">CONS</text>
     </svg>`;
   }
   function renderThemes() {
@@ -4222,6 +4300,8 @@ const UI = (() => {
         <div class="theme-preview">${themePreviewSvg(t)}</div>
         <div class="theme-info">
           <span class="theme-name">${esc(t.fileName.replace(/\.ptt$/i,''))}${lib.config?.values?.THEMENAME === t.fileName.replace(/\.ptt$/i,'') ? ' <span style="font-size:9px;color:var(--accent)" title="active on the device">● device</span>' : ''}</span>
+        </div>
+        <div class="theme-actions">
           <button class="btn ghost sm" data-use="${i}" title="Apply this palette to the Librarian UI (preview only)">Preview</button>
           <button class="btn ghost sm" data-setdev="${i}" title="Write this theme into the card's .config.xml so the device boots with it">Set on device</button>
         </div>
@@ -4338,21 +4418,46 @@ const UI = (() => {
   // ── GROOVES ────────────────────────────────────────────
   function renderGrooves() {
     if (!lib) return;
-    const rows = [];
+    const byProj = new Map();
     for (const p of lib.projects)
-      for (const g of p.grooves)
-        rows.push({proj:p, idx:g.i, steps:g.steps});
-    $('grooves-stat').textContent = rows.length
-      ? `${rows.length} custom grooves across ${new Set(rows.map(r=>r.proj.dirName)).size} projects (default 6/6 grooves hidden)`
-      : '';
-    $('grooves-list').innerHTML = rows.length ? rows.map(r => `
-      <div class="groove-row">
-        <span class="groove-name" title="${esc(r.proj.name)}">${esc(r.proj.name)} · G${PT.hx2(r.idx)}</span>
-        <div class="groove-steps">${r.steps.map(v =>
-          `<span class="g-step ${v!==6?'accent':''}">${v}</span>`).join('')}</div>
-        <span class="groove-meta">${r.steps.length} steps · ${(r.steps.reduce((a,b)=>a+b,0)/r.steps.length).toFixed(1)} avg ticks</span>
-      </div>`).join('')
-      : '<div class="center-note">No custom grooves found.<br>Grooves live inside each project; only non-default ones are shown here.</div>';
+      for (const g of p.grooves) {
+        if (!byProj.has(p.dirName)) byProj.set(p.dirName, { p, list: [] });
+        byProj.get(p.dirName).list.push(g);
+      }
+    const total = [...byProj.values()].reduce((n, x) => n + x.list.length, 0);
+    $('grooves-stat').textContent = total ? `${total} custom grooves in ${byProj.size} projects` : '';
+    if (!total) {
+      $('grooves-list').innerHTML = '<div class="center-note">No custom grooves on this card.<br><br>A groove sets how many ticks each step lasts — the default is 6/6 (straight time).<br>Something like 7/5 shifts every other step late: classic swing. Grooves live inside each project<br>(GROOVE screen on the device, applied with the GRV command); only non-default ones appear here.</div>';
+      return;
+    }
+    let html = `<div style="padding:12px 20px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);line-height:1.7">
+      A groove is the tick length of each sequencer step — default is <b style="color:var(--text)">6,6</b> (straight).
+      Bigger bar = longer step. <b style="color:var(--text)">7,5</b> = swing; a groove with more steps cycles through them.
+      Applied per channel with the <b style="color:var(--text)">GRV</b> command.</div>`;
+    for (const { p, list } of byProj.values()) {
+      html += `<div class="grp open"><div class="grp-hdr"><span class="grp-chev">▶</span>
+        <span class="grp-name">${esc(p.name)}</span><span class="grp-cnt">${list.length}</span></div><div class="grp-body">`;
+      for (const g of list) {
+        const max = Math.max(...g.steps, 8);
+        const feel = g.steps.length === 2 && g.steps[0] !== g.steps[1]
+          ? `swing ${Math.round(g.steps[0] / (g.steps[0] + g.steps[1]) * 100)}%`
+          : g.steps.every(v => v === g.steps[0]) ? 'straight' : 'custom';
+        html += `<div class="groove-row">
+          <span class="groove-name">G${PT.hx2(g.i)}</span>
+          <div style="display:flex;align-items:flex-end;gap:3px;height:34px">
+            ${g.steps.map(v => `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+              <div style="width:16px;height:${Math.round(v / max * 24) + 4}px;background:var(--accent);opacity:${v === 6 ? .45 : .95};border-radius:2px 2px 0 0"></div>
+              <span style="font-size:9px;color:var(--muted);font-variant-numeric:tabular-nums">${v}</span>
+            </div>`).join('')}
+          </div>
+          <span class="groove-meta">${g.steps.length} step${g.steps.length > 1 ? 's' : ''} · ${feel}</span>
+        </div>`;
+      }
+      html += `</div></div>`;
+    }
+    $('grooves-list').innerHTML = html;
+    $('grooves-list').querySelectorAll('.grp-hdr').forEach(h =>
+      h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
   }
 
   // ── RENDERS ────────────────────────────────────────────
@@ -4430,17 +4535,31 @@ const UI = (() => {
       for (const p of lib.projects)
         for (const nm of p.unusedPool) {
           const s = p.pool.find(x => x.name === nm);
-          rows.push(`<div class="prob-row clickable" data-proj="${esc(p.dirName)}">
-            <span class="prob-icon">○</span>
+          rows.push(`<div class="prob-row" data-proj="${esc(p.dirName)}" data-name="${esc(nm)}">
+            <button class="play-btn" data-path="projects/${esc(p.dirName)}/samples/${esc(nm)}">▶</button>
             <div class="prob-main"><div class="prob-name">${esc(nm)}</div>
             <div class="prob-sub">${esc(p.name)} — in pool, not referenced by any instrument</div></div>
-            <span class="prob-right">${fmtBytes(s?.size)}</span></div>`);
+            <span class="prob-right">${fmtBytes(s?.size)}</span>
+            <button class="btn ghost sm btn-trash-one" title="Move to PTLibrarian_Trash/ on the card (reversible)">🗑 Trash</button>
+          </div>`);
         }
       const total = lib.projects.reduce((n,p)=>n+p.unusedPoolBytes,0);
-      host.innerHTML = (rows.length ? `<div class="prob-group-hdr">${fmtBytes(total)} reclaimable</div>` : '') +
+      host.innerHTML = (rows.length ? `<div class="prob-group-hdr" style="display:flex;align-items:center;gap:10px">${fmtBytes(total)} reclaimable
+        <button class="btn sm" id="btn-trash-all">🗑 Move all to card trash</button>
+        <span style="font-weight:400;text-transform:none;letter-spacing:0">files go to PTLibrarian_Trash/ on the card — nothing is deleted</span></div>` : '') +
         (rows.join('') || empty('Every pool sample is referenced by an instrument.'));
-      host.querySelectorAll('.prob-row.clickable').forEach(r =>
-        r.addEventListener('click', () => { switchTab('projects'); openProjModal(r.dataset.proj); }));
+      $('btn-trash-all')?.addEventListener('click', trashAllUnused);
+      host.querySelectorAll('.play-btn').forEach(b =>
+        b.addEventListener('click', e => { e.stopPropagation(); AudioPlayer.playPath(sd, b.dataset.path, b); }));
+      host.querySelectorAll('.btn-trash-one').forEach(b =>
+        b.addEventListener('click', async e => {
+          e.stopPropagation();
+          const row = b.closest('.prob-row');
+          b.disabled = true; b.textContent = '…';
+          if (await trashPoolSample(row.dataset.proj, row.dataset.name)) {
+            await persist(); await rescan(lib); switchTab('problems'); switchProb('unusedpool');
+          } else { b.disabled = false; b.textContent = '🗑 Trash'; }
+        }));
     } else if (probSec === 'unusedinstr') {
       const list = allInstruments().filter(i => instrUsage(i).length === 0);
       host.innerHTML = list.map(i => `<div class="prob-row">
@@ -5120,6 +5239,51 @@ const UI = (() => {
     switchTab('problems');
   }
 
+  // ── CLEANUP: move unused pool samples to on-card trash ─
+  // Never a true delete: the file is copied to PTLibrarian_Trash/ on the
+  // card, verified, and only then removed from the pool. Reversible by
+  // moving it back with any file manager.
+  async function trashPoolSample(dirName, sampleName) {
+    const p = projByDir(dirName);
+    if (!p || !await ensureWrite()) return false;
+    try {
+      const poolDir = await getPathDir(`projects/${p.dirName}/samples`, false);
+      const f = await (await poolDir.getFileHandle(sampleName)).getFile();
+      const bytes = await f.arrayBuffer();
+      const trashDir = `PTLibrarian_Trash/${p.dirName}`;
+      let destName = sampleName, free = false;
+      const tDir = await getPathDir(trashDir, true);
+      for (let n = 2; n < 200 && !free; n++) {
+        try { await tDir.getFileHandle(destName); destName = sampleName.replace(/\.wav$/i, '') + n + '.wav'; }
+        catch { free = true; }
+      }
+      await writeCardFile(trashDir, destName, bytes);
+      const verify = await readCardFile(trashDir, destName);
+      if (verify.size !== bytes.byteLength) throw new Error('trash copy verification failed — pool untouched');
+      await poolDir.removeEntry(sampleName);
+      logRepair(true, 'trash-sample', `${p.name}: ${sampleName} → PTLibrarian_Trash/${p.dirName}/${destName} (${fmtBytes(bytes.byteLength)})`);
+      return true;
+    } catch(e) {
+      logRepair(false, 'trash-sample', `${p.name}: ${sampleName}: ${e.message || e}`);
+      setCacheBar(`Cleanup failed: ${e.message || e}`, false);
+      return false;
+    }
+  }
+  async function trashAllUnused() {
+    const jobs = [];
+    for (const p of lib.projects) for (const nm of p.unusedPool) jobs.push([p.dirName, nm]);
+    if (!jobs.length || !await ensureWrite()) return;
+    const btn = $('btn-trash-all');
+    if (btn) { btn.disabled = true; btn.textContent = 'Cleaning…'; }
+    let ok = 0;
+    for (const [d, nm] of jobs) if (await trashPoolSample(d, nm)) ok++;
+    setCacheBar(`Cleanup: ${ok}/${jobs.length} moved to PTLibrarian_Trash/ — rescanning…`, true);
+    await persist();
+    await rescan(lib);
+    switchTab('problems');
+    switchProb('unusedpool');
+  }
+
   // ── SETS ───────────────────────────────────────────────
   function setDeps(dirNames) {
     const projs = dirNames.map(projByDir).filter(Boolean);
@@ -5360,6 +5524,17 @@ const UI = (() => {
   function init() {
     const supported = 'showDirectoryPicker' in window;
     if (!supported) $('browser-warn').style.display = 'block';
+    // UI text size: cycles small/medium/large, remembered per browser
+    const FONT_SIZES = [13, 15, 17];
+    let fontIdx = 0;
+    try { fontIdx = Math.max(0, FONT_SIZES.indexOf(parseInt(localStorage.getItem('pt-fontsize'), 10))); } catch {}
+    const applyFont = () => { document.documentElement.style.setProperty('font-size', FONT_SIZES[fontIdx] + 'px'); document.body.style.fontSize = FONT_SIZES[fontIdx] + 'px'; };
+    if (fontIdx > 0) applyFont();
+    $('btn-fontsize').addEventListener('click', () => {
+      fontIdx = (fontIdx + 1) % FONT_SIZES.length;
+      applyFont();
+      try { localStorage.setItem('pt-fontsize', String(FONT_SIZES[fontIdx])); } catch {}
+    });
     $('btn-open').addEventListener('click', () => openCard());
     $('btn-open-empty').addEventListener('click', () => openCard());
     $('btn-demo').addEventListener('click', () => openCard(Demo.buildCard(), {demo: true}));
@@ -5438,6 +5613,8 @@ const UI = (() => {
     $('theme-q').addEventListener('input', debounce(e => { themeFilter = e.target.value; renderThemes(); }));
     $('btn-theme-reset').addEventListener('click', resetTheme);
     $('btn-theme-fromdev').addEventListener('click', saveDeviceTheme);
+    $('theme-size').addEventListener('input', e =>
+      document.documentElement.style.setProperty('--theme-card', e.target.value + 'px'));
 
     // Problems
     document.querySelectorAll('.prob-btn').forEach(b =>
@@ -5535,6 +5712,7 @@ const UI = (() => {
       $('usb-status').textContent = msg;
       $('btn-usb-refresh').disabled = !connected;
       $('btn-usb-png').disabled = !connected;
+      $('btn-usb-full').disabled = !connected;
       $('btn-usb-input').disabled = !connected;
       $('btn-usb-connect').textContent = connected ? 'DISCONNECT' : 'CONNECT USB';
       if (!connected && usbInput) toggleUsbInput();
@@ -5574,6 +5752,10 @@ const UI = (() => {
       USB.isConnected() ? USB.disconnect() : USB.connect(usbStatus));
     $('btn-usb-refresh').addEventListener('click', () => USB.requestRefresh());
     $('btn-usb-png').addEventListener('click', () => USB.snapshotPng());
+    $('btn-usb-full').addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else $('usb-stage').requestFullscreen?.().catch(() => {});
+    });
 
     // PWA: register the service worker when served over http(s); the
     // file:// case (opening index.html directly) skips it silently.

@@ -99,22 +99,11 @@ const usb = await page.evaluate(() => {
 check('usb: refresh request sent on connect', usb.refreshSent);
 check('usb: glyphs rendered on canvas', usb.lit > 100);
 
-// ── 6. experimental remote input frames ────────────────
-await page.click('#btn-usb-input');
-await page.keyboard.down('ArrowRight');
-await page.waitForTimeout(100);
-await page.keyboard.up('ArrowRight');
-await page.waitForTimeout(100);
-// on-screen PLAY pad button
-await page.dispatchEvent('.usb-key[data-bit="8"]', 'pointerdown');
-await page.waitForTimeout(80);
-await page.dispatchEvent('.usb-key[data-bit="8"]', 'pointerup');
-await page.waitForTimeout(150);
-const inputFrames = await page.evaluate(() =>
-  window.__writes.filter(w => w[0] === 0xFE && w[1] === 0x03).map(w => w[2] | (w[3] << 8)));
-check('input: RIGHT press+release masks sent', inputFrames.includes(0x004) &&
-  inputFrames.indexOf(0x000, inputFrames.indexOf(0x004)) > inputFrames.indexOf(0x004));
-check('input: PLAY (bit 8) mask sent from on-screen pad', inputFrames.includes(0x100));
+// ── 6. remote input is disabled (device reacted to the opcode) ──
+check('input: button hidden pending firmware agreement', await page.evaluate(() =>
+  getComputedStyle(document.getElementById('btn-usb-input')).display === 'none'));
+check('input: no FE 03 frames were sent', await page.evaluate(() =>
+  !window.__writes.some(w => w[0] === 0xFE && w[1] === 0x03)));
 
 // ── 7. player + phrase editor on the demo card ─────────
 await page.click('.tab-btn[data-tab="projects"]');
@@ -205,6 +194,37 @@ const slicesAfter = await page.evaluate(() => {
   }, 400));
 });
 check('slicer: 7 markers persisted to card (8 slices)', slicesAfter === 7);
+
+// ── 8b. chain preview + unused-pool trash on the demo card ─
+await page.keyboard.press('Escape');
+await page.click('.tab-bin, .tab-btn[data-tab="projects"]').catch(() => {});
+await page.click('.tab-btn[data-tab="projects"]');
+await page.waitForTimeout(300);
+await page.evaluate(() => [...document.querySelectorAll('.proj-item')].find(r => r.textContent.includes('NIGHTDRIVE'))?.querySelector('.proj-row')?.click());
+await page.waitForTimeout(200);
+await page.click('.btn-det-open');
+await page.waitForTimeout(700);
+await page.click('#btn-modal-patterns');
+await page.waitForTimeout(400);
+check('patterns: zoom + expand controls present', await page.evaluate(() =>
+  !!document.getElementById('pv-zoom') && !!document.getElementById('btn-pv-expand')));
+check('patterns: chain colour pickers present', await page.evaluate(() =>
+  document.querySelectorAll('.pv-legend-item input[type=color]').length > 0));
+await page.evaluate(() => document.querySelector('.pv-legend-item .cp-play')?.click());
+await page.waitForTimeout(800);
+const chainBtn = await page.evaluate(() => document.querySelector('.pv-legend-item .cp-play')?.textContent);
+check('patterns: chain preview started', chainBtn === '■' || chainBtn === '▶');  // ■ while playing, ▶ if already ended
+await page.keyboard.press('Escape');
+await page.click('.tab-btn[data-tab="problems"]');
+await page.waitForTimeout(200);
+await page.evaluate(() => document.querySelector('[data-psec="unusedpool"]').click());
+await page.waitForTimeout(300);
+const unusedBefore = await page.evaluate(() => document.querySelectorAll('.btn-trash-one').length);
+check('cleanup: trash buttons offered', unusedBefore >= 1);
+await page.click('.btn-trash-one');
+await page.waitForTimeout(2000);
+const unusedAfter = await page.evaluate(() => document.querySelectorAll('.btn-trash-one').length);
+check('cleanup: sample moved to card trash', unusedAfter === unusedBefore - 1);
 
 // ── 9. warm reopen of a (mock) real card reads no wav content ──
 await page.evaluate(() => {
