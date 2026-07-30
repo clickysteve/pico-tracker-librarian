@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.8.0 — fourth feedback round
+
+- **Song grid row triggers.** Every row in the song grid has a ▶ that
+  plays that row across all 8 channels at once, the way it actually
+  sounds there, rather than one chain in isolation.
+- **Detail panels moved beside the grid.** Chain and phrase panels now
+  live in the empty space to the right of the song grid instead of
+  stacking underneath it, so you can see the grid and what you're editing
+  at the same time.
+- **Timeline spans the full pane width** (as does the Overview song map),
+  scaling to whatever the song length is instead of drawing a small fixed
+  strip in the corner.
+- **Chain colours are grouped by number.** The high nibble picks a hue
+  family, so the 00s are all one colour, the 10s another, and so on;
+  within a group the lightness strides so neighbours like 00 and 01 stay
+  clearly distinct. The chain list is bucketed with group headers, and
+  ↺ Colours resets any custom picks.
+- **Slicer waveform zoom.** Scroll to zoom (shift+scroll to pan), −/+/Fit
+  buttons, and a full-file strip underneath showing where the zoom window
+  sits — drag it to scroll. Marker placement, dragging and auditioning all
+  respect the zoom.
+- **Project overview redesigned.** Four headline cards (BPM, length,
+  scale, samples) over three grouped panels (Song / Instruments / File)
+  instead of fourteen identical pills. Length is a real playback duration.
+- **Instrument and sample sections collapse** in the project workspace.
+- **✂ on every instrument** in the project workspace, not just on sample
+  rows, and preview ▶ on the sample pool in the project list detail too.
+
 ## v0.7.0 — third feedback round
 
 - **macOS junk files are hidden.** AppleDouble `._name.wav` resource

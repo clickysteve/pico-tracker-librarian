@@ -512,11 +512,33 @@
     .recent-date { font-size:10px; color:var(--muted); flex-shrink:0; }
 
     /* PROJECT OVERVIEW */
-    .ov-stats { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
-    .ov-stat { display:inline-flex; align-items:center; gap:6px; background:var(--surface2);
-      border:1px solid var(--border); border-radius:5px; padding:4px 9px; font-size:11px; }
-    .ov-stat .ov-k { color:var(--muted); font-size:9px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; }
-    .ov-stat .ov-v { color:var(--text); font-family:monospace; }
+    .ov-stats { margin-bottom:14px; }
+    .ov-heroes { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+      gap:8px; margin-bottom:8px; }
+    .ov-hero { background:var(--surface2); border:1px solid var(--border); border-radius:6px;
+      padding:10px 12px; }
+    .ov-hero-v { font-size:22px; font-weight:700; color:var(--accent); font-family:monospace;
+      line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ov-hero-k { font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+      color:var(--muted); margin-top:3px; }
+    .ov-hero-sub { font-size:10px; color:var(--border2); margin-top:2px;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ov-panels { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; }
+    .ov-panel { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 11px; }
+    .ov-panel-t { font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+      color:var(--accent); margin-bottom:4px; }
+    .ov-line { display:flex; justify-content:space-between; gap:10px; font-size:11px; padding:1.5px 0; }
+    .ov-line span { color:var(--muted); }
+    .ov-line b { font-family:monospace; font-weight:600; color:var(--text); }
+    .ov-line b.warnv { color:var(--warn); }
+    .ov-line b.badv { color:var(--c-miss); }
+    .ov-fold { cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; }
+    .ov-fold:hover { color:var(--accent); }
+    .ov-chev { display:inline-block; font-size:8px; transition:transform .12s; transform:rotate(-90deg); }
+    .ov-fold.open .ov-chev { transform:none; }
+    .ichip-slice { margin-left:5px; cursor:pointer; color:var(--muted); font-size:11px;
+      padding:0 2px; border-radius:3px; }
+    .ichip-slice:hover { color:var(--accent); background:var(--surface); }
     .ov-minimap { display:flex; align-items:center; gap:10px; background:var(--surface2);
       border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-bottom:14px;
       cursor:pointer; overflow-x:auto; }
@@ -531,11 +553,29 @@
     .pv-hdr { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
     .pv-hdr-title { font-size:10px; font-weight:700; letter-spacing:1.5px;
       text-transform:uppercase; color:var(--muted); flex:1; }
-    .pv-grid-wrap { overflow-x:auto; padding-bottom:4px; }
+    .pv-grid-wrap { overflow-x:auto; overflow-y:auto; padding-bottom:4px; max-height:74vh; min-width:0; }
+    .pv-grid-wrap::-webkit-scrollbar { width:4px; height:4px; }
+    .pv-grid-wrap::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
     .pv-grid { display:grid; gap:1px; width:max-content; }
-    .pv-body { display:flex; gap:16px; align-items:flex-start; }
+    /* chain list | song grid | detail panels, side by side */
+    .pv-body { display:grid; grid-template-columns:auto auto minmax(280px,1fr); gap:16px; align-items:start; }
+    @media (max-width:1100px) { .pv-body { grid-template-columns:auto 1fr; }
+      .pv-side { grid-column:1/-1; } }
+    .pv-side { min-width:0; position:sticky; top:0; max-height:74vh; overflow-y:auto; }
+    .pv-side::-webkit-scrollbar { width:4px; }
+    .pv-side::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+    .pv-side .pv-detail { max-height:none; }
+    .pv-side-hint { font-size:11px; color:var(--muted); background:var(--surface2);
+      border:1px dashed var(--border2); border-radius:6px; padding:14px; line-height:1.6; }
+    .pv-rowplay { display:flex; align-items:center; justify-content:center; cursor:pointer;
+      color:var(--border2); font-size:9px; border-radius:3px; user-select:none;
+      height:var(--pvh,22px); }
+    .pv-rowplay:hover { color:var(--accent); background:var(--accent-dim); }
+    .pv-rowplay.playing { color:var(--accent); background:var(--accent-dim); }
+    .pv-chaingroup { font-size:8px; font-weight:700; letter-spacing:1px; color:var(--border2);
+      padding:5px 6px 2px; text-transform:uppercase; }
     .pv-chainlist { flex-shrink:0; display:flex; flex-direction:column; gap:2px;
-      max-height:62vh; overflow-y:auto; padding-right:6px; position:sticky; top:0; }
+      max-height:74vh; overflow-y:auto; padding-right:6px; position:sticky; top:0; }
     .pv-chainlist::-webkit-scrollbar { width:4px; }
     .pv-chainlist::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
     .pv-chainlist-hdr { font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
@@ -564,6 +604,7 @@
     .pv-detail::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
     .pv-detail-title { font-size:10px; font-weight:700; letter-spacing:1px;
       text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+    .pv-csteps { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:0 18px; }
     .pv-cstep { display:flex; gap:8px; padding:3px 0; font-size:11px; font-family:monospace;
       border-bottom:1px solid var(--border); align-items:center; }
     .pv-cstep:last-child { border-bottom:none; }
@@ -606,8 +647,8 @@
     .pe-help { font-size:10px; color:var(--muted); margin-top:8px; line-height:1.6; }
     .pe-help code { background:var(--surface2); padding:0 3px; border-radius:2px; }
     .pe-help b { color:var(--text); font-weight:600; }
-    .tl-svg-wrap { overflow-x:auto; }
-    .tl-svg { display:block; }
+    .tl-svg-wrap { width:100%; }
+    .tl-svg { display:block; width:100%; }
     .tl-legend { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:8px; }
     .tl-leg-item { display:inline-flex; align-items:center; gap:5px;
       font-size:10px; color:var(--muted); max-width:160px;
@@ -721,7 +762,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.7.0 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.8.0 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -1086,6 +1127,13 @@
     </div>
     <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
       <canvas id="slice-wave" width="940" height="180" style="width:100%;border:1px solid var(--border2);border-radius:6px;background:#0d1012;cursor:crosshair;touch-action:none"></canvas>
+      <canvas id="slice-overview" width="940" height="34" title="Whole sample — drag the lit box to scroll, click to jump" style="width:100%;border:1px solid var(--border);border-radius:5px;background:#0a0c0d;cursor:pointer;touch-action:none"></canvas>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="btn ghost sm" id="btn-slice-zoomout" title="Zoom out (or scroll on the waveform)">−</button>
+        <button class="btn ghost sm" id="btn-slice-zoomin" title="Zoom in (or scroll on the waveform)">+</button>
+        <button class="btn ghost sm" id="btn-slice-fit" title="Show the whole sample">⤢ Fit</button>
+        <span id="slice-zoomlbl" style="font-size:11px;color:var(--muted);font-family:monospace"></span>
+      </div>
       <div id="slice-chips" style="display:flex;flex-wrap:wrap;gap:5px;min-height:26px"></div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <button class="btn ghost sm" id="btn-slice-detect" title="Find drum hits automatically">⚡ Detect transients</button>
@@ -1101,7 +1149,7 @@
         <span class="stat-chip" id="slice-stat" style="margin-left:auto"></span>
       </div>
       <div style="font-size:11px;color:var(--muted)">
-        Click the waveform to audition a slice · double-click to add a marker · drag markers to move · click a chip's ✕ to remove · keys 1–9,0 trigger slices like pads.
+        Click the waveform to audition a slice · double-click to add a marker · drag markers to move · scroll to zoom (shift+scroll to pan) · drag the strip below to scroll · keys 1–9,0 trigger slices like pads.
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border)">
@@ -1952,7 +2000,10 @@ const PT = (() => {
   function buildEventTimeline(proj, opts = {}) {
     const last = lastSongRow(proj);
     const solo = opts.chain != null || opts.phrase != null;   // single-chain / single-phrase preview
+    // opts.songRow: play one row of the song grid across all 8 channels
+    const oneRow = !solo && opts.songRow != null;
     if (!solo && last < 0) return null;
+    if (oneRow && (opts.songRow < 0 || opts.songRow > last)) return null;
     const CMD_KIL = 0x1E, CMD_HOP = 0x1B, CMD_GRV = 0x1A, CMD_VOL = 0x45, CMD_PAN = 0x2A;
     const bpm = proj.tempo && proj.tempo > 0 ? proj.tempo : 120;
     const tickSec = 60 / (bpm * 24);       // 24 ticks per beat, default step = 6 ticks
@@ -1967,8 +2018,9 @@ const PT = (() => {
     const chanCount = solo ? 1 : CHANNELS;
     for (let t = 0; t < chanCount; t++) {
       let tick = 0, gSteps = grooveOf(0), gPos = 0, hopEntry = 0;
-      const lastRow = solo ? 0 : last;
-      for (let row = 0; row <= lastRow; row++) {
+      const firstRow = oneRow ? opts.songRow : 0;
+      const lastRow = solo ? 0 : (oneRow ? opts.songRow : last);
+      for (let row = firstRow; row <= lastRow; row++) {
         const c = opts.chain != null ? opts.chain : (solo ? 0 : gridCell(proj, row, t));
         if (c === EMPTY) continue;
         for (let cs = 0; cs < STEPS; cs++) {
@@ -3756,7 +3808,8 @@ const UI = (() => {
           ${p.pool.map(s => {
             const un = p.unusedPool.includes(s.name);
             const si = p.instruments.find(i => i.sample && i.sample.toLowerCase() === s.name.toLowerCase());
-            return `<div class="spr ok"><span class="spr-ic">${un?'○':'♪'}</span>
+            return `<div class="spr ok">
+              <button class="play-btn det-play" data-path="projects/${esc(p.dirName)}/samples/${esc(s.name)}" title="audition">▶</button>
               <span class="spr-path" style="${un?'opacity:.55':''}">${esc(s.name)}${un?' <span style="opacity:.6">— unused</span>':''}</span>
               <span class="spr-meta">${s.meta?fmtDur(s.meta.duration):''} ${fmtBytes(s.size)}</span>
               ${si ? `<button class="btn ghost sm det-slice" data-instr="${si.id}" title="open the slice editor for this sample">✂</button>` : ''}</div>`;
@@ -3782,6 +3835,8 @@ const UI = (() => {
         const i = p.instruments.find(x => x.id === parseInt(b.dataset.instr, 10));
         if (i) openSlicer({ ...i, source: 'project', proj: p, srcLabel: p.name });
       }));
+    det.querySelectorAll('.det-play').forEach(b =>
+      b.addEventListener('click', e => { e.stopPropagation(); AudioPlayer.playPath(sd, b.dataset.path, b); }));
   }
 
   // ── Row-level project preview ──────────────────────────
@@ -3832,39 +3887,69 @@ const UI = (() => {
     const hist = PT.detectScales(parsed);
 
     // stat strip
-    const stat = (k, v, title) => `<span class="ov-stat" ${title?`title="${esc(title)}"`:''}><span class="ov-k">${k}</span><span class="ov-v">${v}</span></span>`;
-    const stats = [
-      stat('BPM', p.tempo ?? '—'),
-      stat('Master', p.master ?? '—'),
-      stat('Transpose', (p.transpose>0?'+':'')+(p.transpose??0)),
-      stat('Scale', esc(p.scale ?? 'Chromatic') + (p.scaleRoot?' · '+esc(p.scaleRoot):'')),
-      stat('Song rows', p.songRows),
-      stat('Chains', p.chainsUsed),
-      stat('Phrases', p.phrasesUsed),
-      stat('Tables', p.tablesUsed),
-      stat('Grooves', (p.grooves||[]).length),
-      stat('Notes', p.noteCount ?? '—'),
-      stat('Firmware', esc(p.version ?? '?')),
-      stat('File', fmtBytes(p.fileSize)),
-      stat('Pool', `${p.pool.length} · ${fmtBytes(p.poolBytes)}`),
-      stat('Saved', fmtDate(p.lastModified) + (p.hasAutosave ? ' · autosave' : ''), p.autosaveNewer ? 'autosave is NEWER than the save file' : ''),
-    ].join('');
+    // Headline facts get size and colour; the rest are grouped into three
+    // small panels so the eye has somewhere to land. Fourteen identical
+    // pills read as noise.
+    let durTxt = '—';
+    try {
+      const tl = PT.buildEventTimeline(parsed);
+      if (tl && tl.duration > 0) {
+        const m = Math.floor(tl.duration / 60), s = Math.round(tl.duration % 60);
+        durTxt = `${m}:${String(s).padStart(2, '0')}`;
+      }
+    } catch {}
+    const hero = (v, k, sub) => `<div class="ov-hero"><div class="ov-hero-v">${v}</div>
+      <div class="ov-hero-k">${k}</div>${sub ? `<div class="ov-hero-sub">${sub}</div>` : ''}</div>`;
+    const typeCounts = {};
+    for (const i of p.instruments) typeCounts[i.typeShort] = (typeCounts[i.typeShort] || 0) + 1;
+    const line = (k, v, cls) => `<div class="ov-line"><span>${k}</span><b class="${cls || ''}">${v}</b></div>`;
+    const stats = `
+      <div class="ov-heroes">
+        ${hero(p.tempo ?? '—', 'BPM', `master ${p.master ?? '—'}`)}
+        ${hero(durTxt, 'Length', `${p.songRows} song rows`)}
+        ${hero(esc((p.scale ?? 'Chromatic').replace(/ \(.*\)$/, '')), 'Scale',
+          `${p.scaleRoot ? 'root ' + esc(p.scaleRoot.trim()) + ' · ' : ''}transpose ${p.transpose > 0 ? '+' : ''}${p.transpose ?? 0}`)}
+        ${hero(p.pool.length, 'Samples', fmtBytes(p.poolBytes))}
+      </div>
+      <div class="ov-panels">
+        <div class="ov-panel"><div class="ov-panel-t">Song</div>
+          ${line('Chains', p.chainsUsed)}
+          ${line('Phrases', p.phrasesUsed)}
+          ${line('Tables', p.tablesUsed)}
+          ${line('Grooves', (p.grooves || []).length)}
+          ${line('Notes', p.noteCount ?? '—')}
+        </div>
+        <div class="ov-panel"><div class="ov-panel-t">Instruments</div>
+          ${line('Total', p.instruments.length)}
+          ${Object.entries(typeCounts).map(([t, n]) => line(esc(t), n)).join('')}
+          ${line('Unused', p.instruments.filter(i => !i.used).length,
+            p.instruments.some(i => !i.used) ? 'warnv' : '')}
+        </div>
+        <div class="ov-panel"><div class="ov-panel-t">File</div>
+          ${line('Firmware', esc(p.version ?? '?'))}
+          ${line('Size', fmtBytes(p.fileSize))}
+          ${line('Saved', fmtDate(p.lastModified))}
+          ${line('Autosave', p.hasAutosave ? (p.autosaveNewer ? 'newer!' : 'yes') : 'no',
+            p.autosaveNewer ? 'warnv' : '')}
+          ${p.missing.length ? line('Missing samples', p.missing.length, 'badv') : ''}
+        </div>
+      </div>`;
 
     // mini song map — click through to the Patterns tab
     let mini = '';
     {
       const lastR = PT.lastSongRow(parsed);
       if (lastR >= 0) {
-        const RW = 5, RH = 9, GAP = 1, W = (lastR+1)*(RW+GAP)+26, H = 8*(RH+GAP);
-        const mColor = new Map(); let mi = 0;
-        mini = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+        // full-width strip, same viewBox trick as the Patterns timeline
+        const RH = 9, GAP = 1, LEFT = 18, VBW = 1000, H = 8*(RH+GAP);
+        const rw = (VBW - LEFT - 4) / (lastR + 1);
+        mini = `<svg viewBox="0 0 ${VBW} ${H}" preserveAspectRatio="none" width="100%" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
         for (let t = 0; t < 8; t++) {
           mini += `<text x="0" y="${t*(RH+GAP)+8}" fill="#7b858c" font-size="7" font-family="monospace">${t+1}</text>`;
           for (let r = 0; r <= lastR; r++) {
             const c = PT.gridCell(parsed, r, t);
             if (c === PT.EMPTY) continue;
-            if (!mColor.has(c)) mColor.set(c, chainColorOf(p, c, CHAIN_PALETTE[mi++ % CHAIN_PALETTE.length]));
-            mini += `<rect x="${18 + r*(RW+GAP)}" y="${t*(RH+GAP)}" width="${RW}" height="${RH}" rx="1" fill="${mColor.get(c)}"/>`;
+            mini += `<rect x="${(LEFT + r*rw).toFixed(2)}" y="${t*(RH+GAP)}" width="${Math.max(1, rw-0.5).toFixed(2)}" height="${RH}" fill="${chainColorOf(p, c, groupChainColor(c))}"/>`;
           }
         }
         mini += '</svg>';
@@ -3894,23 +3979,31 @@ const UI = (() => {
     body.innerHTML = `
       <div id="modal-overview">
       <div class="ov-stats">${stats}</div>
-      ${mini ? `<div class="ov-minimap" id="ov-minimap" title="Song map — click to open Patterns">${mini}<span class="ov-minimap-lbl">open patterns ›</span></div>` : ''}
+      ${mini ? `<div class="ov-minimap" id="ov-minimap" title="Song map — click to open Patterns">
+        <div style="flex:1;min-width:0">${mini}</div><span class="ov-minimap-lbl">open patterns ›</span></div>` : ''}
       <div class="sd-cols">
         <div class="sd-col">
-          <div class="det-title">Instruments (${p.instruments.length}) — click for parameters</div>
-          <div class="iblock">${p.instruments.map(i => `
-            <span class="ichip ichip-instr" data-id="${i.id}" title="click for parameters">
-              <span class="ichip-slot">${esc(i.idHex)}</span>
-              <span class="tb ${esc(i.type)}">${esc(i.typeShort)}</span>
-              <span class="ichip-name" style="${i.used?'':'opacity:.45'}">${esc(i.name)}</span>
-            </span>`).join('') || '<span style="color:var(--muted);font-size:11px">none</span>'}
+          <div class="det-title ov-fold open" data-fold="ov-instr"><span class="ov-chev">▾</span>Instruments (${p.instruments.length}) — click for parameters</div>
+          <div id="ov-instr">
+            <div class="iblock">${p.instruments.map(i => {
+              const sliceable = i.sample && p.pool.some(x => x.name.toLowerCase() === i.sample.toLowerCase());
+              return `<span class="ichip ichip-instr" data-id="${i.id}" title="click for parameters">
+                <span class="ichip-slot">${esc(i.idHex)}</span>
+                <span class="tb ${esc(i.type)}">${esc(i.typeShort)}</span>
+                <span class="ichip-name" style="${i.used?'':'opacity:.45'}">${esc(i.name)}</span>
+                ${sliceable ? `<span class="ichip-slice" data-slice-instr="${i.id}" title="open the slice editor for ${esc(i.name)}">✂</span>` : ''}
+              </span>`;
+            }).join('') || '<span style="color:var(--muted);font-size:11px">none</span>'}
+            </div>
+            <div id="modal-instr-detail"></div>
           </div>
-          <div id="modal-instr-detail"></div>
         </div>
         <div class="sd-col">
-          <div class="det-title">Samples (${p.pool.length})</div>
-          ${p.missing.map(nm => `<div class="spr miss"><span class="spr-ic">✕</span><span class="spr-path">${esc(nm)}</span></div>`).join('')}
-          ${poolRows || '<span style="color:var(--muted);font-size:11px">empty pool</span>'}
+          <div class="det-title ov-fold open" data-fold="ov-samples"><span class="ov-chev">▾</span>Samples (${p.pool.length})</div>
+          <div id="ov-samples">
+            ${p.missing.map(nm => `<div class="spr miss"><span class="spr-ic">✕</span><span class="spr-path">${esc(nm)}</span></div>`).join('')}
+            ${poolRows || '<span style="color:var(--muted);font-size:11px">empty pool</span>'}
+          </div>
         </div>
       </div>
       <div class="ov-two">
@@ -3942,6 +4035,19 @@ const UI = (() => {
       b.addEventListener('click', () => {
         const i = p.instruments.find(x => x.id === parseInt(b.dataset.instr, 10));
         if (i) openSlicer({ ...i, source: 'project', proj: p, srcLabel: p.name });
+      }));
+    // ✂ directly on an instrument chip — don't also open the param panel
+    body.querySelectorAll('[data-slice-instr]').forEach(b =>
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        const i = p.instruments.find(x => x.id === parseInt(b.dataset.sliceInstr, 10));
+        if (i) openSlicer({ ...i, source: 'project', proj: p, srcLabel: p.name });
+      }));
+    body.querySelectorAll('.ov-fold').forEach(h =>
+      h.addEventListener('click', () => {
+        const open = h.classList.toggle('open');
+        const target = $(h.dataset.fold);
+        if (target) target.style.display = open ? '' : 'none';
       }));
     $('ov-minimap')?.addEventListener('click', togglePatternView);
     setModalTab('overview');
@@ -4043,8 +4149,32 @@ const UI = (() => {
   function closeProjModal() { SongPlayer.stop(); $('proj-modal').style.display = 'none'; modalProj = null; }
 
   // ── Pattern viewer ─────────────────────────────────────
-  const CHAIN_PALETTE = ['#79b5e3','#34d399','#a78bfa','#f472b6','#fcd34d','#34d399','#fb923c','#f87171',
-    '#38bdf8','#c084fc','#facc15','#4ade80','#e879f9','#fca5a5','#93c5fd','#a5f3d0'];
+  // Chains are numbered in groups on the device (00-0F, 10-1F, …) and
+  // people build songs that way — one group per section or per part. So
+  // the high nibble picks a hue family and the low nibble varies
+  // lightness within it: the 30s all read as "the purple ones" at a
+  // glance, and 31 is still distinguishable from 3A.
+  const CHAIN_HUES = [205, 150, 265, 330, 45, 175, 25, 0,
+                      190, 285, 55, 130, 310, 15, 220, 95];
+  function groupChainColor(c) {
+    const hue = CHAIN_HUES[(c >> 4) & 0xF];
+    const step = c & 0xF;                     // 0..15 within the group
+    // Walking lightness straight up the group would make 00 and 01 all but
+    // identical, and songs put those side by side. Striding by 9 around the
+    // 16 slots throws consecutive chains to opposite ends of the lightness
+    // band (min ~21 luma apart) while the group keeps one hue.
+    const slot = (step * 9) % 16;
+    const light = 36 + slot / 15 * 46;        // 36% … 82%
+    const sat = 58 + (step % 3) * 9;
+    return hslHex(hue, sat, light);
+  }
+  function hslHex(h, s, l) {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))));
+    return '#' + [f(0), f(8), f(4)].map(v => v.toString(16).padStart(2, '0')).join('');
+  }
 
   function setModalTab(tab) {
     $('btn-modal-overview')?.classList.toggle('active', tab === 'overview');
@@ -4070,31 +4200,46 @@ const UI = (() => {
   function renderPatterns(host, p, parsed) {
     const last = PT.lastSongRow(parsed);
     if (last < 0) { host.innerHTML = '<div class="pv-hdr"><span class="pv-hdr-title">Patterns</span></div><div style="color:var(--muted);font-size:12px">Song grid is empty.</div>'; return; }
+    const CH = 8;
     const chainColor = new Map();
-    let ci = 0;
-    // Timeline SVG
-    const CH = 8, RW = 7, RH = 13, GAP = 1;
-    const W = (last+1) * (RW+GAP) + 40, H = CH * (RH+GAP) + 18;
-    let svg = `<svg class="tl-svg" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+    const chainUse = new Map();
+    for (let r = 0; r <= last; r++)
+      for (let t = 0; t < CH; t++) {
+        const c = PT.gridCell(parsed, r, t);
+        if (c === PT.EMPTY) continue;
+        chainUse.set(c, (chainUse.get(c) || 0) + 1);
+        if (!chainColor.has(c)) chainColor.set(c, chainColorOf(p, c, groupChainColor(c)));
+      }
+
+    // Timeline SVG — stretches to the full width of the pane. Row width is
+    // whatever divides the available space, so a 26-row song fills the bar
+    // just as a 200-row one does.
+    const RH = 15, GAP = 1, LEFT = 22;
+    const H = CH * (RH + GAP) + 18;
+    const VBW = 1000;                                   // viewBox units; scaled by CSS
+    const rw = (VBW - LEFT - 4) / (last + 1);
+    let svg = `<svg class="tl-svg" viewBox="0 0 ${VBW} ${H}" preserveAspectRatio="none" width="100%" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
     for (let t = 0; t < CH; t++) {
-      svg += `<text x="0" y="${t*(RH+GAP)+10}" fill="#7b858c" font-size="8" font-family="monospace">${t+1}</text>`;
+      svg += `<text x="0" y="${t*(RH+GAP)+11}" fill="#7b858c" font-size="9" font-family="monospace">${t+1}</text>`;
       for (let r = 0; r <= last; r++) {
         const c = PT.gridCell(parsed, r, t);
         if (c === PT.EMPTY) continue;
-        if (!chainColor.has(c)) chainColor.set(c, chainColorOf(p, c, CHAIN_PALETTE[ci++ % CHAIN_PALETTE.length]));
-        svg += `<rect x="${20 + r*(RW+GAP)}" y="${t*(RH+GAP)}" width="${RW}" height="${RH}" rx="1.5" fill="${chainColor.get(c)}"/>`;
+        svg += `<rect x="${(LEFT + r*rw).toFixed(2)}" y="${t*(RH+GAP)}" width="${Math.max(1, rw-0.6).toFixed(2)}" height="${RH}" fill="${chainColor.get(c)}"/>`;
       }
     }
-    for (let r = 0; r <= last; r += 8)
-      svg += `<text x="${20 + r*(RW+GAP)}" y="${H-3}" fill="#3a4046" font-size="7" font-family="monospace">${PT.hx2(r)}</text>`;
+    const lblEvery = Math.max(1, Math.ceil((last + 1) / 32));
+    for (let r = 0; r <= last; r += lblEvery)
+      svg += `<text x="${(LEFT + r*rw).toFixed(2)}" y="${H-3}" fill="#3a4046" font-size="8" font-family="monospace">${PT.hx2(r)}</text>`;
     svg += '</svg>';
 
     // Song grid table — column tracks follow the zoom var (a fixed 30px
-    // here was why cells clipped their text at larger zoom levels)
-    let grid = `<div class="pv-grid" style="grid-template-columns:repeat(${CH+1},var(--pvw,30px))">`;
-    grid += `<div class="pv-cell clbl"></div>`;
+    // here was why cells clipped their text at larger zoom levels). The
+    // leading ▶ column plays that whole song row across all 8 channels.
+    let grid = `<div class="pv-grid" style="grid-template-columns:18px repeat(${CH+1},var(--pvw,30px))">`;
+    grid += `<div class="pv-cell clbl"></div><div class="pv-cell clbl"></div>`;
     for (let t = 0; t < CH; t++) grid += `<div class="pv-cell clbl">C${t+1}</div>`;
     for (let r = 0; r <= last; r++) {
+      grid += `<div class="pv-rowplay" data-row="${r}" title="Play song row ${PT.hx2(r)} (all channels)">▶</div>`;
       grid += `<div class="pv-cell rlbl">${PT.hx2(r)}</div>`;
       for (let t = 0; t < CH; t++) {
         const c = PT.gridCell(parsed, r, t);
@@ -4105,40 +4250,51 @@ const UI = (() => {
     }
     grid += '</div>';
 
-    // Ordered chain list, ascending, with usage counts — lives down the
-    // left-hand side of the song grid
-    const chainUse = new Map();
-    for (let r = 0; r <= last; r++)
-      for (let t = 0; t < CH; t++) {
-        const c = PT.gridCell(parsed, r, t);
-        if (c !== PT.EMPTY) chainUse.set(c, (chainUse.get(c) || 0) + 1);
-      }
+    // Ordered chain list, ascending, grouped by high nibble
     const chainsAsc = [...chainColor.keys()].sort((a, b) => a - b);
-    const chainList = `<div class="pv-chainlist">
-      <div class="pv-chainlist-hdr">Chains · ${chainsAsc.length}</div>
-      ${chainsAsc.map(c => `<div class="pv-chainrow" data-chain="${c}">
+    let chainRows = '', lastGroup = -1;
+    for (const c of chainsAsc) {
+      const g = (c >> 4) & 0xF;
+      if (g !== lastGroup) {
+        chainRows += `<div class="pv-chaingroup">${PT.hx2(g << 4).slice(0,1)}0s</div>`;
+        lastGroup = g;
+      }
+      chainRows += `<div class="pv-chainrow" data-chain="${c}">
         <input type="color" value="${chainColor.get(c)}" data-chain="${c}" title="pick a colour for chain ${PT.hx2(c)}">
         <span class="cp-open" data-chain="${c}" style="color:${chainColor.get(c)}" title="open chain ${PT.hx2(c)}">${PT.hx2(c)}</span>
         <span class="cp-count" title="times used in the song grid">×${chainUse.get(c) || 0}</span>
         <span class="cp-play" data-chain="${c}" title="preview this chain">▶</span>
-      </div>`).join('')}</div>`;
+      </div>`;
+    }
+    const chainList = `<div class="pv-chainlist">
+      <div class="pv-chainlist-hdr">Chains · ${chainsAsc.length}</div>${chainRows}</div>`;
 
     host.innerHTML = `
       <div class="pv-hdr">
         <span class="pv-hdr-title">Timeline — ${last+1} rows</span>
         <input id="pv-zoom" type="range" min="22" max="52" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--pvw')) || 30}" style="width:100px;accent-color:var(--accent)" title="cell size">
+        <button class="btn ghost sm" id="btn-pv-recolour" title="Discard custom colours and go back to the by-group palette">↺ Colours</button>
         <button class="btn ghost sm" id="btn-pv-expand" title="Grow the window to nearly full screen">⛶ Expand</button>
       </div>
       <div class="tl-svg-wrap">${svg}</div>
-      <div class="pv-hdr" style="margin-top:14px"><span class="pv-hdr-title">Song grid — click a chain</span></div>
+      <div class="pv-hdr" style="margin-top:14px"><span class="pv-hdr-title">Song grid — ▶ plays a whole row · click a chain to open it</span></div>
       <div class="pv-body">
         ${chainList}
-        <div style="min-width:0;flex:1">
-          <div class="pv-grid-wrap">${grid}</div>
+        <div class="pv-grid-wrap">${grid}</div>
+        <div class="pv-side">
           <div class="pv-detail" id="pv-chain-detail" style="display:none"></div>
           <div class="pv-detail" id="pv-phrase-detail" style="display:none"></div>
+          <div class="pv-side-hint" id="pv-side-hint">Click a chain in the grid or the list to inspect it here, then a phrase inside it to edit.</div>
         </div>
       </div>`;
+    host.querySelectorAll('.pv-rowplay').forEach(b =>
+      b.addEventListener('click', () => previewSongRow(p, parsed, parseInt(b.dataset.row, 10), b)));
+    host.querySelector('#btn-pv-recolour').addEventListener('click', async () => {
+      for (const k of Object.keys(chainColors))
+        if (k.startsWith(`${p.dirName}:`)) delete chainColors[k];
+      await persist();
+      renderPatterns(host, p, parsed);
+    });
     host.querySelectorAll('.pv-cell.chain').forEach(cell =>
       cell.addEventListener('click', () => showChain(parsed, parseInt(cell.dataset.chain, 10), host)));
     host.querySelector('#pv-zoom').addEventListener('input', e => {
@@ -4175,10 +4331,25 @@ const UI = (() => {
     SongPlayer.play(sd, p, parsed, null, () => { el.textContent = '▶'; }, { chain: c })
       .then(ok => { el.textContent = ok ? '■' : orig; });
   }
+  // Play one row of the song grid: every channel's chain at that row,
+  // together, exactly as the song would sound there.
+  function previewSongRow(p, parsed, row, el) {
+    if (SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
+    const host = el.closest('#modal-pattern-section');
+    host?.querySelectorAll('.pv-rowplay.playing').forEach(x => x.classList.remove('playing'));
+    el.textContent = '…';
+    el.classList.add('playing');
+    SongPlayer.play(sd, p, parsed, null,
+      () => { el.textContent = '▶'; el.classList.remove('playing'); },
+      { songRow: row })
+      .then(ok => { el.textContent = ok ? '■' : '▶'; if (!ok) el.classList.remove('playing'); });
+  }
   function showChain(parsed, c, host) {
     host.querySelectorAll('.pv-cell.chain').forEach(x => x.classList.toggle('hi', parseInt(x.dataset.chain,10) === c));
     const det = host.querySelector('#pv-chain-detail');
     det.style.display = 'block';
+    const hint = host.querySelector('#pv-side-hint');
+    if (hint) hint.style.display = 'none';
     // usage: where in the song does this chain appear?
     const uses = [];
     for (let r = 0; r <= PT.lastSongRow(parsed); r++)
@@ -4197,7 +4368,7 @@ const UI = (() => {
         <span class="cp-play" style="cursor:pointer;font-size:13px" title="preview this chain">▶</span>
         <span style="font-weight:400;letter-spacing:0;text-transform:none">used at ${uses.length} spot${uses.length===1?'':'s'}: ${uses.slice(0,12).map(esc).join('  ')}${uses.length>12?' …':''}</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px">${rows}</div>`;
+      <div class="pv-csteps">${rows}</div>`;
     det.querySelector('.cp-play').addEventListener('click', e => previewChain(pRef, parsed, c, e.target));
     det.querySelectorAll('.cp').forEach(el =>
       el.addEventListener('click', () => showPhrase(parsed, parseInt(el.dataset.p, 10), host)));
@@ -5609,26 +5780,54 @@ const UI = (() => {
     Slicer.markers = (inst.slices || []).map(sl => toCtxFrames(sl.offset))
       .filter(o => o > 0 && o < Slicer.data.length).sort((a,b) => a-b);
     Slicer.dirty = false;
+    Slicer.view = { start: 0, len: Slicer.data.length };   // always open fitted
     $('btn-slice-save').disabled = false;
     $('slice-status').textContent = '';
     drawSlicer();
   }
   function closeSlicer() { $('slice-modal').style.display = 'none'; Slicer.proj = null; }
 
+  // ── Slicer viewport ────────────────────────────────────
+  // The waveform can be zoomed into a window of the sample; every
+  // frame↔pixel conversion goes through these so markers, drags,
+  // auditioning and drawing all agree on where things are.
+  function sliceView() {
+    const n = Slicer.data ? Slicer.data.length : 0;
+    if (!Slicer.view || Slicer.view.len <= 0) Slicer.view = { start: 0, len: n };
+    const v = Slicer.view;
+    v.len = Math.max(64, Math.min(n, v.len));
+    v.start = Math.max(0, Math.min(n - v.len, v.start));
+    return v;
+  }
+  function sliceZoomTo(len, centreFrame) {
+    const n = Slicer.data.length;
+    const v = sliceView();
+    const c = centreFrame == null ? v.start + v.len / 2 : centreFrame;
+    const frac = v.len ? (c - v.start) / v.len : 0.5;
+    v.len = Math.max(64, Math.min(n, Math.round(len)));
+    v.start = Math.round(c - frac * v.len);
+    sliceView();
+    drawSlicer();
+  }
+
   function drawSlicer() {
     const c = $('slice-wave'), ctx = c.getContext('2d');
     const W = c.width, H = c.height, d = Slicer.data;
+    const v = sliceView();
+    const xOf = f => (f - v.start) / v.len * W;
     ctx.fillStyle = '#0d1012';
     ctx.fillRect(0, 0, W, H);
-    // waveform
+    // waveform over the visible window only
     ctx.strokeStyle = '#79b5e3';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    const step = Math.max(1, Math.floor(d.length / W));
+    const per = v.len / W;
+    const step = Math.max(1, Math.floor(per));
     for (let x = 0; x < W; x++) {
       let min = 1, max = -1;
-      const base = Math.floor(x / W * d.length);
-      for (let j = 0; j < step; j++) { const v = d[base + j] || 0; if (v < min) min = v; if (v > max) max = v; }
+      const base = Math.floor(v.start + x * per);
+      for (let j = 0; j < step; j++) { const val = d[base + j] || 0; if (val < min) min = val; if (val > max) max = val; }
+      if (per < 1) { const val = d[base] || 0; min = Math.min(min, val); max = Math.max(max, val); }
       const y1 = (1 - max) / 2 * H, y2 = (1 - min) / 2 * H;
       ctx.moveTo(x + .5, y1); ctx.lineTo(x + .5, Math.max(y2, y1 + 1));
     }
@@ -5636,20 +5835,23 @@ const UI = (() => {
     // region tints + markers
     const bounds = [0, ...Slicer.markers, d.length];
     for (let i = 0; i < bounds.length - 1; i++) {
-      const x0 = bounds[i] / d.length * W, x1 = bounds[i + 1] / d.length * W;
+      const x0 = xOf(bounds[i]), x1 = xOf(bounds[i + 1]);
+      if (x1 < 0 || x0 > W) continue;
       if (i % 2) { ctx.fillStyle = 'rgba(121,181,227,.05)'; ctx.fillRect(x0, 0, x1 - x0, H); }
       ctx.fillStyle = '#7b858c';
       ctx.font = '10px monospace';
-      ctx.fillText(String(i + 1), x0 + 3, 12);
+      ctx.fillText(String(i + 1), Math.max(3, x0 + 3), 12);
     }
     ctx.strokeStyle = '#f59e0b';
     ctx.lineWidth = 2;
     for (const m of Slicer.markers) {
-      const x = m / d.length * W;
+      const x = xOf(m);
+      if (x < -6 || x > W + 6) continue;
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath(); ctx.moveTo(x - 5, 0); ctx.lineTo(x + 5, 0); ctx.lineTo(x, 9); ctx.fill();
     }
+    drawSliceOverview();
     // chips
     $('slice-chips').innerHTML = bounds.slice(0, -1).map((b, i) => `
       <span class="ipchip mod" style="cursor:pointer" data-slice="${i}">
@@ -5671,6 +5873,48 @@ const UI = (() => {
       }));
     const n = Slicer.markers.length + 1;
     $('slice-stat').textContent = `${n} slice${n>1?'s':''} (max ${Slicer.maxSlices + 1}) · ${Slicer.buffer.duration.toFixed(2)}s · ${Slicer.buffer.sampleRate}Hz`;
+    const zl = $('slice-zoomlbl');
+    if (zl) {
+      const sr = Slicer.buffer.sampleRate;
+      zl.textContent = v.len >= d.length
+        ? 'whole sample'
+        : `${(v.start / sr).toFixed(3)}s – ${((v.start + v.len) / sr).toFixed(3)}s  (${(d.length / v.len).toFixed(1)}×)`;
+    }
+  }
+
+  // Full-file strip under the main waveform showing where the zoom window sits.
+  function drawSliceOverview() {
+    const c = $('slice-overview');
+    if (!c || !Slicer.data) return;
+    const ctx = c.getContext('2d'), W = c.width, H = c.height, d = Slicer.data;
+    const v = sliceView();
+    ctx.fillStyle = '#0a0c0d';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#3f5a70';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const step = Math.max(1, Math.floor(d.length / W));
+    for (let x = 0; x < W; x++) {
+      let min = 1, max = -1;
+      const base = Math.floor(x / W * d.length);
+      for (let j = 0; j < step; j++) { const val = d[base + j] || 0; if (val < min) min = val; if (val > max) max = val; }
+      const y1 = (1 - max) / 2 * H, y2 = (1 - min) / 2 * H;
+      ctx.moveTo(x + .5, y1); ctx.lineTo(x + .5, Math.max(y2, y1 + 1));
+    }
+    ctx.stroke();
+    // markers as thin ticks
+    ctx.strokeStyle = 'rgba(245,158,11,.5)';
+    for (const m of Slicer.markers) {
+      const x = m / d.length * W;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    // the lit window
+    const x0 = v.start / d.length * W, x1 = (v.start + v.len) / d.length * W;
+    ctx.fillStyle = 'rgba(121,181,227,.16)';
+    ctx.fillRect(x0, 0, Math.max(2, x1 - x0), H);
+    ctx.strokeStyle = '#79b5e3';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x0 + .5, .5, Math.max(2, x1 - x0) - 1, H - 1);
   }
 
   let sliceSrc = null;
@@ -5687,13 +5931,13 @@ const UI = (() => {
   }
 
   function slicerFrameAt(evt) {
-    const c = $('slice-wave'), r = c.getBoundingClientRect();
-    return Math.round((evt.clientX - r.left) / r.width * Slicer.data.length);
+    const c = $('slice-wave'), r = c.getBoundingClientRect(), v = sliceView();
+    return Math.round(v.start + (evt.clientX - r.left) / r.width * v.len);
   }
   function initSlicerEvents() {
     const c = $('slice-wave');
     const near = frame => {
-      const tol = Slicer.data.length / c.getBoundingClientRect().width * 6;
+      const tol = sliceView().len / c.getBoundingClientRect().width * 6;
       let best = -1, bd = tol;
       Slicer.markers.forEach((m, i) => { const d0 = Math.abs(m - frame); if (d0 < bd) { bd = d0; best = i; } });
       return best;
@@ -5735,6 +5979,39 @@ const UI = (() => {
       Slicer.dirty = true;
       drawSlicer();
     });
+    // wheel zooms around the cursor; shift+wheel pans
+    c.addEventListener('wheel', e => {
+      if (!Slicer.proj) return;
+      e.preventDefault();
+      const v = sliceView();
+      if (e.shiftKey) {
+        v.start += Math.round(v.len * 0.12 * Math.sign(e.deltaY || e.deltaX));
+        sliceView();
+        drawSlicer();
+      } else {
+        sliceZoomTo(v.len * (e.deltaY > 0 ? 1.25 : 0.8), slicerFrameAt(e));
+      }
+    }, { passive: false });
+    $('btn-slice-zoomin').addEventListener('click', () => sliceZoomTo(sliceView().len * 0.5));
+    $('btn-slice-zoomout').addEventListener('click', () => sliceZoomTo(sliceView().len * 2));
+    $('btn-slice-fit').addEventListener('click', () => {
+      Slicer.view = { start: 0, len: Slicer.data.length };
+      drawSlicer();
+    });
+    // overview strip: click to centre, drag to scroll
+    const ov = $('slice-overview');
+    let ovDrag = false;
+    const ovMove = e => {
+      if (!Slicer.proj) return;
+      const r = ov.getBoundingClientRect(), v = sliceView();
+      const f = (e.clientX - r.left) / r.width * Slicer.data.length;
+      v.start = Math.round(f - v.len / 2);
+      sliceView();
+      drawSlicer();
+    };
+    ov.addEventListener('pointerdown', e => { ovDrag = true; ov.setPointerCapture(e.pointerId); ovMove(e); });
+    ov.addEventListener('pointermove', e => { if (ovDrag) ovMove(e); });
+    ov.addEventListener('pointerup', e => { ovDrag = false; try { ov.releasePointerCapture(e.pointerId); } catch {} });
     $('btn-slice-detect').addEventListener('click', () => {
       const sens = parseFloat($('slice-sens').value);
       let on = PT.detectOnsets(Slicer.data, Slicer.buffer.sampleRate, Slicer.maxSlices + 1, sens);

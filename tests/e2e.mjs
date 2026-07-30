@@ -110,8 +110,29 @@ await page.click('.tab-btn[data-tab="projects"]');
 await page.waitForTimeout(300);
 await page.click('.proj-row');           // first project (BREAKS-90 or A-Z first)
 await page.waitForTimeout(200);
+// v0.8 overview: hero stats, foldable sections, per-instrument slicer
+check('overview: pool rows have preview buttons in the list detail',
+  await page.evaluate(() => document.querySelectorAll('.det-play').length > 0));
 await page.click('.btn-det-open');
 await page.waitForTimeout(700);
+check('overview: headline stats rendered', await page.evaluate(() =>
+  document.querySelectorAll('.ov-hero').length === 4 &&
+  document.querySelectorAll('.ov-panel').length === 3));
+check('overview: stats are not all identical chips', await page.evaluate(() =>
+  document.querySelectorAll('.ov-stat').length === 0));
+check('overview: instrument chips carry a ✂ when sliceable', await page.evaluate(() =>
+  document.querySelectorAll('.ichip-instr [data-slice-instr]').length > 0));
+check('overview: pool rows have preview buttons', await page.evaluate(() =>
+  document.querySelectorAll('#ov-samples .play-btn').length > 0));
+// fold the instruments section away and back
+await page.click('[data-fold="ov-instr"]');
+await page.waitForTimeout(150);
+check('overview: instruments section collapses', await page.evaluate(() =>
+  document.getElementById('ov-instr').style.display === 'none'));
+await page.click('[data-fold="ov-instr"]');
+await page.waitForTimeout(150);
+check('overview: instruments section reopens', await page.evaluate(() =>
+  document.getElementById('ov-instr').style.display !== 'none'));
 // play (headless audio context runs silently; just assert the button flips)
 await page.click('#btn-modal-play');
 await page.waitForTimeout(900);
@@ -185,6 +206,21 @@ await page.click('#btn-slice-equal');
 await page.waitForTimeout(200);
 const chipCount = await page.evaluate(() => document.querySelectorAll('#slice-chips [data-slice]').length);
 check('slicer: equal-8 produced 8 regions', chipCount === 8);
+// v0.8 zoom: buttons narrow the view window, Fit restores it
+check('slicer: zoom controls + overview strip present', await page.evaluate(() =>
+  !!document.getElementById('btn-slice-zoomin') && !!document.getElementById('btn-slice-zoomout')
+  && !!document.getElementById('btn-slice-fit') && !!document.getElementById('slice-overview')));
+await page.click('#btn-slice-zoomin');
+await page.click('#btn-slice-zoomin');
+await page.waitForTimeout(150);
+check('slicer: zoom in narrows the visible window', await page.evaluate(() =>
+  /\d×\)$/.test(document.getElementById('slice-zoomlbl').textContent)));
+check('slicer: markers survive zooming', await page.evaluate(() =>
+  document.querySelectorAll('#slice-chips [data-slice]').length === 8));
+await page.click('#btn-slice-fit');
+await page.waitForTimeout(150);
+check('slicer: Fit restores the whole sample', await page.evaluate(() =>
+  document.getElementById('slice-zoomlbl').textContent === 'whole sample'));
 await page.click('#btn-slice-save');
 await page.waitForTimeout(2500);
 const slicesAfter = await page.evaluate(() => {
@@ -228,6 +264,30 @@ await page.evaluate(() => document.querySelector('.pv-chainrow .cp-play')?.click
 await page.waitForTimeout(800);
 const chainBtn = await page.evaluate(() => document.querySelector('.pv-chainrow .cp-play')?.textContent);
 check('patterns: chain preview started', chainBtn === '■' || chainBtn === '▶');  // ■ while playing, ▶ if already ended
+// v0.8 layout: detail panels live beside the grid, not under it
+check('patterns: detail panel sits beside the grid', await page.evaluate(() => {
+  const grid = document.querySelector('.pv-grid-wrap'), side = document.querySelector('.pv-side');
+  if (!grid || !side) return false;
+  return side.getBoundingClientRect().left >= grid.getBoundingClientRect().right - 2;
+}));
+check('patterns: timeline spans the pane width', await page.evaluate(() => {
+  const svg = document.querySelector('.tl-svg'), wrap = document.querySelector('.tl-svg-wrap');
+  return svg && wrap && svg.getBoundingClientRect().width > wrap.getBoundingClientRect().width * 0.95;
+}));
+check('patterns: chain list is grouped by high nibble', await page.evaluate(() =>
+  document.querySelectorAll('.pv-chaingroup').length >= 1));
+// row triggers: one per song row, and pressing one starts playback
+const rowBtns = await page.evaluate(() => document.querySelectorAll('.pv-rowplay').length);
+const gridRows = await page.evaluate(() => document.querySelectorAll('.pv-cell.rlbl').length);
+check('patterns: a row trigger for every song row', rowBtns > 0 && rowBtns === gridRows);
+await page.evaluate(() => document.querySelector('.pv-rowplay')?.click());
+await page.waitForTimeout(700);
+check('patterns: row trigger started playback', await page.evaluate(() => {
+  const b = document.querySelector('.pv-rowplay');
+  return b.textContent === '■' || b.textContent === '▶';
+}));
+await page.evaluate(() => { const b = document.querySelector('.pv-rowplay'); if (b.textContent === '■') b.click(); });
+await page.waitForTimeout(200);
 await page.keyboard.press('Escape');
 await page.click('.tab-btn[data-tab="problems"]');
 await page.waitForTimeout(200);

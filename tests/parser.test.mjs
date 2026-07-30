@@ -778,5 +778,87 @@ t('setlistFolderName numbers folders so the device sorts them in play order', ()
   eq([...named].sort(), named, 'numbered names sort into setlist order');
 });
 
+// ── v0.8: single song-row playback ─────────────────────
+t('buildEventTimeline songRow plays every channel at that row', () => {
+  const p = PT.parseProject(buildProjectXml());
+  // fixture row 0: ch0 → chain 00 (phrase 00 = C3, then phrase 01 = 48 tsp -3)
+  //                ch1 → chain 02 (phrase 00 = C3)
+  const tl = PT.buildEventTimeline(p, { songRow: 0 });
+  ok(tl, 'expected a timeline');
+  const ons = tl.events.filter(e => e.type === 'on');
+  const chans = new Set(ons.map(e => e.ch));
+  ok(chans.has(0) && chans.has(1), 'both populated channels sound, got ' + [...chans]);
+  ok(!ons.some(e => e.ch > 1), 'silent channels contribute nothing');
+});
+t('buildEventTimeline songRow 1 differs from row 0', () => {
+  const p = PT.parseProject(buildProjectXml());
+  // row 1: only ch0 → chain 01 (phrase 02, note 72 at step 1)
+  const tl = PT.buildEventTimeline(p, { songRow: 1 });
+  const ons = tl.events.filter(e => e.type === 'on');
+  eq(ons.length, 1, 'one note in row 1');
+  eq(ons[0].note, 72);
+  eq(ons[0].ch, 0);
+});
+t('buildEventTimeline songRow is a strict subset of the full song', () => {
+  const p = PT.parseProject(buildProjectXml());
+  const full = PT.buildEventTimeline(p).events.filter(e => e.type === 'on').length;
+  const r0 = PT.buildEventTimeline(p, { songRow: 0 }).events.filter(e => e.type === 'on').length;
+  const r1 = PT.buildEventTimeline(p, { songRow: 1 }).events.filter(e => e.type === 'on').length;
+  eq(r0 + r1, full, 'rows 0+1 account for every note in this 2-row fixture');
+});
+t('buildEventTimeline songRow out of range returns null', () => {
+  const p = PT.parseProject(buildProjectXml());
+  eq(PT.buildEventTimeline(p, { songRow: 99 }), null);
+  eq(PT.buildEventTimeline(p, { songRow: -1 }), null);
+});
+t('buildEventTimeline songRow does not disturb chain or phrase modes', () => {
+  const p = PT.parseProject(buildProjectXml());
+  eq(PT.buildEventTimeline(p, { chain: 0x00 }).events.filter(e => e.type === 'on').length, 2);
+  eq(PT.buildEventTimeline(p, { phrase: 0x00 }).events.filter(e => e.type === 'on').length, 1);
+});
+
+// ── v0.8: chain colours grouped by high nibble ─────────
+t('groupChainColor gives each nibble group its own hue family', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const hues = /const CHAIN_HUES = \[[\s\S]*?\];/.exec(html);
+  const gc = /function groupChainColor\(c\) \{[\s\S]*?\n  \}/.exec(html);
+  const hh = /function hslHex\(h, s, l\) \{[\s\S]*?\n  \}/.exec(html);
+  ok(hues && gc && hh, 'colour helpers not found in index.html');
+  const fn = new Function(`${hues[0]}\n${hh[0]}\n${gc[0]}; return groupChainColor;`)();
+  const hex = /^#[0-9a-f]{6}$/;
+  for (const c of [0x00, 0x0F, 0x10, 0x3A, 0x7F, 0xFE]) ok(hex.test(fn(c)), `bad hex for ${c}: ${fn(c)}`);
+  // Hue is what makes a group read as a family. (Raw RGB distance can't be
+  // the test: a dark red sits nearer a dark orange than a light red does.)
+  const hueOf = h => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    if (!d) return 0;
+    const q = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return (q * 60 + 360) % 360;
+  };
+  const dHue = (a, b) => { const x = Math.abs(hueOf(a) - hueOf(b)); return Math.min(x, 360 - x); };
+  for (let g = 0; g < 16; g++) {
+    const base = fn(g << 4);
+    for (let s = 1; s < 16; s++)
+      ok(dHue(base, fn((g << 4) | s)) < 3, `chain ${((g<<4)|s).toString(16)} left its group's hue`);
+  }
+  for (let g = 0; g < 16; g++)
+    for (let g2 = g + 1; g2 < 16; g2++)
+      ok(dHue(fn(g << 4), fn(g2 << 4)) > 8, `groups ${g} and ${g2} share a hue`);
+  // neighbours inside a group still differ (no two chains share a swatch)
+  const swatches = new Set();
+  for (let c = 0x20; c <= 0x2F; c++) swatches.add(fn(c));
+  eq(swatches.size, 16, 'all 16 chains in a group get distinct colours');
+  // and consecutive chains must be *visibly* apart, not a 1% lightness step:
+  // songs use 00,01,02,03 side by side and they have to be tellable apart
+  const lumOf = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  for (let g = 0; g < 16; g++)
+    for (let s = 0; s < 15; s++) {
+      const d = Math.abs(lumOf(fn((g << 4) | s)) - lumOf(fn((g << 4) | (s + 1))));
+      ok(d > 18, `chains ${((g<<4)|s).toString(16)} and ${((g<<4)|s+1).toString(16)} are too close (Δlum ${d.toFixed(1)})`);
+    }
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
