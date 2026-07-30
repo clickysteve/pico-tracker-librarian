@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.6.0 — second feedback round
+- Project screen is now a full-screen workspace with Overview / Patterns
+  tabs — Patterns finally has room. Slice editor reachable from the
+  project screen's instrument view too.
+- Every project row has a round ▶ preview button; play/stop straight from
+  the list. Play buttons restyled (circled) so they no longer look like
+  the expand chevrons.
+- Theme creator: build a theme from scratch or "Edit copy" any existing
+  one — live device-screen preview, 12 colour pickers, font choice, save
+  as .ptt to the card. Preview rendering now matches the firmware's real
+  colour roles (row numbers alternate ACCENT/ACCENTALT, chain 00 in HI1,
+  cursor is an inverted HI2 block, channel strip inverted, etc).
+- Instrument parameter editing (experimental): edit any existing param of
+  a project-bank instrument in place, saved with the full backup/verify/
+  rollback path.
+- USB mirror: ⧉ Pop out opens the mirror in its own window (for OBS /
+  capture); full-screen mode as before.
+- Samples and Grooves start collapsed, with Expand/Collapse-all buttons.
+  Sample names click-to-copy their card path (browsers can't "reveal in
+  Finder" — the path is the best we can hand you).
+- Card access while the device is connected is a firmware matter
+  (issues #1430/#1432) — nothing a client can do yet.
+
 ## v0.5.0 — real-device feedback round
 - USB mirror now fits the window (responsive canvas) and has a full-screen
   mode. Remote input is disabled: the Advance visibly reacts to the

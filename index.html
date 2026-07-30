@@ -143,7 +143,7 @@
     /* PROJECTS — LIST ROWS */
     .proj-item { border-bottom:1px solid var(--border); }
     .proj-row { display:grid;
-      grid-template-columns:16px minmax(140px,1fr) 64px 60px 60px 70px 86px 90px;
+      grid-template-columns:26px minmax(140px,1fr) 64px 60px 60px 70px 86px 90px;
       align-items:center; gap:0 12px; padding:9px 20px;
       cursor:pointer; user-select:none; transition:background .1s; }
     .proj-row:hover { background:var(--surface); }
@@ -220,9 +220,17 @@
     .proj-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:100;
       display:flex; align-items:center; justify-content:center; padding:24px; }
     .proj-modal-box { background:var(--surface); border:1px solid var(--border2);
-      border-radius:10px; width:min(760px,100%); max-height:86vh;
+      border-radius:10px; width:min(1240px,95vw); height:92vh; max-height:92vh;
       display:flex; flex-direction:column; overflow:hidden; transition:width .15s; }
-    .proj-modal-box.pv-max { width:96vw; max-height:96vh; }
+    .proj-modal-box.pv-max { width:97vw; height:97vh; max-height:97vh; }
+    .modal-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); padding:0 16px; flex-shrink:0; background:var(--surface); }
+    .modal-tab { background:none; border:none; border-bottom:2px solid transparent; color:var(--muted);
+      padding:9px 14px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; }
+    .modal-tab:hover { color:var(--text); }
+    .modal-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .play-btn { border:1px solid var(--border2); border-radius:50%; width:22px; height:22px;
+      display:inline-flex; align-items:center; justify-content:center; padding:0; }
+    .play-btn:hover { border-color:var(--accent); }
     .pv-legend-item { display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--muted);
       background:var(--surface2); border:1px solid var(--border); border-radius:14px; padding:2px 9px 2px 4px; }
     .pv-legend-item input[type=color] { width:16px; height:16px; border:none; padding:0; background:none; cursor:pointer; border-radius:50%; }
@@ -298,8 +306,8 @@
     .sb-badge.used   { background:#1c2f1c; color:var(--c-found); border:1px solid #2a4a2a; cursor:pointer; }
     .sb-badge.unused { background:var(--surface2); color:var(--muted); border:1px solid var(--border); cursor:pointer; }
     .sb-file-row.sel { background:var(--accent-dim); box-shadow:inset 3px 0 0 var(--accent); }
-    .play-btn { background:transparent; border:none; cursor:pointer; padding:0 4px;
-      font-size:11px; color:var(--muted); line-height:1; transition:color .1s; flex-shrink:0; }
+    .play-btn { background:transparent; cursor:pointer;
+      font-size:10px; color:var(--muted); line-height:1; transition:color .1s,border-color .1s; flex-shrink:0; }
     .play-btn:hover,.play-btn.playing { color:var(--accent); }
     .play-btn:disabled { opacity:.4; cursor:default; }
 
@@ -617,7 +625,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.5.0 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.6.0 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -729,6 +737,8 @@
     <div class="tab-pane" id="tab-samples">
       <div class="toolbar">
         <input class="search" id="sampbr-q" type="text" placeholder="filter samples…">
+        <button class="btn ghost sm" id="btn-samp-expand">▾ Expand all</button>
+        <button class="btn ghost sm" id="btn-samp-collapse">▸ Collapse all</button>
         <span class="stat-chip" id="sampbr-stat" style="margin-left:auto"></span>
       </div>
       <div class="scroll-area"><div id="sampbr-list"></div></div>
@@ -741,6 +751,7 @@
         <button class="btn ghost sm" id="btn-theme-reset" title="Back to the default app palette">↺ Reset preview</button>
         <button class="btn ghost sm" id="btn-theme-fromdev" title="Save the colours currently in the device's .config.xml as a new .ptt file">⬇ Save device colours as .ptt</button>
         <input id="theme-size" type="range" min="180" max="420" value="230" style="width:110px;accent-color:var(--accent)" title="card size">
+        <button class="btn sm" id="btn-theme-new">＋ New theme</button>
         <span class="stat-chip" id="themes-stat" style="margin-left:auto"></span>
       </div>
       <div class="themes-scroll">
@@ -751,7 +762,9 @@
     <!-- ── GROOVES ── -->
     <div class="tab-pane" id="tab-grooves">
       <div class="toolbar">
-        <span class="stat-chip" id="grooves-stat"></span>
+        <button class="btn ghost sm" id="btn-grv-expand">▾ Expand all</button>
+        <button class="btn ghost sm" id="btn-grv-collapse">▸ Collapse all</button>
+        <span class="stat-chip" id="grooves-stat" style="margin-left:auto"></span>
       </div>
       <div class="scroll-area"><div id="grooves-list"></div></div>
     </div>
@@ -842,6 +855,7 @@
         <button class="btn ghost sm" id="btn-usb-png" disabled>⬇ PNG</button>
         <button class="btn ghost sm" id="btn-usb-input" disabled style="display:none" title="Disabled: the Advance reacts unexpectedly to the proposed input opcode — needs firmware-side agreement first">⌨ Input (experimental)</button>
         <button class="btn ghost sm" id="btn-usb-full" disabled title="Show only the mirrored screen">⛶ Full screen</button>
+        <button class="btn ghost sm" id="btn-usb-popout" disabled title="Open the mirror in its own window (handy for OBS / capture)">⧉ Pop out</button>
         <span class="stat-chip" id="usb-status" style="margin-left:auto">Not connected</span>
       </div>
       <div class="scroll-area" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:16px">
@@ -884,11 +898,14 @@
       <span class="proj-modal-title" id="modal-title"></span>
       <span class="proj-modal-meta" id="modal-meta"></span>
       <button class="btn sm" id="btn-modal-play" title="Play this project in the browser (approximate — sample channels only)">▶ Play</button>
-      <button class="btn ghost sm" id="btn-modal-patterns">▦ Patterns</button>
       <button class="btn ghost sm" id="btn-modal-midi" title="Export as a Standard MIDI File">⬇ MIDI</button>
       <button class="btn ghost sm" id="btn-modal-diff">⇌ Compare</button>
       <button class="modal-nav-btn" id="btn-modal-next" title="Next project (→)">›</button>
       <button class="btn ghost sm" id="btn-modal-close">✕</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="btn-modal-overview">Overview</button>
+      <button class="modal-tab" id="btn-modal-patterns">Patterns</button>
     </div>
     <div class="proj-modal-body" id="modal-body"></div>
   </div>
@@ -926,6 +943,27 @@
       <button class="btn ghost sm" id="btn-samp-close">✕</button>
     </div>
     <div class="samp-body" id="samp-body"></div>
+  </div>
+</div>
+
+<!-- Theme editor modal -->
+<div id="theme-ed-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:170;display:none;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:10px;width:min(760px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px;font-weight:700;flex:1">Theme editor</span>
+      <input id="theme-ed-name" class="search" style="width:150px" maxlength="16" placeholder="theme name">
+      <select id="theme-ed-font" class="sorter"><option value="0">Font: Regular</option><option value="1">Font: Bold</option><option value="2">Font: Wide</option></select>
+      <button class="btn ghost sm" id="btn-theme-ed-close">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 240px;gap:16px;padding:16px;overflow-y:auto">
+      <div id="theme-ed-preview" style="border:1px solid var(--border2);border-radius:8px;overflow:hidden;align-self:start"></div>
+      <div id="theme-ed-colors" style="display:flex;flex-direction:column;gap:7px"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border)">
+      <span id="theme-ed-status" style="flex:1;font-size:12px;color:var(--c-miss)"></span>
+      <button class="btn ghost sm" id="btn-theme-ed-cancel">Cancel</button>
+      <button class="btn" id="btn-theme-ed-save">Save .ptt to card</button>
+    </div>
   </div>
 </div>
 
@@ -1920,10 +1958,34 @@ const PT = (() => {
     return o;
   }
 
+  // ── Rewrite existing instrument PARAM values in project XML ──
+  // Only updates PARAMs that already exist in the block (the firmware
+  // writes every non-default parameter, and inventing new elements risks
+  // ordering quirks). Returns which keys were actually applied.
+  function rewriteInstrumentParams(text, instrIdHex, params) {
+    const idRe = new RegExp(`<INSTRUMENT\\b[^>]*\\bID="${escapeRe(instrIdHex)}"[^>]*>`);
+    const m = idRe.exec(text);
+    if (!m) return { ok: false, error: `instrument ID="${instrIdHex}" not found` };
+    if (m[0].endsWith('/>')) return { ok: false, error: `instrument ${instrIdHex} is a self-closing element` };
+    const start = m.index;
+    const end = text.indexOf('</INSTRUMENT>', start);
+    if (end < 0) return { ok: false, error: 'unterminated INSTRUMENT element' };
+    let block = text.slice(start, end);
+    const applied = [];
+    for (const [k, v] of Object.entries(params)) {
+      const re = new RegExp(`(<PARAM\\s+NAME="${escapeRe(escapeAttr(k))}"\\s+VALUE=")[^"]*(")`);
+      if (re.test(block)) {
+        block = block.replace(re, (mm, p1, p2) => p1 + escapeAttr(v) + p2);
+        applied.push(k);
+      }
+    }
+    return { ok: true, text: text.slice(0, start) + block + text.slice(end), applied };
+  }
+
   return {
     parseXml, decodeHexBuffer, u16leFrom, buildPti, buildPtt, rewriteConfigTheme, defaultConfigXml,
     noteFromStr, encodeHexBuffer, rewriteSongSections, buildEventTimeline,
-    rewriteInstrumentSlices, detectOnsets, snapZeroCross,
+    rewriteInstrumentSlices, rewriteInstrumentParams, detectOnsets, snapZeroCross,
     parseProject, parsePti, parseTheme, parseConfig, parseInstrumentEl,
     parseWavHeader, rewriteSampleRef,
     noteStr, cmdName, fxStr, hx2, hx4, colorHex, detectScales, buildMidi,
@@ -3507,7 +3569,7 @@ const UI = (() => {
     renderChunked(host, list, p => `
       <div class="proj-item" data-proj="${esc(p.dirName)}">
         <div class="proj-row">
-          <span class="p-chev">▶</span>
+          <button class="play-btn proj-play" data-proj="${esc(p.dirName)}" title="preview this project">▶</button>
           <span class="p-name">${esc(p.name)}${p.autosaveNewer?'<span class="p-auto">autosave</span>':''}${lib.currentProject===p.dirName?' <span style="color:var(--accent);font-size:10px" title="last project opened on the device (.current)">●</span>':''}</span>
           <span class="p-meta">${p.tempo??'—'} BPM</span>
           <span class="p-meta">${p.instruments.length} inst</span>
@@ -3521,6 +3583,10 @@ const UI = (() => {
       host2.querySelectorAll('.proj-item:not([data-wired])').forEach(el => {
         el.dataset.wired = '1';
         el.querySelector('.proj-row').addEventListener('click', () => toggleProjDetail(el));
+        el.querySelector('.proj-play').addEventListener('click', e => {
+          e.stopPropagation();
+          rowPlayToggle(el.querySelector('.proj-play'));
+        });
       });
     });
   }
@@ -3584,6 +3650,28 @@ const UI = (() => {
       s.addEventListener('click', e => { e.stopPropagation(); openProjModal(s.dataset.proj); }));
   }
 
+  // ── Row-level project preview ──────────────────────────
+  let rowPlayBtn = null;
+  async function rowPlayToggle(btn) {
+    if (rowPlayBtn === btn && SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
+    SongPlayer.stop();
+    const p = projByDir(btn.dataset.proj);
+    if (!p) return;
+    let parsed = fullCache.get(p.dirName);
+    if (!parsed) {
+      btn.textContent = '…';
+      try { parsed = (await readProjectFull(p)).parsed; fullCache.set(p.dirName, parsed); }
+      catch { btn.textContent = '▶'; return; }
+    }
+    rowPlayBtn = btn;
+    const ok = await SongPlayer.play(sd, p, parsed, null, () => {
+      btn.textContent = '▶'; btn.classList.remove('playing');
+      if (rowPlayBtn === btn) rowPlayBtn = null;
+    });
+    btn.textContent = ok ? '■' : '▶';
+    if (ok) btn.classList.add('playing');
+  }
+
   // ── Project modal (full detail + pattern viewer) ──────
   async function readProjectFull(p) {
     const dir = await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(p.dirName);
@@ -3609,6 +3697,7 @@ const UI = (() => {
     fullCache.set(p.dirName, parsed);
     const hist = PT.detectScales(parsed);
     body.innerHTML = `
+      <div id="modal-overview">
       <div class="sd-cols">
         <div class="sd-col">
           <div class="det-title">Instruments</div>
@@ -3638,9 +3727,11 @@ const UI = (() => {
           `<span class="nh-scale-chip ${i===0?'top':''}">${esc(c.label)}</span>`).join('')}
           ${p.scale && p.scale !== 'None (Chromatic)' ? `<span class="nh-scale-chip" style="margin-left:auto">project scale: ${esc(p.scale)}</span>` : ''}</div>` : ''}
       </div>
-      <div id="modal-pattern-section" class="pv-section" style="display:none"></div>`;
+      </div>
+      <div id="modal-pattern-section" style="display:none"></div>`;
     body.querySelectorAll('.ichip-instr').forEach(ch =>
       ch.addEventListener('click', () => showInstrParams(p, parseInt(ch.dataset.id, 10))));
+    setModalTab('overview');
     updateModalNav();
   }
 
@@ -3648,13 +3739,17 @@ const UI = (() => {
     const i = p.instruments.find(x => x.id === id);
     const host = $('modal-instr-detail');
     if (!i) { host.innerHTML = ''; return; }
+    const sliceable = i.sample && p.pool.some(x => x.name === i.sample);
     host.innerHTML = `
-      <div class="det-title" style="margin-top:12px">${esc(i.idHex)} — ${esc(i.name)} <span class="tb ${esc(i.type)}">${esc(i.rawType)}</span></div>
+      <div class="det-title" style="margin-top:12px;display:flex;align-items:center;gap:8px">${esc(i.idHex)} — ${esc(i.name)} <span class="tb ${esc(i.type)}">${esc(i.rawType)}</span>
+        ${sliceable ? '<button class="btn ghost sm" id="btn-modal-slice">✂ Slice editor</button>' : ''}</div>
       <div class="ipwrap">
         ${Object.entries(i.params).map(([k,v]) =>
           `<span class="ipchip"><span class="ipk">${esc(k)}</span><span class="ipv">${esc(v===''?'—':v)}</span></span>`).join('')}
         ${i.slices.map(s => `<span class="ipchip mod"><span class="ipk">SL${String(s.index).padStart(2,'0')}</span><span class="ipv">${s.offset}</span></span>`).join('')}
       </div>`;
+    host.querySelector('#btn-modal-slice')?.addEventListener('click', () =>
+      openSlicer({ ...i, source: 'project', proj: p, srcLabel: p.name }));
   }
 
   function updateModalNav() {
@@ -3674,14 +3769,22 @@ const UI = (() => {
   const CHAIN_PALETTE = ['#79b5e3','#34d399','#a78bfa','#f472b6','#fcd34d','#34d399','#fb923c','#f87171',
     '#38bdf8','#c084fc','#facc15','#4ade80','#e879f9','#fca5a5','#93c5fd','#a5f3d0'];
 
+  function setModalTab(tab) {
+    $('btn-modal-overview')?.classList.toggle('active', tab === 'overview');
+    $('btn-modal-patterns')?.classList.toggle('active', tab === 'patterns');
+    const ov = $('modal-overview'), pv = $('modal-pattern-section');
+    if (ov) ov.style.display = tab === 'overview' ? 'block' : 'none';
+    if (pv) pv.style.display = tab === 'patterns' ? 'block' : 'none';
+  }
   function togglePatternView() {
     const sec = $('modal-pattern-section');
     const full = modalProj && fullCache.get(modalProj.dirName);
     if (!full) return;
-    if (sec.style.display !== 'none') { sec.style.display = 'none'; return; }
-    sec.style.display = 'block';
-    renderPatterns(sec, modalProj, full);
-    sec.scrollIntoView({behavior:'smooth', block:'start'});
+    setModalTab('patterns');
+    if (!sec.dataset.rendered) {
+      renderPatterns(sec, modalProj, full);
+      sec.dataset.rendered = '1';
+    }
   }
 
   function chainColorOf(p, c, fallback) {
@@ -4116,9 +4219,10 @@ const UI = (() => {
         const usage = instrUsage(i);
         el.querySelector('.instr-det').innerHTML = `
           <div class="drow"><span class="dlabel">Params</span>
-            <div class="ipwrap">${Object.entries(i.params).map(([k,v]) =>
+            <div class="ipwrap" data-mode="view">${Object.entries(i.params).map(([k,v]) =>
               `<span class="ipchip"><span class="ipk">${esc(k)}</span><span class="ipv">${esc(v===''?'—':v)}</span></span>`).join('') || '<span style="color:var(--muted)">none</span>'}
             ${i.slices.map(s => `<span class="ipchip mod"><span class="ipk">SL${String(s.index).padStart(2,'0')}</span><span class="ipv">${s.offset}</span></span>`).join('')}
+            ${i.source === 'project' && Object.keys(i.params).length ? '<button class="btn ghost sm btn-param-edit" style="margin-left:6px">✎ Edit params</button>' : ''}
             </div></div>
           ${i.sample ? `<div class="drow"><span class="dlabel">Sample</span><span class="dval ${instrSampleState(i)==='miss'?'miss':'dim'}">${esc(i.sample)}${instrSampleState(i)==='miss'?' — not found':''}</span></div>` : ''}
           <div class="drow"><span class="dlabel">Used in</span><span class="dval dim">${usage.length ? usage.map(p => `<span style="cursor:pointer;color:var(--accent)" class="use-link" data-proj="${esc(p.dirName)}">${esc(p.name)}</span>`).join(' · ') : 'nowhere'}</span></div>
@@ -4133,6 +4237,10 @@ const UI = (() => {
         el.querySelector('.btn-slice-open')?.addEventListener('click', e => {
           e.stopPropagation();
           openSlicer(list[parseInt(el.dataset.idx, 10)]);
+        });
+        el.querySelector('.btn-param-edit')?.addEventListener('click', e => {
+          e.stopPropagation();
+          openParamEditor(list[parseInt(el.dataset.idx, 10)], el.querySelector('.ipwrap'));
         });
       });
     });
@@ -4167,10 +4275,10 @@ const UI = (() => {
       dirs.get(d).push(s);
     }
     const sortedDirs = [...dirs.keys()].sort();
-    html += `<div class="grp open"><div class="grp-hdr"><span class="grp-chev">▶</span><span class="grp-name">samples/ (library)</span><span class="grp-cnt">${lib.library.length} files · ${fmtBytes(lib.library.reduce((n,s)=>n+s.size,0))}</span></div><div class="grp-body">`;
+    html += `<div class="grp${q ? ' open' : ''}"><div class="grp-hdr"><span class="grp-chev">▶</span><span class="grp-name">samples/ (library)</span><span class="grp-cnt">${lib.library.length} files · ${fmtBytes(lib.library.reduce((n,s)=>n+s.size,0))}</span></div><div class="grp-body">`;
     for (const d of sortedDirs) {
       const files = dirs.get(d);
-      if (d) html += `<div class="grp open"><div class="grp-hdr" style="padding-left:32px"><span class="grp-chev">▶</span><span class="grp-name">${esc(d)}/</span><span class="grp-cnt">${files.length}</span></div><div class="grp-body">`;
+      if (d) html += `<div class="grp${q ? ' open' : ''}"><div class="grp-hdr" style="padding-left:32px"><span class="grp-chev">▶</span><span class="grp-name">${esc(d)}/</span><span class="grp-cnt">${files.length}</span></div><div class="grp-body">`;
       const CAP = 300;
       const shown = files.length > CAP + 50 ? files.slice(0, CAP) : files;
       for (const s of shown) {
@@ -4181,7 +4289,7 @@ const UI = (() => {
         totalCount++; totalBytes += s.size;
         html += `<div class="sb-file-row" data-row="${rowIdx}">
           <button class="play-btn" data-path="samples/${esc(s.path)}">▶</button>
-          <span class="sb-fname">${esc(s.name)}</span>
+          <span class="sb-fname" style="cursor:pointer" title="click to copy card path" data-copy="samples/${esc(s.path)}">${esc(s.name)}</span>
           <span class="sb-fmeta">${s.meta ? `${fmtDur(s.meta.duration)} · ${s.meta.sampleRate}Hz ${s.meta.bits}bit ${s.meta.channels===2?'st':'mo'}` : ''} · ${fmtBytes(s.size)}</span>
           <span class="sb-badge ${usedIn?'used':'unused'}" data-name="${esc(s.name)}">${usedIn ? 'in '+usedIn+' proj' : 'unused'}</span>
         </div>`;
@@ -4203,7 +4311,7 @@ const UI = (() => {
         sampbrRows.push({path:`projects/${p.dirName}/samples/${s.name}`, name:s.name});
         html += `<div class="sb-file-row" data-row="${rowIdx}">
           <button class="play-btn" data-path="projects/${esc(p.dirName)}/samples/${esc(s.name)}">▶</button>
-          <span class="sb-fname">${esc(s.name)}</span>
+          <span class="sb-fname" style="cursor:pointer" title="click to copy card path" data-copy="projects/${esc(p.dirName)}/samples/${esc(s.name)}">${esc(s.name)}</span>
           <span class="sb-fmeta">${s.meta ? `${fmtDur(s.meta.duration)} · ${s.meta.sampleRate}Hz ${s.meta.bits}bit` : ''} · ${fmtBytes(s.size)}</span>
           <span class="sb-badge ${unused?'unused':'used'}" data-name="${esc(s.name)}">${unused?'unused':'used'}</span>
         </div>`;
@@ -4221,6 +4329,14 @@ const UI = (() => {
       b.addEventListener('click', e => { e.stopPropagation(); AudioPlayer.playPath(sd, b.dataset.path, b); }));
     host.querySelectorAll('.sb-badge').forEach(b =>
       b.addEventListener('click', e => { e.stopPropagation(); openSampModal(b.dataset.name); }));
+    host.querySelectorAll('[data-copy]').forEach(el =>
+      el.addEventListener('click', async e => {
+        e.stopPropagation();
+        try { await navigator.clipboard.writeText(el.dataset.copy); } catch {}
+        const t = el.textContent;
+        el.textContent = '✓ path copied';
+        setTimeout(() => { el.textContent = t; }, 900);
+      }));
   }
 
   function sampbrAudition(delta) {
@@ -4267,29 +4383,34 @@ const UI = (() => {
   // ── THEMES ─────────────────────────────────────────────
   function themePreviewSvg(t) {
     const c = n => PT.colorHex(t.colors[n] ?? 0);
-    // roles mirror the device song screen: FOREGROUND for cell text,
-    // EMPHASIS for row labels, CURSORCOLOR block behind the cursor cell,
-    // HICOLOR2 for the playing row, INFO/WARN/ERROR in the status area
+    // Painted the way SongView.cpp actually paints: row numbers alternate
+    // ACCENT/ACCENTALT, chain cells are FOREGROUND (chain 00 = HICOLOR1),
+    // empty cells dim, cursor = inverted HICOLOR2 block, bottom channel
+    // strip inverted HICOLOR1 with the active channel in HICOLOR2.
+    const cellVals = [[0,1,-1,2,-1,-1],[0,1,-1,2,-1,-1],[0,1,3,2,-1,-1],[4,1,3,-1,-1,-1],[-1,-1,-1,-1,-1,-1],[5,-1,-1,-1,-1,-1]];
     return `<svg viewBox="0 0 220 118" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block">
       <rect width="220" height="118" fill="${c('BACKGROUND')}"/>
-      <text x="8" y="15" fill="${c('INFOCOLOR')}" font-size="9" font-family="monospace">SONG</text>
-      <text x="150" y="15" fill="${c('FOREGROUND')}" font-size="9" font-family="monospace">138 BPM</text>
-      <rect x="4" y="${21+2*13}" width="212" height="12" fill="${c('HICOLOR2')}" opacity=".35"/>
-      ${[0,1,2,3,4,5].map(r => `
-        <text x="8" y="${31+r*13}" fill="${c('EMPHASISCOLOR')}" font-size="9" font-family="monospace">${PT.hx2(r)}</text>
-        ${[0,1,2,3,4,5].map(col => {
-          const isCursor = r === 2 && col === 1;
-          const bg = isCursor ? `<rect x="${30+col*28-2}" y="${22+r*13}" width="22" height="11" fill="${c('CURSORCOLOR')}"/>` : '';
-          const empty = (r*7+col*5) % 5 === 0;
-          return `${bg}<text x="${30+col*28}" y="${31+r*13}" fill="${empty ? c('EMPHASISCOLOR') : c('FOREGROUND')}" font-size="9" font-family="monospace">${empty?'--':PT.hx2((r*13+col*29)%128)}</text>`;
+      <text x="8" y="14" fill="${c('INFOCOLOR')}" font-size="9" font-family="monospace">SONG</text>
+      <text x="150" y="14" fill="${c('FOREGROUND')}" font-size="9" font-family="monospace">NIGHTDRIVE</text>
+      ${cellVals.map((rowVals, r) => `
+        <text x="8" y="${30+r*13}" fill="${c(Math.floor(r/4)%2 ? 'ACCENTALTCOLOR' : 'ACCENTCOLOR')}" font-size="9" font-family="monospace">${PT.hx2(r)}</text>
+        ${rowVals.map((v, col) => {
+          const isCursor = r === 2 && col === 2;
+          if (isCursor) return `<rect x="${30+col*26-2}" y="${21+r*13}" width="20" height="11" fill="${c('HICOLOR2')}"/>
+            <text x="${30+col*26}" y="${30+r*13}" fill="${c('BACKGROUND')}" font-size="9" font-family="monospace">${v<0?'--':PT.hx2(v)}</text>`;
+          const fill = v < 0 ? c('EMPHASISCOLOR') : v === 0 ? c('HICOLOR1') : c('FOREGROUND');
+          return `<text x="${30+col*26}" y="${30+r*13}" fill="${fill}" font-size="9" font-family="monospace">${v<0?'--':PT.hx2(v)}</text>`;
         }).join('')}`).join('')}
-      <text x="8" y="112" fill="${c('ACCENTCOLOR')}" font-size="8" font-family="monospace">▶ 02</text>
-      <text x="48" y="112" fill="${c('WARNCOLOR')}" font-size="8" font-family="monospace">WARN</text>
-      <text x="88" y="112" fill="${c('ERRORCOLOR')}" font-size="8" font-family="monospace">ERR</text>
-      <text x="126" y="112" fill="${c('ACCENTALTCOLOR')}" font-size="8" font-family="monospace">ALT</text>
-      <text x="162" y="112" fill="${c('CONSOLECOLOR')}" font-size="8" font-family="monospace">CONS</text>
+      ${[0,1,2,3,4,5,6,7].map(i => `
+        <rect x="${8+i*17}" y="103" width="15" height="10" fill="${c(i===2?'HICOLOR2':'HICOLOR1')}"/>
+        <text x="${11+i*17}" y="111" fill="${c('BACKGROUND')}" font-size="8" font-family="monospace">${i+1}</text>`).join('')}
+      <text x="152" y="111" fill="${c('WARNCOLOR')}" font-size="8" font-family="monospace">W</text>
+      <text x="166" y="111" fill="${c('ERRORCOLOR')}" font-size="8" font-family="monospace">E</text>
+      <text x="180" y="111" fill="${c('INFOCOLOR')}" font-size="8" font-family="monospace">I</text>
+      <text x="194" y="111" fill="${c('CURSORCOLOR')}" font-size="8" font-family="monospace">▮</text>
     </svg>`;
   }
+
   function renderThemes() {
     if (!lib) return;
     const q = themeFilter.toLowerCase();
@@ -4304,6 +4425,7 @@ const UI = (() => {
         <div class="theme-actions">
           <button class="btn ghost sm" data-use="${i}" title="Apply this palette to the Librarian UI (preview only)">Preview</button>
           <button class="btn ghost sm" data-setdev="${i}" title="Write this theme into the card's .config.xml so the device boots with it">Set on device</button>
+          <button class="btn ghost sm" data-edit="${i}" title="Duplicate this theme and edit the copy">✎ Edit copy</button>
         </div>
         <div class="theme-swatches">
           ${PT.THEME_COLOR_NAMES.filter(n => t.colors[n] !== undefined).slice(0,8).map(n => `
@@ -4316,6 +4438,63 @@ const UI = (() => {
       b.addEventListener('click', () => applyTheme(list[parseInt(b.dataset.use, 10)])));
     $('themes-grid').querySelectorAll('[data-setdev]').forEach(b =>
       b.addEventListener('click', () => setDeviceTheme(list[parseInt(b.dataset.setdev, 10)], b)));
+    $('themes-grid').querySelectorAll('[data-edit]').forEach(b =>
+      b.addEventListener('click', () => openThemeEditor(list[parseInt(b.dataset.edit, 10)])));
+  }
+
+  // ── THEME CREATOR ──────────────────────────────────────
+  let editTheme = null;
+  function openThemeEditor(fromTheme) {
+    editTheme = {
+      font: fromTheme?.font ?? 0,
+      colors: { ...(fromTheme?.colors ?? {
+        BACKGROUND: 0x0B0D0E, FOREGROUND: 0xEEF1F2, HICOLOR1: 0x2E5A80, HICOLOR2: 0x79B5E3,
+        CONSOLECOLOR: 0xFF00FF, CURSORCOLOR: 0x2E5A80, INFOCOLOR: 0x79B5E3, WARNCOLOR: 0xF59E0B,
+        ERRORCOLOR: 0xF87171, ACCENTCOLOR: 0x79B5E3, ACCENTALTCOLOR: 0x9CCBF0, EMPHASISCOLOR: 0x7B858C,
+      }) },
+    };
+    $('theme-ed-name').value = fromTheme ? (fromTheme.fileName.replace(/\.ptt$/i, '') + '-2').slice(0, 16) : 'MyTheme';
+    $('theme-ed-font').value = String(editTheme.font);
+    renderThemeEditor();
+    $('theme-ed-modal').style.display = 'flex';
+  }
+  function renderThemeEditor() {
+    $('theme-ed-preview').innerHTML = themePreviewSvg(editTheme);
+    $('theme-ed-colors').innerHTML = PT.THEME_COLOR_NAMES.map(nm => `
+      <label style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)">
+        <input type="color" data-role="${nm}" value="${PT.colorHex(editTheme.colors[nm] ?? 0)}" style="width:26px;height:22px;border:none;background:none;padding:0;cursor:pointer">
+        <span style="flex:1">${nm.replace('COLOR','').toLowerCase()}</span>
+        <span style="font-family:monospace;font-size:10px;color:var(--border2)">${PT.colorHex(editTheme.colors[nm] ?? 0)}</span>
+      </label>`).join('');
+    $('theme-ed-colors').querySelectorAll('input[type=color]').forEach(inp =>
+      inp.addEventListener('input', () => {
+        editTheme.colors[inp.dataset.role] = parseInt(inp.value.slice(1), 16);
+        $('theme-ed-preview').innerHTML = themePreviewSvg(editTheme);
+      }));
+  }
+  async function saveThemeEditor() {
+    const name = ($('theme-ed-name').value.trim() || 'MyTheme').slice(0, 16).replace(/[^\w \-]+/g, '');
+    editTheme.font = parseInt($('theme-ed-font').value, 10) || 0;
+    if (!await ensureWrite()) return;
+    const status = $('theme-ed-status');
+    try {
+      const dir = await sd.getDirectoryHandle('themes', { create: true });
+      let fname = name + '.ptt', free = false;
+      for (let n = 2; n < 200 && !free; n++) {
+        try { await dir.getFileHandle(fname); fname = `${name}${n}.ptt`; } catch { free = true; }
+      }
+      if (!free) throw new Error('no free filename');
+      const w = await (await dir.getFileHandle(fname, { create: true })).createWritable();
+      await w.write(PT.buildPtt(editTheme)); await w.close();
+      const verify = PT.parseTheme(await (await readCardFile('themes', fname)).text());
+      if (!verify) throw new Error('verification failed: written theme does not parse');
+      logRepair(true, 'create-theme', `themes/${fname}`);
+      await persist();
+      $('theme-ed-modal').style.display = 'none';
+      setCacheBar(`Saved themes/${fname} — rescanning…`, true);
+      await rescan(lib);
+      switchTab('themes');
+    } catch(e) { status.textContent = 'Save failed: ' + (e.message || e); }
   }
 
   // ── Set device theme: paranoid .config.xml write ──────
@@ -4435,7 +4614,7 @@ const UI = (() => {
       Bigger bar = longer step. <b style="color:var(--text)">7,5</b> = swing; a groove with more steps cycles through them.
       Applied per channel with the <b style="color:var(--text)">GRV</b> command.</div>`;
     for (const { p, list } of byProj.values()) {
-      html += `<div class="grp open"><div class="grp-hdr"><span class="grp-chev">▶</span>
+      html += `<div class="grp"><div class="grp-hdr"><span class="grp-chev">▶</span>
         <span class="grp-name">${esc(p.name)}</span><span class="grp-cnt">${list.length}</span></div><div class="grp-body">`;
       for (const g of list) {
         const max = Math.max(...g.steps, 8);
@@ -5145,6 +5324,70 @@ const UI = (() => {
     }
   }
 
+  // ── INSTRUMENT PARAM EDITOR (experimental) ─────────────
+  function openParamEditor(inst, wrap) {
+    if (!inst || inst.source !== 'project') return;
+    const p = inst.proj;
+    wrap.dataset.mode = 'edit';
+    wrap.innerHTML = Object.entries(inst.params).map(([k, v]) => `
+      <span class="ipchip" style="gap:4px">
+        <span class="ipk">${esc(k)}</span>
+        <input class="pe-param" data-k="${esc(k)}" value="${esc(v)}" style="width:${Math.max(4, String(v).length + 1)}ch;background:var(--surface);border:1px solid var(--border2);color:var(--text);font-family:monospace;font-size:11px;border-radius:3px;padding:1px 4px">
+      </span>`).join('') + `
+      <button class="btn sm btn-param-save">💾 Save</button>
+      <button class="btn ghost sm btn-param-cancel">Cancel</button>
+      <span class="pe-status" style="font-size:11px;color:var(--muted);width:100%">Values are written as-is — the device clamps out-of-range numbers. Enum params (loopmode, filter mode …) must match the device's exact label.</span>`;
+    wrap.querySelector('.btn-param-cancel').addEventListener('click', () => renderInstruments());
+    wrap.querySelector('.btn-param-save').addEventListener('click', async () => {
+      const changes = {};
+      wrap.querySelectorAll('.pe-param').forEach(inp => {
+        if (inp.value !== String(inst.params[inp.dataset.k])) changes[inp.dataset.k] = inp.value;
+      });
+      if (!Object.keys(changes).length) { renderInstruments(); return; }
+      await saveInstrumentParams(p, inst, changes, wrap.querySelector('.pe-status'));
+    });
+  }
+  async function saveInstrumentParams(p, inst, changes, statusEl) {
+    if (!await ensureWrite()) return;
+    const setStatus = m => { if (statusEl) statusEl.textContent = m; };
+    const projPath = `projects/${p.dirName}`;
+    const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+    let backedUp = false, original = null;
+    try {
+      const { file: curFile, bytes: curBytes, text } = await readCardFileForEdit(projPath, p.datName);
+      if (curFile.lastModified !== p.lastModified || curFile.size !== p.fileSize)
+        throw new Error('project changed on card since the last scan — rescan first (nothing written)');
+      const res = PT.rewriteInstrumentParams(text, inst.idHex, changes);
+      if (!res.ok) throw new Error(res.error);
+      const missing = Object.keys(changes).filter(k => !res.applied.includes(k));
+      if (missing.length) throw new Error(`param(s) not present in the file: ${missing.join(', ')} — nothing written`);
+      setStatus('Backing up…');
+      original = curBytes;
+      await writeCardFile(`PTLibrarian_Backups/${stamp}/${p.dirName}`, p.datName, curBytes);
+      backedUp = true;
+      setStatus('Writing…');
+      await writeCardFile(projPath, p.datName, res.text);
+      setStatus('Verifying…');
+      const reread = PT.parseProject(await (await readCardFile(projPath, p.datName)).text());
+      const ni = reread?.instruments.find(x => x.idHex === inst.idHex);
+      if (!ni) throw new Error('verification failed: instrument missing after write');
+      for (const [k, v] of Object.entries(changes))
+        if (String(ni.params[k]) !== String(v) && !(k === 'sample' && ni.sample === v))
+          throw new Error(`verification failed: ${k} reads back as "${ni.params[k]}"`);
+      logRepair(true, 'edit-params', `${p.name}: ${inst.idHex} ${inst.name}: ${Object.entries(changes).map(([k,v]) => `${k}=${v}`).join(', ')} — original backed up`);
+      await persist();
+      setCacheBar('Params saved and verified — rescanning…', true);
+      await rescan(lib);
+      switchTab('instruments');
+    } catch(e) {
+      logRepair(false, 'edit-params', `${p.name}: ${inst.idHex}: ${e.message || e}`);
+      if (backedUp && original !== null) {
+        try { await writeCardFile(projPath, p.datName, original); setStatus(`Failed: ${e.message || e} — original restored.`); }
+        catch { setStatus(`Failed: ${e.message || e} — RESTORE FAILED, backup at PTLibrarian_Backups/${stamp}/`); }
+      } else setStatus(`Failed: ${e.message || e} (nothing written)`);
+    }
+  }
+
   // ── EXTRACT INSTRUMENT AS .PTI ─────────────────────────
   async function exportPti(inst) {
     if (!inst) return;
@@ -5589,6 +5832,7 @@ const UI = (() => {
       if (!ok) $('modal-meta').textContent = baseMeta;
     });
     $('btn-modal-patterns').addEventListener('click', togglePatternView);
+    $('btn-modal-overview').addEventListener('click', () => setModalTab('overview'));
     $('btn-modal-midi').addEventListener('click', exportMidi);
     $('btn-modal-diff').addEventListener('click', () => modalProj && startDiff(modalProj));
 
@@ -5606,6 +5850,10 @@ const UI = (() => {
 
     // Samples
     $('sampbr-q').addEventListener('input', debounce(e => { sampFilter = e.target.value; renderSamples(); }));
+    const setAllGroups = (root, open) =>
+      document.querySelectorAll(root + ' .grp').forEach(g => g.classList.toggle('open', open));
+    $('btn-samp-expand').addEventListener('click', () => setAllGroups('#sampbr-list', true));
+    $('btn-samp-collapse').addEventListener('click', () => setAllGroups('#sampbr-list', false));
     $('btn-samp-close').addEventListener('click', () => $('samp-modal').classList.remove('open'));
     $('samp-modal').addEventListener('click', e => { if (e.target === $('samp-modal')) $('samp-modal').classList.remove('open'); });
 
@@ -5615,6 +5863,16 @@ const UI = (() => {
     $('btn-theme-fromdev').addEventListener('click', saveDeviceTheme);
     $('theme-size').addEventListener('input', e =>
       document.documentElement.style.setProperty('--theme-card', e.target.value + 'px'));
+    $('btn-theme-new').addEventListener('click', () => openThemeEditor(null));
+    $('btn-theme-ed-close').addEventListener('click', () => $('theme-ed-modal').style.display = 'none');
+    $('btn-theme-ed-cancel').addEventListener('click', () => $('theme-ed-modal').style.display = 'none');
+    $('btn-theme-ed-save').addEventListener('click', saveThemeEditor);
+
+    // Grooves
+    $('btn-grv-expand').addEventListener('click', () =>
+      document.querySelectorAll('#grooves-list .grp').forEach(g => g.classList.add('open')));
+    $('btn-grv-collapse').addEventListener('click', () =>
+      document.querySelectorAll('#grooves-list .grp').forEach(g => g.classList.remove('open')));
 
     // Problems
     document.querySelectorAll('.prob-btn').forEach(b =>
@@ -5713,6 +5971,7 @@ const UI = (() => {
       $('btn-usb-refresh').disabled = !connected;
       $('btn-usb-png').disabled = !connected;
       $('btn-usb-full').disabled = !connected;
+      $('btn-usb-popout').disabled = !connected;
       $('btn-usb-input').disabled = !connected;
       $('btn-usb-connect').textContent = connected ? 'DISCONNECT' : 'CONNECT USB';
       if (!connected && usbInput) toggleUsbInput();
@@ -5755,6 +6014,27 @@ const UI = (() => {
     $('btn-usb-full').addEventListener('click', () => {
       if (document.fullscreenElement) document.exitFullscreen();
       else $('usb-stage').requestFullscreen?.().catch(() => {});
+    });
+    let popWin = null, popRaf = 0;
+    $('btn-usb-popout').addEventListener('click', () => {
+      if (popWin && !popWin.closed) { popWin.focus(); return; }
+      popWin = window.open('', 'pt-mirror', 'width=800,height=620');
+      if (!popWin) return;
+      popWin.document.title = 'picoTracker mirror';
+      popWin.document.body.style.cssText = 'margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh';
+      const pc = popWin.document.createElement('canvas');
+      pc.width = 960; pc.height = 720;
+      pc.style.cssText = 'max-width:100vw;max-height:100vh;aspect-ratio:4/3;image-rendering:pixelated';
+      popWin.document.body.appendChild(pc);
+      const pctx = pc.getContext('2d');
+      const src = $('usb-canvas');
+      cancelAnimationFrame(popRaf);
+      const blit = () => {
+        if (!popWin || popWin.closed) return;
+        pctx.drawImage(src, 0, 0);
+        popRaf = requestAnimationFrame(blit);
+      };
+      blit();
     });
 
     // PWA: register the service worker when served over http(s); the

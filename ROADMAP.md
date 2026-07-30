@@ -3,12 +3,12 @@
 Gathered from real-device testing feedback. Roughly in priority order.
 
 ## Next
+- **Card access over USB** — blocked on firmware (issues #1430 mass
+  storage / #1432 data protocol); the librarian will work while the
+  device is connected the day either lands.
 - **Phrase editor rework** — the current grid works but is bare. Wanted:
   keyboard-first editing (arrows + type-to-enter like a tracker), row
   insert/copy/paste, live audition of the edited phrase, undo.
-- **Theme creator** — build/edit themes in the librarian: colour pickers
-  for all 12 roles with the live device-screen preview, save as .ptt,
-  duplicate-and-tweak from an existing theme.
 - **True sample delete** — the Problems tab can move unused pool samples
   to `PTLibrarian_Trash/` on the card; add explicit delete (with confirm)
   from the sample browser and preview flows, plus a trash browser with

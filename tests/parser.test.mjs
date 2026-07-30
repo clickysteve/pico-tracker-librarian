@@ -680,5 +680,23 @@ t('regression: buildMidi survives a fully dense song', () => {
   ok(smf.ntrks === 9, 'tracks: ' + smf.ntrks);
 });
 
+
+t('rewriteInstrumentParams edits only existing params of the target', () => {
+  const xml = buildProjectXml();
+  const res = PT.rewriteInstrumentParams(xml, '00', { volume: '90', loopmode: 'loop', nonexistent: '5' });
+  ok(res.ok, res.error);
+  eq(res.applied.sort(), ['loopmode', 'volume']);
+  const p = PT.parseProject(res.text);
+  eq(p.instruments[0].params.volume, '90');
+  eq(p.instruments[0].params.loopmode, 'loop');
+  eq(p.instruments[0].params.table, '-1', 'untouched param preserved');
+  eq(p.instruments[1].type, 'MIDI', 'other instruments untouched');
+});
+t('rewriteInstrumentParams escapes values safely', () => {
+  const res = PT.rewriteInstrumentParams(buildProjectXml(), '00', { volume: '1 & "2" <3> $&' });
+  ok(res.ok, res.error);
+  eq(PT.parseProject(res.text).instruments[0].params.volume, '1 & "2" <3> $&');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
