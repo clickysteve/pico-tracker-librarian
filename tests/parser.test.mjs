@@ -698,5 +698,85 @@ t('rewriteInstrumentParams escapes values safely', () => {
   eq(PT.parseProject(res.text).instruments[0].params.volume, '1 & "2" <3> $&');
 });
 
+// ── v0.7: single-phrase audition timeline ──────────────
+t('buildEventTimeline phrase mode plays only that phrase', () => {
+  const p = PT.parseProject(buildProjectXml());
+  // phrase 00 has C3 at step 0, OFF at step 1, KIL at step 2
+  const tl = PT.buildEventTimeline(p, { phrase: 0x00 });
+  ok(tl, 'expected a timeline');
+  const ons = tl.events.filter(e => e.type === 'on');
+  eq(ons.length, 1, 'one note on');
+  eq(ons[0].note, 60);
+  eq(ons[0].ch, 0, 'previewed on channel 0');
+  eq(ons[0].transpose, 0, 'no chain transpose applied in phrase mode');
+  // phrase 02 has a note at step 1 only
+  const tl2 = PT.buildEventTimeline(p, { phrase: 0x02 });
+  const ons2 = tl2.events.filter(e => e.type === 'on');
+  eq(ons2.length, 1);
+  eq(ons2[0].note, 72);
+});
+t('buildEventTimeline phrase mode ignores the song grid entirely', () => {
+  const p = PT.parseProject(buildProjectXml());
+  // an empty phrase yields a timeline with no note-ons, not the whole song
+  const tl = PT.buildEventTimeline(p, { phrase: 0x7F });
+  ok(tl, 'expected a timeline even for an empty phrase');
+  eq(tl.events.filter(e => e.type === 'on').length, 0);
+});
+t('buildEventTimeline still builds the full song when no opts given', () => {
+  const p = PT.parseProject(buildProjectXml());
+  const full = PT.buildEventTimeline(p);
+  const solo = PT.buildEventTimeline(p, { phrase: 0x00 });
+  ok(full.events.filter(e => e.type === 'on').length >
+     solo.events.filter(e => e.type === 'on').length, 'song has more notes than one phrase');
+  ok(full.events.some(e => e.ch > 0), 'song spans multiple channels');
+});
+t('buildEventTimeline chain mode unaffected by the phrase-mode change', () => {
+  const p = PT.parseProject(buildProjectXml());
+  const tl = PT.buildEventTimeline(p, { chain: 0x00 });
+  const ons = tl.events.filter(e => e.type === 'on');
+  // chain 00: phrase 00 (C3) then phrase 01 (note 48, transpose -3)
+  eq(ons.length, 2);
+  eq(ons[0].note, 60);
+  eq(ons[1].note, 48);
+  eq(ons[1].transpose, -3, 'chain transpose still applied');
+});
+
+// ── v0.7: OS junk-file filter (pure fn lifted out of Scanner) ──
+t('isJunkName hides macOS AppleDouble and dot files, keeps real content', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const m = /function isJunkName\(name\) \{[\s\S]*?\n  \}/.exec(html);
+  ok(m, 'isJunkName not found in index.html');
+  const isJunkName = new Function(`${m[0]}; return isJunkName;`)();
+  // the exact thing Steve saw on his card
+  ok(isJunkName('._fatbrass.wav'), '._fatbrass.wav should be hidden');
+  ok(isJunkName('._guitar1.wav'), '._guitar1.wav should be hidden');
+  ok(isJunkName('.DS_Store'));
+  ok(isJunkName('.Spotlight-V100'));
+  ok(isJunkName('.Trashes'));
+  ok(isJunkName('Thumbs.db'));
+  ok(isJunkName('thumbs.db'), 'case-insensitive');
+  // real card content must survive
+  ok(!isJunkName('fatbrass.wav'));
+  ok(!isJunkName('ptsav.dat'));
+  ok(!isJunkName('lgptsav.dat'));
+  ok(!isJunkName('BREAKS-90'));
+  ok(!isJunkName('my.theme.ptt'), 'dots elsewhere in the name are fine');
+});
+
+// ── v0.7: setlist export folder numbering ──────────────
+t('setlistFolderName numbers folders so the device sorts them in play order', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const m = /function setlistFolderName\(dirName, idx\) \{[\s\S]*?\n  \}/.exec(html);
+  ok(m, 'setlistFolderName not found in index.html');
+  const fn = new Function(`${m[0]}; return setlistFolderName;`)();
+  eq(fn('OPENER', 0), '01_OPENER');
+  eq(fn('CLOSER', 9), '10_CLOSER');
+  eq(fn('ENCORE', 98), '99_ENCORE');
+  // the whole point: alphabetical order === setlist order
+  const set = ['ZED', 'ALPHA', 'MID'];
+  const named = set.map(fn);
+  eq([...named].sort(), named, 'numbered names sort into setlist order');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

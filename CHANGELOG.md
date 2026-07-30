@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.7.0 — third feedback round
+
+- **macOS junk files are hidden.** AppleDouble `._name.wav` resource
+  forks, `.DS_Store`, `.Spotlight-V100`, `.Trashes` and `Thumbs.db` are
+  skipped everywhere: scans, sample lists, project lists, ZIP/folder
+  exports. They were showing up as fake samples and inflating counts.
+- **Pattern grid sizes properly.** The grid's column widths were pinned
+  at 30px while the zoom slider only scaled the cells, so cell text
+  clipped at anything above the default. Columns now follow the zoom.
+- **Ordered chain list down the left of the song grid**, ascending by
+  chain number (it used to be a legend in song-usage order), with usage
+  counts, colour pickers, per-chain preview, and hover-to-highlight of a
+  chain's cells in the grid.
+- **Overview tab filled out**: a stat strip (BPM, master, transpose,
+  scale, rows/chains/phrases/tables/grooves, note count, firmware, file
+  and pool size, save date), a clickable mini song map, FX-usage and
+  groove summaries, and sample rows you can audition inline.
+- **Phrase editor rebuilt.** One always-editable tracker grid instead of
+  a view/edit toggle: beat-striped rows, column headers, full keyboard
+  navigation (arrows / Tab / Enter / Delete), type-to-edit, per-step
+  copy/paste, whole-phrase copy/paste/clear, 50-level undo, and a ▶
+  button to audition just that phrase.
+- **Instrument parameters grouped and readable**: Sample / Tuning / Mix /
+  Filter / Crush / Amp / LFO 1 / LFO 2 / Table cards instead of one flat
+  chip wall, with level bars for 0–255 params, note names for root note,
+  L/R for pan, and slice markers in their own card. The editor gained
+  sliders alongside the text fields.
+- **Setlists.** The Sets tab is now an ordered setlist: click to add,
+  drag or ▲▼ to reorder, ✕ to remove, and the order is saved with the
+  set. Export can number the project folders (`01_`, `02_` …) so the
+  device lists them in playing order.
+- **Slicer is findable.** ✂ buttons now sit on every sample row that has
+  an instrument, in both the project Overview and the project list's
+  expanded detail, on top of the existing Instruments-tab entry point.
+
 ## v0.6.0 — second feedback round
 - Project screen is now a full-screen workspace with Overview / Patterns
   tabs — Patterns finally has room. Slice editor reachable from the

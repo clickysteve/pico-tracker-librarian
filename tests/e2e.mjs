@@ -126,16 +126,22 @@ await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
 await page.waitForTimeout(200);
 await page.evaluate(() => document.querySelector('.pv-cstep .cp')?.click());
 await page.waitForTimeout(200);
-const canEdit = await page.evaluate(() => !!document.getElementById('btn-phrase-edit'));
-check('editor: edit button offered', canEdit);
-await page.click('#btn-phrase-edit');
-await page.waitForTimeout(200);
+// the grid is directly editable now — no separate "edit" mode toggle
+const canEdit = await page.evaluate(() =>
+  !!document.querySelector('.pe-row[data-step="0"] .pe-c[data-f="note"][tabindex="0"]'));
+check('editor: phrase grid is editable in place', canEdit);
+check('editor: keyboard help shown', await page.evaluate(() => !!document.querySelector('.pe-help')));
+// focus the note cell at step 0, type a new note, commit with Enter
+await page.click('.pe-row[data-step="0"] .pe-c[data-f="note"]');
+await page.waitForTimeout(100);
+await page.keyboard.press('Enter');       // begin editing the focused cell
+await page.waitForTimeout(100);
 await page.evaluate(() => {
-  const inp = document.querySelector('[data-step="0"] [data-f="note"]');
+  const inp = document.querySelector('.pe-row[data-step="0"] .pe-edit');
   inp.value = 'E-4';
-  inp.dispatchEvent(new Event('change'));
 });
-await page.waitForTimeout(200);
+await page.keyboard.press('Enter');       // commit
+await page.waitForTimeout(250);
 check('editor: dirty bar appears', await page.evaluate(() => !!document.getElementById('pv-save-bar')));
 await page.click('#btn-save-edits');
 await page.waitForTimeout(2000);
@@ -154,8 +160,9 @@ await page.waitForTimeout(200);
 await page.evaluate(() => document.querySelector('.pv-cstep .cp')?.click());
 await page.waitForTimeout(300);
 const savedNote = await page.evaluate(() =>
-  document.querySelector('#phrase-rows .pv-pstep .pn')?.textContent);
+  document.querySelector('#phrase-rows .pe-row[data-step="0"] .pe-note')?.textContent.trim());
 check('editor: saved edit persisted to card (E-4 at step 0)', savedNote === 'E-4');
+check('editor: phrase audition button present', await page.evaluate(() => !!document.getElementById('btn-ph-play')));
 
 // ── 8. slice editor on the demo card ───────────────────
 await page.keyboard.press('Escape');
@@ -188,7 +195,7 @@ const slicesAfter = await page.evaluate(() => {
     const r = rows.find(x => x.textContent.includes('Night Bass'));
     r?.querySelector('.instr-row')?.click();
     setTimeout(() => {
-      const chips = r ? [...r.querySelectorAll('.ipchip.mod')] : [];
+      const chips = r ? [...r.querySelectorAll('.pp-slice')] : [];
       res(chips.length);
     }, 200);
   }, 400));
@@ -209,10 +216,17 @@ await page.waitForTimeout(400);
 check('patterns: zoom + expand controls present', await page.evaluate(() =>
   !!document.getElementById('pv-zoom') && !!document.getElementById('btn-pv-expand')));
 check('patterns: chain colour pickers present', await page.evaluate(() =>
-  document.querySelectorAll('.pv-legend-item input[type=color]').length > 0));
-await page.evaluate(() => document.querySelector('.pv-legend-item .cp-play')?.click());
+  document.querySelectorAll('.pv-chainrow input[type=color]').length > 0));
+// the chain list must be ascending by chain number, not song-usage order
+check('patterns: chain list is in ascending order', await page.evaluate(() => {
+  const ns = [...document.querySelectorAll('.pv-chainrow')].map(r => parseInt(r.dataset.chain, 10));
+  return ns.length > 1 && ns.every((n, i) => i === 0 || n > ns[i - 1]);
+}));
+check('patterns: chain list shows usage counts', await page.evaluate(() =>
+  [...document.querySelectorAll('.pv-chainrow .cp-count')].every(e => /^×\d+$/.test(e.textContent))));
+await page.evaluate(() => document.querySelector('.pv-chainrow .cp-play')?.click());
 await page.waitForTimeout(800);
-const chainBtn = await page.evaluate(() => document.querySelector('.pv-legend-item .cp-play')?.textContent);
+const chainBtn = await page.evaluate(() => document.querySelector('.pv-chainrow .cp-play')?.textContent);
 check('patterns: chain preview started', chainBtn === '■' || chainBtn === '▶');  // ■ while playing, ▶ if already ended
 await page.keyboard.press('Escape');
 await page.click('.tab-btn[data-tab="problems"]');
@@ -251,12 +265,29 @@ await page.evaluate(() => {
 <COMMAND1>${RUN(45,16)}</COMMAND1><PARAM1>${RUN(0,32)}</PARAM1><COMMAND2>${RUN(45,16)}</COMMAND2><PARAM2>${RUN(0,32)}</PARAM2></SONG>
 <INSTRUMENTBANK><INSTRUMENT ID="00" TYPE="SAMPLE"><PARAM NAME="sample" VALUE="k.wav"/></INSTRUMENT></INSTRUMENTBANK>
 <TABLES/><GROOVES>${RUN(255,64)}</GROOVES><MIXER/></PICOTRACKER>`;
+  // macOS junk is sprinkled through this card on purpose — none of it
+  // should be scanned, counted, or shown anywhere
   const card = mkDir('WARMCARD', {
-    projects: mkDir('projects', { ONE: mkDir('ONE', {
-      'ptsav.dat': mkFile('ptsav.dat', proj),
-      samples: mkDir('samples', { 'k.wav': mkFile('k.wav', wav()), 'x.wav': mkFile('x.wav', wav()) }),
-    }) }),
-    samples: mkDir('samples', { 'lib.wav': mkFile('lib.wav', wav()) }),
+    projects: mkDir('projects', {
+      ONE: mkDir('ONE', {
+        'ptsav.dat': mkFile('ptsav.dat', proj),
+        '._ptsav.dat': mkFile('._ptsav.dat', 'MACJUNK'),
+        '.DS_Store': mkFile('.DS_Store', 'MACJUNK'),
+        samples: mkDir('samples', {
+          'k.wav': mkFile('k.wav', wav()),
+          'x.wav': mkFile('x.wav', wav()),
+          '._k.wav': mkFile('._k.wav', wav()),
+          '._x.wav': mkFile('._x.wav', wav()),
+        }),
+      }),
+      '.DS_Store': mkFile('.DS_Store', 'MACJUNK'),
+      '._ONE': mkDir('._ONE', { 'ptsav.dat': mkFile('ptsav.dat', proj) }),
+    }),
+    samples: mkDir('samples', {
+      'lib.wav': mkFile('lib.wav', wav()),
+      '._lib.wav': mkFile('._lib.wav', wav()),
+      '.Spotlight-V100': mkDir('.Spotlight-V100', { 'junk.wav': mkFile('junk.wav', wav()) }),
+    }),
   });
   window.showDirectoryPicker = async () => card;
 });
@@ -264,6 +295,18 @@ await page.click('#btn-open');
 await page.waitForTimeout(1200);
 const coldMsg = await page.evaluate(() => document.getElementById('cache-msg').textContent);
 check('cold open reads sample heads', /[1-9]\d* samples? read/.test(coldMsg));
+// junk filter: 3 real wavs on this card (k, x, lib) and one real project
+check('junk: only the 3 real wavs were read (macOS ._ files skipped)',
+  /\b3 samples? read/.test(coldMsg));
+await page.click('.tab-btn[data-tab="samples"]');
+await page.waitForTimeout(400);
+check('junk: no ._ files listed in the sample browser', await page.evaluate(() =>
+  !document.getElementById('tab-samples').textContent.includes('._')));
+await page.click('.tab-btn[data-tab="projects"]');
+await page.waitForTimeout(400);
+check('junk: ._ project folder not listed as a project', await page.evaluate(() =>
+  document.querySelectorAll('.proj-item').length === 1 &&
+  !document.getElementById('tab-projects').textContent.includes('._ONE')));
 await page.click('#btn-open');
 await page.waitForTimeout(1500);
 const warmMsg = await page.evaluate(() => document.getElementById('cache-msg').textContent);

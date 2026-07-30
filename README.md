@@ -15,6 +15,8 @@ No card handy? Hit **Try with demo data** on the landing screen — a synthetic 
 
 That's it — unlike the M8, picoTracker projects are self-contained (each project folder carries its own `samples/` pool), so missing-sample detection works instantly with no cataloguing step. The library is cached (IndexedDB), so reopening the same card is instant and rescans are incremental.
 
+Cards that have been near a Mac collect AppleDouble junk (`._kick.wav`, `.DS_Store`, `.Spotlight-V100`). These are skipped everywhere — scans, listings and exports — so they never show up as phantom samples.
+
 ## What it does
 
 ### Browse
@@ -28,12 +30,13 @@ That's it — unlike the M8, picoTracker projects are self-contained (each proje
 
 ### Play & edit
 - **In-browser playback** — press Play on any project and hear it: a Web Audio engine walks the song exactly like the firmware player (grooves, GRV switches, HOPs, chain + project transpose) triggering the project's own pool samples, with slices, loop modes, and VOL/PAN/KIL honoured. An honest sketch of the song, not a device emulator: synth voices (SID/OPAL) and most FX are out of scope by design.
-- **Phrase editor (experimental)** — drill into any phrase and edit notes, instruments, and FX commands in place, with one-click transpose (±1/±12). Edits are held in memory until you explicitly save; saving uses the same paranoid path as repairs (mtime guard, on-card backup, byte-level verification of every phrase buffer after the write, automatic rollback). Legacy 2-byte-command beta files are read-only.
+- **Phrase editor** — a tracker-style grid you edit in place: arrows and Tab move the cursor, typing starts an edit, Enter commits and drops to the next step, Delete clears a cell. Per-step copy/paste (⌘/Ctrl+C/V), whole-phrase copy/paste/clear, one-click transpose (±1/±12), 50-level undo (⌘/Ctrl+Z), and a ▶ that auditions just that phrase. Edits are held in memory until you explicitly save; saving uses the same paranoid path as repairs (mtime guard, on-card backup, byte-level verification of every phrase buffer after the write, automatic rollback). Legacy 2-byte-command beta files are read-only.
 
 - **Slice editor** — open any sample instrument's wav on a big waveform: drag slice markers, double-click to add, audition slices by clicking regions or with number-key pads, auto-chop breakbeats with transient detection (adjustable sensitivity), equal-divide clean loops, and snap everything to zero-crossings. Saving rewrites just that instrument's SLnn points with the usual backup + verify + rollback.
 
 ### Inspect
-- **Pattern viewer** — chain-coloured timeline of all 8 channels, the full song grid, drill-down into chains and phrases with real picoTracker FX names (KIL, HOP, PSL, TBL, …), plus a note histogram with scale detection.
+- **Pattern viewer** — chain-coloured timeline of all 8 channels, the full song grid with a zoom slider, and an ordered chain list down the left (ascending by chain number, with usage counts, per-chain colours, preview, and hover-to-highlight). Drill down into chains and phrases with real picoTracker FX names (KIL, HOP, PSL, TBL, …).
+- **Project overview** — every project stat at a glance (BPM, master, transpose, scale, rows/chains/phrases/tables/grooves, note count, firmware, sizes), a clickable mini song map, FX-usage and groove summaries, grouped instrument parameters with level bars, and auditionable sample rows.
 - **Compare** — diff two projects: shared/unique instruments and samples, metadata side by side.
 - **MIDI export** — download any project as a standard MIDI file (type 1, 24 PPQ, one track per channel, chain + project transpose applied, per-channel GRV groove switches and HOP flow honoured).
 
@@ -47,7 +50,7 @@ That's it — unlike the M8, picoTracker projects are self-contained (each proje
 - **Extract as .pti** — pull any instrument out of a project bank into `instruments/` as a `.pti` file (or download it if the card is read-only).
 - **Repair mode** — two fixes for a broken reference: *copy* a matching WAV from the library or another project's pool into this project's pool (no project-file edit), or *re-point* the reference to an existing pool sample by rewriting only that attribute inside `lgptsav.dat`.
 - **Backup** — copy the card to a folder or download it as a ZIP, with per-directory selection (`.config.xml` and `.current` always included).
-- **Sets** — tick projects and export a lean, card-ready `projects/` layout as a folder or ZIP. Sets can be named and saved for reuse.
+- **Setlists** — click projects to add them to an ordered setlist, drag or ▲▼ to reorder, then export a lean, card-ready `projects/` layout as a folder or ZIP. Folders can be numbered (`01_`, `02_` …) so the device lists them in playing order. Setlists can be named and saved, order included.
 
 ## The safety model
 
@@ -72,9 +75,9 @@ The entire app is a single `index.html` — deliberately, so it can be hosted an
 Tests are zero-dependency Node scripts that extract the `PT` module straight out of `index.html`:
 
 ```bash
-node tests/parser.test.mjs   # format unit tests (38: formats, MIDI timing, theme writing)
+node tests/parser.test.mjs   # format unit tests (68: formats, MIDI timing, theme writing)
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
-node tests/e2e.mjs           # browser end-to-end (needs: npm i -D playwright)
+node tests/e2e.mjs           # browser end-to-end, 34 checks (needs: npm i -D playwright)
 ```
 
 The USB mirror's font is the 8x8 Wide face and special-glyph page by nILS (public domain), as shipped in the picoTracker firmware; the firmware's other two fonts are not redistributable and are intentionally not embedded.
