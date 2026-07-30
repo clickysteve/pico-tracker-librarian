@@ -8,8 +8,10 @@ Requires Chrome or Edge (it uses the File System Access API to read your card; F
 
 ## Getting started
 
-1. Open `index.html` in Chrome or Edge.
+1. Open `index.html` in Chrome or Edge (or the hosted page).
 2. Click **OPEN SD CARD** and pick your picoTracker card (or any folder with the picoTracker layout: `projects/`, `samples/`, `instruments/`, `themes/`, …).
+
+No card handy? Hit **Try with demo data** on the landing screen — a synthetic card (generated audio included) loads entirely in memory so you can explore every tab, the pattern viewer, and the repair flow.
 
 That's it — unlike the M8, picoTracker projects are self-contained (each project folder carries its own `samples/` pool), so missing-sample detection works instantly with no cataloguing step. The library is cached (IndexedDB), so reopening the same card is instant and rescans are incremental.
 

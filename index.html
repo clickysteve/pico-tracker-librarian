@@ -606,7 +606,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.2.0 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.2.1 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -626,6 +626,7 @@
     </div>
     <div class="empty-divider" id="empty-divider" style="display:none">— or —</div>
     <button class="btn secondary" id="btn-open-empty">OPEN SD CARD</button>
+    <button class="btn ghost" id="btn-demo" title="Explore the app with a synthetic demo card — no SD card needed">▶ Try with demo data</button>
     <div id="browser-warn" class="browser-warn" style="display:none">
       ⚠ Requires Chrome or Edge — Firefox and Safari do not support the File System Access API.
     </div>
@@ -2250,6 +2251,340 @@ const AudioPlayer = (() => {
 
 
 // ══════════════════════════════════════════════════════════
+// DEMO — synthetic in-memory SD card
+// Lets anyone explore the app without a picoTracker: generated
+// audio, plausible projects (pico 2.3 and Advance 3.x formats),
+// one repairable problem, themes, renders. Nothing is written to
+// disk; repairs operate on the in-memory card.
+// ══════════════════════════════════════════════════════════
+const Demo = (() => {
+  // ── audio synthesis (16-bit PCM WAV) ───────────────────
+  function wav(samples, sr = 22050, channels = 1) {
+    const n = samples.length;
+    const b = new Uint8Array(44 + n * 2);
+    const dv = new DataView(b.buffer);
+    const w = (o, str) => { for (let i = 0; i < str.length; i++) b[o + i] = str.charCodeAt(i); };
+    w(0,'RIFF'); dv.setUint32(4, 36 + n*2, true); w(8,'WAVE');
+    w(12,'fmt '); dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,channels,true);
+    dv.setUint32(24,sr,true); dv.setUint32(28,sr*2*channels,true); dv.setUint16(32,2*channels,true); dv.setUint16(34,16,true);
+    w(36,'data'); dv.setUint32(40,n*2,true);
+    for (let i = 0; i < n; i++) dv.setInt16(44 + i*2, Math.max(-1, Math.min(1, samples[i])) * 32000, true);
+    return b;
+  }
+  let rndState = 12345;
+  const rnd = () => ((rndState = (rndState * 1103515245 + 12345) & 0x7FFFFFFF) / 0x7FFFFFFF) * 2 - 1;
+  const sr = 22050;
+  function kick(len = .35) {
+    const n = sr * len, out = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr, f = 120 * Math.exp(-t * 18) + 42;
+      out[i] = Math.sin(2 * Math.PI * f * t * (1 + 2 * Math.exp(-t * 30))) * Math.exp(-t * 9);
+    }
+    return wav(out);
+  }
+  function snare(len = .22) {
+    const n = sr * len, out = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      out[i] = (rnd() * .8 + Math.sin(2*Math.PI*185*t) * .4) * Math.exp(-t * 22);
+    }
+    return wav(out);
+  }
+  function hat(len = .08, open = false) {
+    const n = sr * (open ? .3 : len), out = new Float64Array(n);
+    let hp = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr, x = rnd();
+      hp = x - hp * .35;
+      out[i] = hp * .6 * Math.exp(-t * (open ? 12 : 60));
+    }
+    return wav(out);
+  }
+  function bass(note = 33, len = .5) {
+    const f = 440 * Math.pow(2, (note - 69) / 12);
+    const n = sr * len, out = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const saw = 2 * ((f * t) % 1) - 1;
+      out[i] = (saw * .5 + Math.sin(2*Math.PI*f*t) * .5) * Math.exp(-t * 4) * .8;
+    }
+    return wav(out);
+  }
+  function pad(root = 57, len = 1.4) {
+    const n = sr * len, out = new Float64Array(n);
+    for (const semi of [0, 3, 7, 12]) {
+      const f = 440 * Math.pow(2, (root + semi - 69) / 12);
+      for (let i = 0; i < n; i++) {
+        const t = i / sr;
+        out[i] += Math.sin(2*Math.PI*f*t + Math.sin(2*Math.PI*.7*t)) * .22 *
+          Math.min(1, t * 6) * Math.min(1, (len - t) * 2);
+      }
+    }
+    return wav(out);
+  }
+  function breakLoop() { // 1 bar of chopped drums at 90 BPM
+    const bpm = 90, beat = 60 / bpm, n = Math.round(sr * beat * 4), out = new Float64Array(n);
+    const hits = [[0,'k'],[.5,'h'],[1,'s'],[1.5,'h'],[1.75,'k'],[2.25,'k'],[2.5,'h'],[3,'s'],[3.6,'s'],[3.8,'h']];
+    for (const [pos, kind] of hits) {
+      const start = Math.round(pos * beat * sr);
+      const env = kind === 'k' ? 14 : kind === 's' ? 20 : 55;
+      for (let i = 0; i < sr * .2 && start + i < n; i++) {
+        const t = i / sr;
+        const v = kind === 'k' ? Math.sin(2*Math.PI*(110*Math.exp(-t*16)+45)*t)
+          : kind === 's' ? rnd() * .7 + Math.sin(2*Math.PI*190*t) * .3 : rnd() * .5;
+        out[start + i] += v * Math.exp(-t * env) * .8;
+      }
+    }
+    return wav(out);
+  }
+  function mixdown() { // simple 4-bar sketch for the renders tab
+    const bpm = 124, beat = 60 / bpm, n = Math.round(sr * beat * 8), out = new Float64Array(n);
+    for (let b = 0; b < 8; b++) {
+      const start = Math.round(b * beat * sr);
+      for (let i = 0; i < sr * .3 && start + i < n; i++) {
+        const t = i / sr;
+        out[start + i] += Math.sin(2*Math.PI*(120*Math.exp(-t*18)+42)*t) * Math.exp(-t*9) * .7;
+      }
+      const f = 440 * Math.pow(2, ([45,45,48,43][b % 4] - 69) / 12);
+      for (let i = 0; i < sr * beat && start + i < n; i++) {
+        const t = i / sr;
+        out[start + i] += (2 * ((f * t) % 1) - 1) * .18 * Math.exp(-t * 3);
+      }
+    }
+    return wav(out);
+  }
+
+  // ── in-memory FS ───────────────────────────────────────
+  function mkFile(name, content, mtime = Date.now() - 86400000 * 7) {
+    let data = typeof content === 'string' ? new TextEncoder().encode(content) : content;
+    return { kind: 'file', name,
+      getFile: async () => new File([data], name, { lastModified: mtime }),
+      createWritable: async () => {
+        const chunks = [];
+        return {
+          write: async d => chunks.push(d instanceof ArrayBuffer ? new Uint8Array(d)
+            : typeof d === 'string' ? new TextEncoder().encode(d) : d),
+          close: async () => {
+            const total = chunks.reduce((a, c) => a + c.length, 0);
+            const merged = new Uint8Array(total);
+            let o = 0; for (const c of chunks) { merged.set(c, o); o += c.length; }
+            data = merged; mtime = Date.now();
+          },
+        };
+      } };
+  }
+  function mkDir(name, entries = {}) {
+    return { kind: 'directory', name, entries,
+      async *[Symbol.asyncIterator]() { for (const [n, h] of Object.entries(entries)) yield [n, h]; },
+      async getDirectoryHandle(n, opts) {
+        const h = entries[n];
+        if (h?.kind === 'directory') return h;
+        if (opts?.create) { const d = mkDir(n); entries[n] = d; return d; }
+        throw new DOMException('not found', 'NotFoundError');
+      },
+      async getFileHandle(n, opts) {
+        const h = entries[n];
+        if (h?.kind === 'file') return h;
+        if (opts?.create) { const f = mkFile(n, new Uint8Array(), Date.now()); entries[n] = f; return f; }
+        throw new DOMException('not found', 'NotFoundError');
+      },
+      async requestPermission() { return 'granted'; },
+      async resolve() { return null; },
+      async isSameEntry() { return false; } };
+  }
+
+  // ── project XML builder ────────────────────────────────
+  function chunksOf(bytes) {
+    let out = '';
+    for (let i = 0; i < bytes.length; i += 64) {
+      const c = bytes.slice(i, i + 64);
+      const uniform = c.every(v => v === c[0]);
+      out += uniform
+        ? `<DATA VALUE="${c[0]}" LENGTH="${c.length}"/>`
+        : `<DATA>${c.map(v => v.toString(16).toUpperCase().padStart(2, '0')).join('')}</DATA>`;
+    }
+    return out;
+  }
+  const u16le = vals => vals.flatMap(v => [v & 0xFF, (v >> 8) & 0xFF]);
+
+  function project(o) {
+    const rows = o.advance ? 256 : 128, phrases = o.advance ? 255 : 128;
+    const grid = new Array(rows * 8).fill(0xFF);
+    const chains = new Array(255 * 16).fill(0xFF);
+    const tsp = new Array(255 * 16).fill(0);
+    const P = phrases * 16;
+    const notes = new Array(P).fill(0xFF), instr = new Array(P).fill(0xFF);
+    const cmd1 = new Array(P).fill(0x2D), par1 = new Array(P).fill(0);
+    const cmd2 = new Array(P).fill(0x2D), par2 = new Array(P).fill(0);
+    for (const [row, ch, chain] of o.grid) grid[row * 8 + ch] = chain;
+    for (const [chain, step, phrase, t] of o.chains) { chains[chain*16+step] = phrase; if (t) tsp[chain*16+step] = t & 0xFF; }
+    for (const [ph, step, note, inst, c1, p1] of o.notes) {
+      const k = ph * 16 + step;
+      if (note !== null) notes[k] = note;
+      if (inst !== undefined && inst !== null) instr[k] = inst;
+      if (c1) { cmd1[k] = c1; par1[k] = p1 ?? 0; }
+    }
+    const grooves = new Array(512).fill(0xFF);
+    for (let g = 0; g < 32; g++) { grooves[g*16] = 6; grooves[g*16+1] = 6; }
+    for (const [g, steps] of Object.entries(o.grooves ?? {}))
+      steps.forEach((v, i) => grooves[g * 16 + i] = v);
+    const grooveXml = o.advance
+      ? `<DATA>${chunksOf(grooves)}</DATA>`   // Advance wraps chunks in a DATA element
+      : chunksOf(grooves);
+    const instXml = o.instruments.map((i, idx) => {
+      const id = i.id ?? idx;
+      const params = Object.entries(i.params ?? {}).map(([k, v]) =>
+        `\n            <PARAM NAME="${k}" VALUE="${v}"/>`).join('');
+      return `\n        <INSTRUMENT ID="${id.toString(16).toUpperCase().padStart(2,'0')}" VERSION="${o.version}" TYPE="${i.type}">
+            <PARAM NAME="InstrumentName" VALUE="${i.name}"/>${i.sample ? `\n            <PARAM NAME="sample" VALUE="${i.sample}"/>` : ''}${params}
+        </INSTRUMENT>`;
+    }).join('');
+    return `<PICOTRACKER>
+    <PROJECT VERSION="${o.version}">
+        <PARAMETER NAME="tempo" VALUE="${o.tempo}"/>
+        <PARAMETER NAME="master" VALUE="90"/>
+        <PARAMETER NAME="transpose" VALUE="0"/>
+        <PARAMETER NAME="scale" VALUE="${o.scale ?? 'None (Chromatic)'}"/>
+        <PARAMETER NAME="scaleroot" VALUE="${o.root ?? 'C '}"/>
+    </PROJECT>
+    <SONG>
+        <SONG>${chunksOf(grid)}</SONG>
+        <CHAINS>${chunksOf(chains)}</CHAINS>
+        <TRANSPOSES>${chunksOf(tsp)}</TRANSPOSES>
+        <NOTES>${chunksOf(notes)}</NOTES>
+        <INSTRUMENTS>${chunksOf(instr)}</INSTRUMENTS>
+        <COMMAND1>${chunksOf(cmd1)}</COMMAND1>
+        <PARAM1>${chunksOf(u16le(par1))}</PARAM1>
+        <COMMAND2>${chunksOf(cmd2)}</COMMAND2>
+        <PARAM2>${chunksOf(u16le(par2))}</PARAM2>
+    </SONG>
+    <INSTRUMENTBANK>${instXml}
+    </INSTRUMENTBANK>
+    <TABLES><TABLE ID="00"/></TABLES>
+    <GROOVES>${grooveXml}</GROOVES>
+    <MIXER/>
+</PICOTRACKER>`;
+  }
+
+  function theme(colors) {
+    return `<THEME>\n    <Font value="#0"/>\n` +
+      Object.entries(colors).map(([k, v]) => `    <Color name="${k}" value="#${v.toString(16).toUpperCase()}"/>`).join('\n') +
+      '\n</THEME>';
+  }
+
+  function buildCard() {
+    rndState = 12345;
+    const smp = {
+      kick: kick(), snare: snare(), hatC: hat(), hatO: hat(.08, true),
+      bassA: bass(45), pad: pad(57), amen: breakLoop(),
+    };
+    const days = d => Date.now() - 86400000 * d;
+    // four-on-floor phrase 0, offbeat hats phrase 1, bassline phrase 2, pad phrase 3
+    const KIT = { kick: 0, snare: 1, hatC: 2, hatO: 3, bass: 4, pad: 5 };
+    const VOL = 0x45, PAN = 0x2A, PSL = 0x30, KIL = 0x1E, GRV = 0x1A;
+    const nightdrive = project({
+      version: '3.1.1', tempo: 124, scale: 'Dorian', root: 'A ', advance: true,
+      grid: [[0,0,0],[1,0,0],[2,0,0],[3,0,0], [0,1,1],[1,1,1],[2,1,1],[3,1,1], [1,2,2],[2,2,2],[3,2,2], [2,3,3],[3,3,3]],
+      chains: [[0,0,0],[1,0,1],[2,0,2],[3,0,3]],
+      notes: [
+        [0,0,36,KIT.kick],[0,4,36,KIT.kick],[0,8,36,KIT.kick],[0,12,36,KIT.kick],
+        [0,4,null,null,VOL,0x60],[0,12,null,null,VOL,0x60],
+        [1,2,42,KIT.hatC],[1,6,42,KIT.hatC],[1,10,42,KIT.hatO],[1,14,42,KIT.hatC],
+        [1,4,38,KIT.snare],[1,12,38,KIT.snare],[1,14,null,null,PAN,0x40],
+        [2,0,45,KIT.bass],[2,3,45,KIT.bass],[2,6,48,KIT.bass],[2,10,43,KIT.bass],[2,14,45,KIT.bass],
+        [2,6,null,null,PSL,0x20],
+        [3,0,57,KIT.pad],[3,8,60,KIT.pad],[3,15,null,null,KIL,0],
+      ],
+      grooves: { 1: [7, 5] },
+      instruments: [
+        { name: 'Kick 909', type: 'SAMPLE', sample: 'kick.wav', params: { volume: 128, 'root note': 36 } },
+        { name: 'Snare Tight', type: 'SAMPLE', sample: 'snare.wav', params: { volume: 110 } },
+        { name: 'Hat Closed', type: 'SAMPLE', sample: 'hat_closed.wav', params: { volume: 90, pan: 150 } },
+        { name: 'Hat Open', type: 'SAMPLE', sample: 'hat_open.wav', params: { volume: 84, pan: 104 } },
+        { name: 'Night Bass', type: 'SAMPLESOURCE', sample: 'bass_a.wav', params: { level: 118, 'voice filter cut': 180, 'lfo1 target': 'filter cut', 'lfo1 depth': 40, SL01: 2205, SL02: 5512 } },
+        { name: 'Galazio Pad', type: 'SAMPLESOURCE', sample: 'pad_am.wav', params: { level: 96, 'voice amp atk': 30, 'voice amp rel': 90 } },
+        { name: 'Ext Synth', type: 'MIDI', params: { channel: 3, volume: 200, 'note length': 12 } },
+      ],
+      pool: { 'kick.wav': smp.kick, 'snare.wav': smp.snare, 'hat_closed.wav': smp.hatC,
+              'hat_open.wav': smp.hatO, 'bass_a.wav': smp.bassA, 'pad_am.wav': smp.pad,
+              'perc_unused.wav': smp.hatO },
+      mtime: days(2),
+    });
+    const breaks90 = project({
+      version: '3.1.1', tempo: 90, advance: true,
+      grid: [[0,0,0],[1,0,0],[2,0,1]],
+      chains: [[0,0,0],[0,1,0],[1,0,1]],
+      notes: [
+        [0,0,48,0],[0,8,48,0,GRV,1],
+        [1,0,36,1],[1,10,36,1],
+      ],
+      grooves: { 1: [8, 4] },
+      instruments: [
+        { name: 'Amen Chop', type: 'SAMPLE', sample: 'amen_break.wav', params: { volume: 128, loopmode: 'none', SL01: 5000, SL02: 11000, SL03: 16000 } },
+        { name: 'Sub', type: 'SAMPLE', sample: 'sub_bass.wav', params: { volume: 128 } },
+        { name: 'Lost Ride', type: 'SAMPLE', sample: 'ride_22.wav', params: { volume: 90 } },
+      ],
+      pool: { 'sub_bass.wav': smp.bassA },   // amen_break + ride_22 missing!
+      mtime: days(30),
+    });
+    const first = project({
+      version: '2.3.1', tempo: 138,
+      grid: [[0,0,0],[1,0,0]],
+      chains: [[0,0,0]],
+      notes: [[0,0,60,0],[0,4,63,0],[0,8,67,0],[0,12,60,0]],
+      instruments: [
+        { name: 'Old Pad', type: 'SAMPLE', sample: 'pad_am.wav', params: { volume: 128 } },
+        { name: 'SID Lead', type: 'SID', params: { VPW: 2048, VADSR: 8834 } },
+      ],
+      pool: { 'pad_am.wav': smp.pad },
+      mtime: days(140),
+    });
+    const cardRoot = mkDir('DEMO CARD', {
+      '.config.xml': mkFile('.config.xml', '<CONFIG VERSION="1"><LINEOUT VALUE="2"/><MIDIDEVICE VALUE="2"/><REMOTEUI VALUE="1"/><BACKLIGHTLEVEL VALUE="220"/><THEMENAME VALUE="Galazio"/></CONFIG>'),
+      '.current': mkFile('.current', 'NIGHTDRIVE'),
+      projects: mkDir('projects', {}),
+      samples: mkDir('samples', {
+        drums: mkDir('drums', {
+          'amen_break.wav': mkFile('amen_break.wav', smp.amen, days(60)),
+          'kick.wav': mkFile('kick.wav', smp.kick, days(60)),
+          'snare_alt.wav': mkFile('snare_alt.wav', smp.snare, days(60)),
+        }),
+        synths: mkDir('synths', {
+          'pad_am.wav': mkFile('pad_am.wav', smp.pad, days(90)),
+          'bass_a.wav': mkFile('bass_a.wav', smp.bassA, days(90)),
+        }),
+      }),
+      instruments: mkDir('instruments', {
+        'Deep Kick.pti': mkFile('Deep Kick.pti', `<INSTRUMENT VERSION="3.1.1" TYPE="SAMPLE">\n    <PARAM NAME="InstrumentName" VALUE="Deep Kick"/>\n    <PARAM NAME="sample" VALUE="kick.wav"/>\n    <PARAM NAME="volume" VALUE="128"/>\n</INSTRUMENT>`, days(20)),
+        'Galazio Pad.pti': mkFile('Galazio Pad.pti', `<INSTRUMENT VERSION="3.1.1" TYPE="SAMPLESOURCE">\n    <PARAM NAME="InstrumentName" VALUE="Galazio Pad"/>\n    <PARAM NAME="sample" VALUE="pad_am.wav"/>\n    <PARAM NAME="level" VALUE="96"/>\n</INSTRUMENT>`, days(20)),
+      }),
+      themes: mkDir('themes', {
+        'Galazio.ptt': mkFile('Galazio.ptt', theme({ BACKGROUND: 0x0B0D0E, FOREGROUND: 0xEEF1F2, HICOLOR1: 0x2E5A80, HICOLOR2: 0x79B5E3, CONSOLECOLOR: 0xFF00FF, CURSORCOLOR: 0x2E5A80, INFOCOLOR: 0x79B5E3, WARNCOLOR: 0xF59E0B, ERRORCOLOR: 0xF87171, ACCENTCOLOR: 0x79B5E3, ACCENTALTCOLOR: 0x9CCBF0, EMPHASISCOLOR: 0x7B858C })),
+        'Sunset.ptt': mkFile('Sunset.ptt', theme({ BACKGROUND: 0x160A04, FOREGROUND: 0xFCE9D4, HICOLOR1: 0x7A2E10, HICOLOR2: 0xF08400, CONSOLECOLOR: 0xFF00FF, CURSORCOLOR: 0x7A2E10, INFOCOLOR: 0xF8B800, WARNCOLOR: 0xE8EC00, ERRORCOLOR: 0xF85050, ACCENTCOLOR: 0xF08400, ACCENTALTCOLOR: 0xF8B800, EMPHASISCOLOR: 0x9A6B4C })),
+      }),
+      renders: mkDir('renders', { 'NIGHTDRIVE-mixdown.wav': mkFile('NIGHTDRIVE-mixdown.wav', mixdown(), days(2)) }),
+    });
+    const addProject = (name, xml, pool, mtime, autosave) => {
+      const samples = {};
+      for (const [n, bytes] of Object.entries(pool)) samples[n] = mkFile(n, bytes, mtime);
+      const entries = { 'ptsav.dat': mkFile('ptsav.dat', xml.xml ?? xml, mtime), samples: mkDir('samples', samples) };
+      if (autosave) entries['autosave.dat'] = mkFile('autosave.dat', xml.xml ?? xml, Date.now() - 3600000);
+      cardRoot.entries.projects.entries[name] = mkDir(name, entries);
+    };
+    addProject('NIGHTDRIVE', nightdrive, {
+      'kick.wav': smp.kick, 'snare.wav': smp.snare, 'hat_closed.wav': smp.hatC,
+      'hat_open.wav': smp.hatO, 'bass_a.wav': smp.bassA, 'pad_am.wav': smp.pad,
+      'perc_unused.wav': smp.hatO,
+    }, days(2));
+    addProject('BREAKS-90', breaks90, { 'sub_bass.wav': smp.bassA }, days(30), true);
+    addProject('FIRSTSONG', first, { 'pad_am.wav': smp.pad }, days(140));
+    return cardRoot;
+  }
+
+  return { buildCard };
+})();
+
+// ══════════════════════════════════════════════════════════
 // USB — Remote UI client (WebSerial)
 // Protocol from the picoTracker firmware (System/RemoteUI):
 // device streams FE <op> frames: TEXT(6, raw), CLEAR(5, raw),
@@ -2470,19 +2805,21 @@ const UI = (() => {
   const cacheKey = () => sd ? `card:${sd.name}` : null;
 
   // ── Boot / open ────────────────────────────────────────
-  async function openCard(handle) {
+  let demoMode = false;
+  async function openCard(handle, opts) {
+    demoMode = !!opts?.demo;
     try {
       sd = handle || await window.showDirectoryPicker({mode:'read'});
     } catch(e) { if (e.name !== 'AbortError') console.warn(e); return; }
-    $('sd-label').textContent = sd.name;
+    $('sd-label').textContent = demoMode ? 'DEMO CARD (synthetic)' : sd.name;
     $('ro-badge').style.display = 'inline';
     $('btn-search').style.display = 'inline-block';
-    Cache.saveHandle(sd);
+    if (!demoMode) Cache.saveHandle(sd);
     $('empty-state').style.display = 'none';
     $('main').classList.add('visible');
 
-    // Try cache first for instant paint
-    const cached = await Cache.load(cacheKey());
+    // Try cache first for instant paint (never for the demo card)
+    const cached = demoMode ? null : await Cache.load(cacheKey());
     if (cached?.lib) {
       lib = cached.lib;
       repairLog = cached.repairLog || [];
@@ -2506,6 +2843,7 @@ const UI = (() => {
     }
   }
   async function persist() {
+    if (demoMode) return;
     await Cache.save({ key: cacheKey(), lib, repairLog, savedSets, savedAt: Date.now() });
   }
   function setCacheBar(msg, busy) {
@@ -2522,7 +2860,9 @@ const UI = (() => {
     renderCurrent();
     if (!fromCache) {
       const s = lib.stats;
-      setCacheBar(`Scan complete — ${s.parsed} parsed, ${s.reused} unchanged. Cached for instant reopen.`, false);
+      setCacheBar(demoMode
+        ? 'Demo card — everything here is synthetic (the audio too). Repairs work but only touch memory. Open your own SD card to see your music.'
+        : `Scan complete — ${s.parsed} parsed, ${s.reused} unchanged. Cached for instant reopen.`, false);
     } else {
       setCacheBar(`Loaded from cache (${Cache.ageStr(savedAt)}) — rescanning…`, true);
     }
@@ -3956,6 +4296,7 @@ const UI = (() => {
     if (!supported) $('browser-warn').style.display = 'block';
     $('btn-open').addEventListener('click', () => openCard());
     $('btn-open-empty').addEventListener('click', () => openCard());
+    $('btn-demo').addEventListener('click', () => openCard(Demo.buildCard(), {demo: true}));
     $('btn-rescan').addEventListener('click', () => rescan(null));
     Cache.loadHandle().then(rec => {
       if (rec?.handle) {
