@@ -455,5 +455,230 @@ t('MIDI: GRV switches groove timing, HOP skips into next phrase', () => {
   eq(ons.map(e => [e.note, e.tick]), [[60, 0], [62, 48], [64, 52]]);
 });
 
+
+// ── Theme writing ──────────────────────────────────────
+t('buildPtt round-trips through parseTheme', () => {
+  const th = { font: 1, colors: { BACKGROUND: 0, ACCENTCOLOR: 0x79B5E3, FOREGROUND: 0xEEF1F2 } };
+  const back = PT.parseTheme(PT.buildPtt(th));
+  eq(back.font, 1);
+  eq(back.colors.BACKGROUND, 0);
+  eq(back.colors.ACCENTCOLOR, 0x79B5E3);
+  ok(PT.buildPtt(th).includes('value="#0"'), 'firmware-style unpadded hex');
+});
+t('rewriteConfigTheme updates in place and appends missing', () => {
+  const cfg = '<CONFIG VERSION="1">\n    <LINEOUT VALUE="2"/>\n    <THEMENAME VALUE="Old"/>\n    <Color name="BACKGROUND" value="#0"/>\n</CONFIG>';
+  const out = PT.rewriteConfigTheme(cfg, 'Galazio', { font: 2, colors: { BACKGROUND: 0x101010, ACCENTCOLOR: 0x79B5E3 } });
+  const parsed = PT.parseConfig(out);
+  eq(parsed.values.THEMENAME, 'Galazio');
+  eq(parsed.values.UIFONT, '2');
+  eq(parsed.values.LINEOUT, '2', 'untouched values preserved');
+  eq(parsed.colors.BACKGROUND, 0x101010);
+  eq(parsed.colors.ACCENTCOLOR, 0x79B5E3, 'missing colour appended');
+});
+t('defaultConfigXml builds a valid config from nothing', () => {
+  const parsed = PT.parseConfig(PT.defaultConfigXml('Fresh', { font: 0, colors: { BACKGROUND: 1 } }));
+  eq(parsed.values.THEMENAME, 'Fresh');
+  eq(parsed.colors.BACKGROUND, 1);
+});
+
+
+// ── Editor plumbing: encode + section rewrite round-trips ──
+t('encodeHexBuffer/decodeHexBuffer round-trip incl run-length', () => {
+  const src = new Uint8Array(200);
+  src.fill(0xFF, 0, 64);              // uniform chunk → run-length form
+  for (let i = 64; i < 200; i++) src[i] = (i * 37) & 0xFF;
+  const el = PT.parseXml(`<B>${PT.encodeHexBuffer(src)}</B>`);
+  const back = PT.decodeHexBuffer(el, 200);
+  eq([...back], [...src]);
+});
+t('noteFromStr parses display names', () => {
+  eq(PT.noteFromStr('C-3'), 60);
+  eq(PT.noteFromStr('C3'), 60);
+  eq(PT.noteFromStr('C#3'), 61);
+  eq(PT.noteFromStr('B7'), 119);
+  eq(PT.noteFromStr('---'), 0xFF);
+  eq(PT.noteFromStr('OFF'), 0xFE);
+  eq(PT.noteFromStr('H2'), null);
+});
+t('rewriteSongSections: unchanged data is byte-equivalent on re-parse', () => {
+  const xml = buildProjectXml();
+  const p = PT.parseProject(xml);
+  const res = PT.rewriteSongSections(xml, p);
+  ok(res.ok, res.error);
+  const p2 = PT.parseProject(res.text);
+  eq([...p2.phrases.notes], [...p.phrases.notes]);
+  eq([...p2.phrases.cmd1], [...p.phrases.cmd1]);
+  eq([...p2.phrases.param1], [...p.phrases.param1]);
+  eq(p2.instruments.length, p.instruments.length, 'instrument bank untouched');
+  eq([...p2.grid], [...p.grid], 'grid untouched');
+  eq(p2.tables.length, p.tables.length, 'tables untouched');
+});
+t('rewriteSongSections: an edit lands and only that edit', () => {
+  const xml = buildProjectXml();
+  const p = PT.parseProject(xml);
+  p.phrases.notes[5] = 72;
+  p.phrases.cmd1[5] = 0x45; p.phrases.param1[5] = 0x1234;
+  const res = PT.rewriteSongSections(xml, p);
+  ok(res.ok, res.error);
+  const p2 = PT.parseProject(res.text);
+  eq(p2.phrases.notes[5], 72);
+  eq(p2.phrases.cmd1[5], 0x45);
+  eq(p2.phrases.param1[5], 0x1234);
+  eq(p2.phrases.notes[0], 60, 'neighbours untouched');
+});
+t('rewriteSongSections refuses legacy 2-byte command files', () => {
+  const p = { geometry: { cmdWidth: 2 }, phrases: {} };
+  ok(!PT.rewriteSongSections('<X/>', p).ok);
+});
+
+// ── Event timeline ─────────────────────────────────────
+t('buildEventTimeline matches MIDI timing incl GRV/HOP', () => {
+  const p = PT.parseProject(buildTimingXml());
+  const tl = PT.buildEventTimeline(p);
+  ok(tl, 'null timeline');
+  const ons = tl.events.filter(e => e.type === 'on');
+  // 120 BPM → tick = 60/(120*24) s; expected ticks 0, 48, 52 (from MIDI test)
+  const tick = 60 / (120 * 24);
+  eq(ons.map(e => [e.note, Math.round(e.time / tick)]), [[60, 0], [62, 48], [64, 52]]);
+  ok(tl.duration > ons[2].time, 'duration covers events');
+});
+
+// ── Real Advance files (if present): rewrite must round-trip ──
+import { readFileSync, existsSync } from 'node:fs';
+const REAL = '/mnt/user-data/uploads/pico-tracker-advance/source-examples/projects';
+if (existsSync(REAL)) {
+  for (const name of ['FIRST', 'THREE', 'oneCycAc']) {
+    t(`real card ${name}: section rewrite round-trips losslessly`, () => {
+      const xml = readFileSync(`${REAL}/${name}/ptsav.dat`, 'utf8');
+      const p = PT.parseProject(xml);
+      const res = PT.rewriteSongSections(xml, p);
+      ok(res.ok, res.error);
+      const p2 = PT.parseProject(res.text);
+      eq([...p2.phrases.notes], [...p.phrases.notes]);
+      eq([...p2.phrases.cmd1], [...p.phrases.cmd1]);
+      eq([...p2.phrases.param2], [...p.phrases.param2]);
+      eq(p2.instruments.map(i => i.name), p.instruments.map(i => i.name));
+      eq(p2.grooves.length, p.grooves.length);
+    });
+  }
+  t('real card SECOND: slice rewrite round-trips', () => {
+    const xml = readFileSync(`${REAL}/SECOND/ptsav.dat`, 'utf8');
+    const p = PT.parseProject(xml);
+    const inst = p.instruments.find(i => i.slices.length);
+    ok(inst, 'no sliced instrument found');
+    const res = PT.rewriteInstrumentSlices(xml, inst.idHex, inst.slices);
+    ok(res.ok, res.error);
+    const p2 = PT.parseProject(res.text);
+    const ni = p2.instruments.find(i => i.idHex === inst.idHex);
+    eq(ni.slices, inst.slices);
+    eq(p2.instruments.length, p.instruments.length);
+    eq([...p2.phrases.notes], [...p.phrases.notes], 'song data untouched');
+  });
+}
+
+
+// ── Slice editing ──────────────────────────────────────
+t('rewriteInstrumentSlices replaces the SLnn set surgically', () => {
+  const xml = buildProjectXml();   // instrument 00 has SL00(dropped)+SL03
+  const res = PT.rewriteInstrumentSlices(xml, '00', [
+    { index: 1, offset: 1000 }, { index: 2, offset: 2500.7 }, { index: 3, offset: 0 }]);
+  ok(res.ok, res.error);
+  const p = PT.parseProject(res.text);
+  eq(p.instruments[0].slices, [{index:1, offset:1000}, {index:2, offset:2501}], 'zero-offset dropped, rounded');
+  eq(p.instruments[0].sample, 'kick.wav', 'other params untouched');
+  eq(p.instruments[1].type, 'MIDI', 'other instruments untouched');
+});
+t('rewriteInstrumentSlices can clear all slices', () => {
+  const res = PT.rewriteInstrumentSlices(buildProjectXml(), '00', []);
+  ok(res.ok, res.error);
+  eq(PT.parseProject(res.text).instruments[0].slices, []);
+});
+t('rewriteInstrumentSlices errors on unknown instrument', () => {
+  ok(!PT.rewriteInstrumentSlices(buildProjectXml(), 'ZZ', []).ok);
+});
+t('detectOnsets finds drum hits in a synthetic break', () => {
+  const sr = 22050, beat = Math.round(sr * 0.4);
+  const data = new Float64Array(beat * 4);
+  for (const start of [0, beat, beat * 2, beat * 3])
+    for (let i = 0; i < 800; i++)
+      data[start + i] = Math.sin(i * 0.5) * Math.exp(-i / 150);
+  const on = PT.detectOnsets(data, sr, 16, 1.0);
+  // first hit is the implicit slice 0; expect ~3 detected onsets near beats 2-4
+  ok(on.length >= 2 && on.length <= 4, 'got ' + on.length);
+  for (const o of on) {
+    const nearBeat = [beat, beat*2, beat*3].some(b => Math.abs(o - b) < sr * 0.06);
+    ok(nearBeat, `onset ${o} not near a beat`);
+  }
+});
+t('snapZeroCross lands on a sign change', () => {
+  const data = new Float64Array(4000);
+  for (let i = 0; i < 4000; i++) data[i] = Math.sin(i / 50);
+  const o = PT.snapZeroCross(data, 100);
+  ok(Math.sign(data[o - 1] || 1) !== Math.sign(data[o] || 1) || data[o] === 0, 'not a crossing');
+});
+
+// ── Regression tests for the v0.4.2 review-pass fixes ──
+t('regression: transpose 0x80 decodes as -128', () => {
+  eq(PT.parseProject(buildProjectXml({transpose: 128})).transpose, -128);
+});
+t('regression: sharps in negative octaves round-trip', () => {
+  for (let v = 0; v <= 119; v++) eq(PT.noteFromStr(PT.noteStr(v)), v, 'note ' + v);
+});
+t('regression: $-sequences in names cannot inject', () => {
+  const xml = buildProjectXml().replace('VALUE="kick.wav"', 'VALUE="bass$1.wav"');
+  const res = PT.rewriteSampleRef(xml, '00', 'bass$1.wav', 'x$&y.wav');
+  ok(res.ok, res.error);
+  eq(PT.parseProject(res.text).instruments[0].sample, 'x$&y.wav');
+  const cfg = PT.rewriteConfigTheme('<CONFIG VERSION="1">\n</CONFIG>', 'my$&theme', {font:0, colors:{BACKGROUND:1}});
+  const parsed = PT.parseConfig(cfg);
+  eq(parsed.values.THEMENAME, 'my$&theme');
+  eq(parsed.colors.BACKGROUND, 1);
+});
+t('regression: apostrophes in sample names (&apos; form) repairable', () => {
+  const xml = buildProjectXml().replace('VALUE="kick.wav"', 'VALUE="don&apos;t.wav"');
+  const res = PT.rewriteSampleRef(xml, '00', "don't.wav", 'fixed.wav');
+  ok(res.ok, res.error);
+  eq(PT.parseProject(res.text).instruments[0].sample, 'fixed.wav');
+});
+t('regression: rewriteSongSections cannot touch TABLES PARAM sections', () => {
+  // craft a file whose SONG lacks PARAM2 but whose TABLES has one
+  let xml = buildProjectXml();
+  const p2open = xml.indexOf('<PARAM2>'), p2close = xml.indexOf('</PARAM2>') + '</PARAM2>'.length;
+  xml = xml.slice(0, p2open) + xml.slice(p2close);   // remove SONG's PARAM2
+  xml = xml.replace('<TABLE ID="01"/>',
+    '<TABLE ID="01"><PARAM2><DATA VALUE="7" LENGTH="32"/></PARAM2></TABLE>');
+  const p = PT.parseProject(xml);
+  const res = PT.rewriteSongSections(xml, p);
+  ok(!res.ok, 'must refuse rather than corrupt the table');
+  ok(res.error.includes('PARAM2'), res.error);
+});
+t('regression: attribute-form SLnn stripped on slice rewrite', () => {
+  const xml = buildProjectXml().replace('<INSTRUMENT ID="00" VERSION="2.3-Beta3" TYPE="SAMPLE">',
+    '<INSTRUMENT ID="00" VERSION="2.3-Beta3" TYPE="SAMPLE" SL05="777">');
+  const res = PT.rewriteInstrumentSlices(xml, '00', [{index: 1, offset: 9000}]);
+  ok(res.ok, res.error);
+  eq(PT.parseProject(res.text).instruments[0].slices, [{index:1, offset:9000}]);
+});
+t('regression: buildMidi survives a fully dense song', () => {
+  const grid = new Array(128*8).fill(0x00);       // every cell -> chain 0
+  const chains = new Array(255*16).fill(0x00);    // every step -> phrase 0
+  const notes = new Array(128*16).fill(60);       // every step a note
+  const instr = new Array(128*16).fill(0);
+  const zeros = new Array(128*16).fill(0);
+  const none = new Array(128*16).fill(0x2D);
+  const xml = `<PICOTRACKER><PROJECT VERSION="2.3"><PARAMETER NAME="tempo" VALUE="200"/></PROJECT>
+<SONG><SONG>${dataChunks(grid)}</SONG><CHAINS>${dataChunks(chains)}</CHAINS>
+<TRANSPOSES>${dataChunks(new Array(255*16).fill(0))}</TRANSPOSES>
+<NOTES>${dataChunks(notes)}</NOTES><INSTRUMENTS>${dataChunks(instr)}</INSTRUMENTS>
+<COMMAND1>${dataChunks(none)}</COMMAND1><PARAM1>${dataChunks(u16le(zeros))}</PARAM1>
+<COMMAND2>${dataChunks(none)}</COMMAND2><PARAM2>${dataChunks(u16le(zeros))}</PARAM2></SONG>
+<INSTRUMENTBANK/><TABLES/><GROOVES>${dataChunks(new Array(512).fill(255))}</GROOVES><MIXER/></PICOTRACKER>`;
+  const p = PT.parseProject(xml);
+  const bytes = PT.buildMidi(p, 'DENSE');   // 128 rows x 16 chain steps x 16 phrase steps x 8ch
+  ok(bytes && bytes.length > 100000, 'expected a large valid file, got ' + (bytes ? bytes.length : null));
+  const smf = readSmf(bytes);
+  ok(smf.ntrks === 9, 'tracks: ' + smf.ntrks);
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -6,3 +6,4 @@ source-examples/
 *.bin
 card-dumps/
 .DS_Store
+discord-draft.md

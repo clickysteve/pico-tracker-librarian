@@ -21,10 +21,16 @@ That's it — unlike the M8, picoTracker projects are self-contained (each proje
 - **Projects** — list and grid views with filtering and sorting (name, date, missing samples, instrument count, BPM, size). Expand a project for its instrument bank, sample pool with missing/unused markers, settings, and similar projects (by shared samples). An `autosave` badge flags projects where the device would load newer unsaved state.
 - **Instruments** — every `.pti` in `instruments/` plus every project's instrument bank, decoded in full (all parameters, slice points), with type filters (SAMPLE / MIDI / SID / OPAL), sample status, and usage tracking.
 - **Samples** — the `samples/` library tree plus every project pool, with duration/rate/bit-depth per WAV, used/unused badges, and arrow-key audition.
-- **Themes** — visual previews of every `.ptt` with swatches. **Use** applies a theme's palette to the app itself.
+- **Themes** — visual previews of every `.ptt` with swatches, and the device's active theme flagged. **Preview** applies a palette to the app itself; **Set on device** writes it into the card's `.config.xml` (backed up, verified, rolled back on failure) so the tracker boots with it; **Save device colours as .ptt** captures the current device palette as a new theme file.
 - **Grooves** — every non-default groove across all projects, step-visualised.
 - **Renders** — `renders/` and `recordings/` with waveform preview and playback.
 - **Stats** — collection KPIs, instrument types, FX command usage, tempo/scale/firmware distributions, backbone samples, recently modified, and the device's `.config.xml`.
+
+### Play & edit
+- **In-browser playback** — press Play on any project and hear it: a Web Audio engine walks the song exactly like the firmware player (grooves, GRV switches, HOPs, chain + project transpose) triggering the project's own pool samples, with slices, loop modes, and VOL/PAN/KIL honoured. An honest sketch of the song, not a device emulator: synth voices (SID/OPAL) and most FX are out of scope by design.
+- **Phrase editor (experimental)** — drill into any phrase and edit notes, instruments, and FX commands in place, with one-click transpose (±1/±12). Edits are held in memory until you explicitly save; saving uses the same paranoid path as repairs (mtime guard, on-card backup, byte-level verification of every phrase buffer after the write, automatic rollback). Legacy 2-byte-command beta files are read-only.
+
+- **Slice editor** — open any sample instrument's wav on a big waveform: drag slice markers, double-click to add, audition slices by clicking regions or with number-key pads, auto-chop breakbeats with transient detection (adjustable sensitivity), equal-divide clean loops, and snap everything to zero-crossings. Saving rewrites just that instrument's SLnn points with the usual backup + verify + rollback.
 
 ### Inspect
 - **Pattern viewer** — chain-coloured timeline of all 8 channels, the full song grid, drill-down into chains and phrases with real picoTracker FX names (KIL, HOP, PSL, TBL, …), plus a note histogram with scale detection.
@@ -32,7 +38,8 @@ That's it — unlike the M8, picoTracker projects are self-contained (each proje
 - **MIDI export** — download any project as a standard MIDI file (type 1, 24 PPQ, one track per channel, chain + project transpose applied, per-channel GRV groove switches and HOP flow honoured).
 
 ### Device (USB)
-- **Live screen mirror** — connect the picoTracker over USB (WebSerial) and watch the device screen in the browser, with full-refresh requests and PNG capture. View-only: stock firmware does not accept remote key input yet. Implements the firmware's Remote UI protocol.
+- **Live screen mirror** — connect the picoTracker over USB (WebSerial) and watch the device screen in the browser, rendered pixel-for-pixel with the device's own bitmap font, with full-refresh requests and PNG capture.
+- **Experimental remote input** — an opt-in mode that sends button presses (keyboard or on-screen pad) as a proposed `FE 03` key-state opcode. Stock firmware ignores it by design; this is the client half of a protocol proposal for the firmware side, ready the day a firmware speaks it. Reachable straight from the landing page, no SD card needed. Requires the https:// page (WebSerial only exists in secure contexts). View-only: stock firmware does not accept remote key input yet. Implements the firmware's Remote UI protocol.
 
 ### Maintain
 - **Problems tab** — missing sample references, unused pool samples (with reclaimable sizes), unused instruments, content-identical samples (byte-level dupe scan), duplicate `.pti` names, stale autosaves, unreadable files, backbone sounds, and the repair log.
@@ -65,8 +72,11 @@ The entire app is a single `index.html` — deliberately, so it can be hosted an
 Tests are zero-dependency Node scripts that extract the `PT` module straight out of `index.html`:
 
 ```bash
-node tests/parser.test.mjs   # format unit tests (35, incl. Advance variants + MIDI timing)
+node tests/parser.test.mjs   # format unit tests (38: formats, MIDI timing, theme writing)
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
+node tests/e2e.mjs           # browser end-to-end (needs: npm i -D playwright)
 ```
+
+The USB mirror's font is the 8x8 Wide face and special-glyph page by nILS (public domain), as shipped in the picoTracker firmware; the firmware's other two fonts are not redistributable and are intentionally not embedded.
 
 Not affiliated with xiphonics. Use at your own risk; the read-only default and backup-first repairs exist precisely so that risk stays near zero.

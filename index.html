@@ -606,7 +606,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.2.1 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.4.2 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -627,6 +627,7 @@
     <div class="empty-divider" id="empty-divider" style="display:none">— or —</div>
     <button class="btn secondary" id="btn-open-empty">OPEN SD CARD</button>
     <button class="btn ghost" id="btn-demo" title="Explore the app with a synthetic demo card — no SD card needed">▶ Try with demo data</button>
+    <button class="btn ghost" id="btn-usb-only" title="Mirror the picoTracker screen over USB — no SD card needed">🖧 USB device mirror</button>
     <div id="browser-warn" class="browser-warn" style="display:none">
       ⚠ Requires Chrome or Edge — Firefox and Safari do not support the File System Access API.
     </div>
@@ -725,7 +726,8 @@
     <div class="tab-pane" id="tab-themes">
       <div class="toolbar">
         <input class="search" id="theme-q" type="text" placeholder="filter themes…">
-        <button class="btn ghost sm" id="btn-theme-reset" title="Back to the default app palette">↺ Reset app theme</button>
+        <button class="btn ghost sm" id="btn-theme-reset" title="Back to the default app palette">↺ Reset preview</button>
+        <button class="btn ghost sm" id="btn-theme-fromdev" title="Save the colours currently in the device's .config.xml as a new .ptt file">⬇ Save device colours as .ptt</button>
         <span class="stat-chip" id="themes-stat" style="margin-left:auto"></span>
       </div>
       <div class="themes-scroll">
@@ -825,13 +827,31 @@
         <button class="btn" id="btn-usb-connect">CONNECT USB</button>
         <button class="btn ghost sm" id="btn-usb-refresh" disabled>↺ Refresh screen</button>
         <button class="btn ghost sm" id="btn-usb-png" disabled>⬇ PNG</button>
+        <button class="btn ghost sm" id="btn-usb-input" disabled title="Send button presses to the device (proposed protocol — needs firmware support; stock firmware ignores it)">⌨ Input (experimental)</button>
         <span class="stat-chip" id="usb-status" style="margin-left:auto">Not connected</span>
       </div>
       <div class="scroll-area" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:20px">
         <canvas id="usb-canvas" width="960" height="720" style="width:min(90%,960px);image-rendering:pixelated;border:1px solid var(--border2);border-radius:8px;background:#000"></canvas>
+        <div id="usb-pad" style="display:none;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center">
+          <div style="display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,34px);gap:4px;margin-right:14px">
+            <span></span><button class="btn dim usb-key" data-bit="3" title="Up (↑)">▲</button><span></span>
+            <button class="btn dim usb-key" data-bit="0" title="Left (←)">◀</button>
+            <button class="btn dim usb-key" data-bit="1" title="Down (↓)">▼</button>
+            <button class="btn dim usb-key" data-bit="2" title="Right (→)">▶</button>
+          </div>
+          <button class="btn dim usb-key" data-bit="4" title="ALT (key A)">ALT</button>
+          <button class="btn dim usb-key" data-bit="5" title="EDIT (key X)">EDIT</button>
+          <button class="btn dim usb-key" data-bit="6" title="ENTER (key Z)">ENTER</button>
+          <button class="btn dim usb-key" data-bit="7" title="NAV (key S)">NAV</button>
+          <button class="btn dim usb-key" data-bit="8" title="PLAY (Space)">PLAY</button>
+          <span class="stat-chip" id="usb-input-note" style="width:100%;text-align:center;margin-top:4px">
+            Keys: arrows · Z=ENTER · X=EDIT · A=ALT · S=NAV · Space=PLAY — sent as proposed opcode FE 03; stock firmware ignores it.
+          </span>
+        </div>
         <div style="font-size:11px;color:var(--muted);max-width:640px;text-align:center;line-height:1.7">
-          Live mirror of the picoTracker screen over USB (Remote UI protocol). View-only:
-          stock firmware doesn't accept remote key input yet. Requires Chrome/Edge (WebSerial)
+          Live mirror of the picoTracker screen over USB (Remote UI protocol), drawn with the
+          device's own font. Stock firmware is view-only — the experimental input mode speaks a
+          proposed key-event opcode that needs firmware support. Requires Chrome/Edge (WebSerial)
           and Remote UI set to On in the device config.
         </div>
       </div>
@@ -847,6 +867,7 @@
       <button class="modal-nav-btn" id="btn-modal-prev" title="Previous project (←)">‹</button>
       <span class="proj-modal-title" id="modal-title"></span>
       <span class="proj-modal-meta" id="modal-meta"></span>
+      <button class="btn sm" id="btn-modal-play" title="Play this project in the browser (approximate — sample channels only)">▶ Play</button>
       <button class="btn ghost sm" id="btn-modal-patterns">▦ Patterns</button>
       <button class="btn ghost sm" id="btn-modal-midi" title="Export as a Standard MIDI File">⬇ MIDI</button>
       <button class="btn ghost sm" id="btn-modal-diff">⇌ Compare</button>
@@ -892,6 +913,41 @@
   </div>
 </div>
 
+<!-- Slice editor modal -->
+<div id="slice-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:170;display:none;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:10px;width:min(980px,100%);display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="slice-title"></span>
+      <button class="btn ghost sm" id="btn-slice-close">✕</button>
+    </div>
+    <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+      <canvas id="slice-wave" width="940" height="180" style="width:100%;border:1px solid var(--border2);border-radius:6px;background:#0d1012;cursor:crosshair;touch-action:none"></canvas>
+      <div id="slice-chips" style="display:flex;flex-wrap:wrap;gap:5px;min-height:26px"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <button class="btn ghost sm" id="btn-slice-detect" title="Find drum hits automatically">⚡ Detect transients</button>
+        <input id="slice-sens" type="range" min="0.4" max="2.4" step="0.1" value="1.0" style="width:90px;accent-color:var(--accent)" title="detection sensitivity">
+        <span style="color:var(--border2)">·</span>
+        <button class="btn ghost sm" id="btn-slice-equal">≡ Equal</button>
+        <input id="slice-n" type="number" min="2" max="32" value="8" class="search" style="width:56px;padding:4px 8px" title="number of equal slices">
+        <span style="color:var(--border2)">·</span>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);cursor:pointer">
+          <input type="checkbox" id="slice-zc" checked style="accent-color:var(--accent)"> snap to zero-crossing
+        </label>
+        <button class="btn ghost sm" id="btn-slice-clear">Clear all</button>
+        <span class="stat-chip" id="slice-stat" style="margin-left:auto"></span>
+      </div>
+      <div style="font-size:11px;color:var(--muted)">
+        Click the waveform to audition a slice · double-click to add a marker · drag markers to move · click a chip's ✕ to remove · keys 1–9,0 trigger slices like pads.
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border)">
+      <span style="flex:1;font-size:12px;color:var(--muted)" id="slice-status"></span>
+      <button class="btn ghost sm" id="btn-slice-cancel">Cancel</button>
+      <button class="btn" id="btn-slice-save">Save slices to card</button>
+    </div>
+  </div>
+</div>
+
 <!-- Fix (repair) modal -->
 <div id="fix-modal">
   <div class="fix-box">
@@ -922,6 +978,12 @@
 
 <script>
 'use strict';
+
+// WebSerial and service workers exist only in secure contexts — if the
+// hosted page is reached over plain http, hop to https before anything else.
+if (location.protocol === 'http:' && !['localhost','127.0.0.1'].includes(location.hostname)) {
+  location.replace('https://' + location.host + location.pathname + location.search);
+}
 
 // ══════════════════════════════════════════════════════════
 // PT — picoTracker XML PARSER
@@ -1132,7 +1194,7 @@ const PT = (() => {
       out.tempo = num('tempo');
       out.master = num('master');
       const tr = num('transpose');
-      out.transpose = tr === null ? 0 : (tr > 0x80 ? tr - 256 : tr);
+      out.transpose = tr === null ? 0 : (tr >= 0x80 ? tr - 256 : tr);
       out.scale = out.params.scale ?? null;
       out.scaleRoot = (out.params.scaleroot ?? '').trim() || null;
       out.wrap = out.params.wrap === 'true';
@@ -1524,17 +1586,26 @@ const PT = (() => {
     if (!tracks.length) return null;
 
     const enc = typeof TextEncoder !== 'undefined' ? new TextEncoder() : { encode: s => Uint8Array.from(s, ch => ch.charCodeAt(0)) };
+    // note: concat-based (no spread of whole tracks) — spreading a large
+    // track as call arguments overflows the stack on note-dense songs
+    const pushAll = (arr, items) => { for (const b of items) arr.push(b); return arr; };
     function chunk(tag, bodyBytes) {
-      return [...enc.encode(tag),
-        (bodyBytes.length >>> 24) & 0xFF, (bodyBytes.length >>> 16) & 0xFF,
-        (bodyBytes.length >>> 8) & 0xFF, bodyBytes.length & 0xFF, ...bodyBytes];
+      const out = [];
+      pushAll(out, enc.encode(tag));
+      out.push((bodyBytes.length >>> 24) & 0xFF, (bodyBytes.length >>> 16) & 0xFF,
+        (bodyBytes.length >>> 8) & 0xFF, bodyBytes.length & 0xFF);
+      return pushAll(out, bodyBytes);
     }
-    function meta(type, dataBytes) { return [0xFF, type, ...midiVlq(dataBytes.length), ...dataBytes]; }
+    function meta(type, dataBytes) {
+      const out = [0xFF, type];
+      pushAll(out, midiVlq(dataBytes.length));
+      return pushAll(out, dataBytes);
+    }
     function trackChunk(events) {
       const body = [];
       let lastTick = 0;
-      for (const e of events) { body.push(...midiVlq(e.tick - lastTick), ...e.data); lastTick = e.tick; }
-      body.push(...midiVlq(0), 0xFF, 0x2F, 0x00);
+      for (const e of events) { pushAll(body, midiVlq(e.tick - lastTick)); pushAll(body, e.data); lastTick = e.tick; }
+      body.push(0x00, 0xFF, 0x2F, 0x00);
       return chunk('MTrk', body);
     }
     const bpm = proj.tempo && proj.tempo > 0 ? proj.tempo : 120;
@@ -1546,10 +1617,12 @@ const PT = (() => {
     ];
     const ntrks = 1 + tracks.length;
     const head = chunk('MThd', [0, 1, (ntrks >> 8) & 0xFF, ntrks & 0xFF, 0, 24]);
-    const out = [...head, ...trackChunk(t0)];
+    const out = [];
+    pushAll(out, head);
+    pushAll(out, trackChunk(t0));
     for (const tr of tracks) {
-      const nameEv = {tick: 0, data: meta(0x03, [...enc.encode(`PT CH${tr.idx + 1}`)])};
-      out.push(...trackChunk([nameEv, ...tr.ev]));
+      const nameEv = {tick: 0, data: meta(0x03, Array.from(enc.encode(`PT CH${tr.idx + 1}`)))};
+      pushAll(out, trackChunk([nameEv, ...tr.ev]));
     }
     return new Uint8Array(out);
   }
@@ -1568,13 +1641,17 @@ const PT = (() => {
     const idRe = new RegExp(`<INSTRUMENT\\b[^>]*\\bID="${escapeRe(instrIdHex)}"[^>]*>`);
     const m = idRe.exec(text);
     if (!m) return { ok:false, error:`instrument ID="${instrIdHex}" not found` };
+    if (m[0].endsWith('/>')) return { ok:false, error:`instrument ${instrIdHex} is a self-closing element` };
     const start = m.index;
     const end = text.indexOf('</INSTRUMENT>', start);
     if (end < 0) return { ok:false, error:'unterminated INSTRUMENT element' };
     const block = text.slice(start, end);
-    const paramRe = new RegExp(`(<PARAM\\s+NAME="sample"\\s+VALUE=")${escapeRe(escapeAttr(oldName))}(")`);
+    // tinyxml2 writes apostrophes as &apos;, our escapeAttr as &#39; —
+    // accept either spelling of the on-disk value
+    const oldEsc = [escapeAttr(oldName), escapeAttr(oldName).replace(/&#39;/g, '&apos;')];
+    const paramRe = new RegExp(`(<PARAM\\s+NAME="sample"\\s+VALUE=")(?:${oldEsc.map(escapeRe).join('|')})(")`);
     if (!paramRe.test(block)) return { ok:false, error:`sample PARAM with VALUE="${oldName}" not found in instrument ${instrIdHex}` };
-    const newBlock = block.replace(paramRe, `$1${escapeAttr(newName)}$2`);
+    const newBlock = block.replace(paramRe, (mm, p1, p2) => p1 + escapeAttr(newName) + p2);
     return { ok:true, text: text.slice(0, start) + newBlock + text.slice(end) };
   }
 
@@ -1591,8 +1668,243 @@ const PT = (() => {
     return lines.join('\n') + '\n';
   }
 
+  // ── .ptt writer + .config.xml theme rewrite ────────────
+  // Colour format matches the firmware writer: "#%X" — uppercase hex,
+  // no zero padding ("#0" is black).
+  const fwHex = v => '#' + (v >>> 0).toString(16).toUpperCase();
+  function buildPtt(themeObj) {
+    const lines = ['<THEME>', `    <Font value="#${themeObj.font ?? 0}"/>`];
+    for (const nm of THEME_COLOR_NAMES)
+      if (themeObj.colors[nm] !== undefined)
+        lines.push(`    <Color name="${nm}" value="${fwHex(themeObj.colors[nm])}"/>`);
+    lines.push('</THEME>');
+    return lines.join('\n') + '\n';
+  }
+  // Rewrite THEMENAME, UIFONT and the Color entries inside .config.xml
+  // text, preserving everything else byte-for-byte. Missing elements are
+  // appended before </CONFIG>.
+  function rewriteConfigTheme(text, themeName, themeObj) {
+    const setValueEl = (t, el, val) => {
+      const re = new RegExp(`(<${el}\\s+VALUE=")[^"]*(")`);
+      if (re.test(t)) return t.replace(re, (mm, p1, p2) => p1 + escapeAttr(val) + p2);
+      return t.replace(/<\/CONFIG>/, () => `    <${el} VALUE="${escapeAttr(val)}"/>\n</CONFIG>`);
+    };
+    let t = text;
+    t = setValueEl(t, 'THEMENAME', themeName);
+    if (themeObj.font !== undefined) t = setValueEl(t, 'UIFONT', String(themeObj.font));
+    for (const nm of THEME_COLOR_NAMES) {
+      const v = themeObj.colors[nm];
+      if (v === undefined) continue;
+      const re = new RegExp(`(<Color\\s+name="${nm}"\\s+value=")[^"]*(")`);
+      if (re.test(t)) t = t.replace(re, (mm, p1, p2) => p1 + fwHex(v) + p2);
+      else t = t.replace(/<\/CONFIG>/, () => `    <Color name="${nm}" value="${fwHex(v)}"/>\n</CONFIG>`);
+    }
+    return t;
+  }
+  function defaultConfigXml(themeName, themeObj) {
+    return rewriteConfigTheme('<CONFIG VERSION="1">\n</CONFIG>', themeName, themeObj);
+  }
+
+  // ── Note text → value ("C-3", "C#3", "OFF", "---") ────
+  function noteFromStr(str) {
+    const t = String(str).trim().toUpperCase();
+    if (t === '' || t === '---' || t === '--') return EMPTY;
+    if (t === 'OFF') return NOTE_OFF;
+    // Display format (noteStr): naturals get a dash separator ("C-3",
+    // "C--2"), sharps don't ("C#3", "C#-2") — so parse name, optional
+    // '#', optional single separator dash, then a (possibly negative)
+    // octave. A separator is only consumed when what follows still
+    // parses as an octave.
+    const m = /^([A-G])(#?)(-?-?\d+)$/.exec(t);
+    if (!m) return null;
+    let oct = m[3];
+    if (!m[2] && oct.startsWith('-')) oct = oct.slice(1);      // natural: first dash is the separator
+    if (oct === '' || oct === '-') return null;
+    const base = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]] + (m[2] ? 1 : 0);
+    const v = (parseInt(oct, 10) + 2) * 12 + base;
+    return v >= 0 && v <= 119 && !isNaN(v) ? v : null;
+  }
+
+  // ── Hex buffer encoder (mirror of HexBuffers.cpp) ─────
+  function encodeHexBuffer(u8) {
+    let out = '';
+    for (let i = 0; i < u8.length; i += 64) {
+      const chunk = u8.subarray(i, Math.min(i + 64, u8.length));
+      let uniform = true;
+      for (let k = 1; k < chunk.length; k++) if (chunk[k] !== chunk[0]) { uniform = false; break; }
+      if (uniform) out += `<DATA VALUE="${chunk[0]}" LENGTH="${chunk.length}"/>`;
+      else {
+        let hex = '';
+        for (const b of chunk) hex += b.toString(16).toUpperCase().padStart(2, '0');
+        out += `<DATA>${hex}</DATA>`;
+      }
+    }
+    return out;
+  }
+  const u16leBytes = arr => {
+    const u8 = new Uint8Array(arr.length * 2);
+    for (let k = 0; k < arr.length; k++) { u8[k*2] = arr[k] & 0xFF; u8[k*2+1] = arr[k] >> 8; }
+    return u8;
+  };
+
+  // ── Rewrite the phrase sections of a project file ─────
+  // Replaces the first occurrence of each phrase-data section (they sit
+  // inside <SONG>, before <TABLES> which reuses some element names) with
+  // re-encoded buffers, leaving every other byte of the file untouched.
+  // Refuses legacy 2-byte-command files.
+  function rewriteSongSections(text, parsed) {
+    if ((parsed.geometry?.cmdWidth ?? 1) !== 1)
+      return { ok: false, error: 'this project uses a legacy beta command encoding — editing is disabled for safety' };
+    const ph = parsed.phrases;
+    const sections = [
+      ['NOTES', encodeHexBuffer(ph.notes)],
+      ['INSTRUMENTS', encodeHexBuffer(ph.instr)],
+      ['COMMAND1', encodeHexBuffer(Uint8Array.from(ph.cmd1))],
+      ['PARAM1', encodeHexBuffer(u16leBytes(ph.param1))],
+      ['COMMAND2', encodeHexBuffer(Uint8Array.from(ph.cmd2))],
+      ['PARAM2', encodeHexBuffer(u16leBytes(ph.param2))],
+    ];
+    // Scope every replacement to the outer <SONG> element: <TABLES>
+    // reuses PARAM1/PARAM2 element names, and a section replaced outside
+    // SONG would silently corrupt table data.
+    let out = text;
+    for (const [name, body] of sections) {
+      const songStart = out.indexOf('<SONG>');
+      let songEnd = out.indexOf('<INSTRUMENTBANK');
+      if (songEnd < 0) songEnd = out.indexOf('<TABLES');
+      if (songStart < 0 || songEnd < 0 || songEnd < songStart)
+        return { ok: false, error: 'SONG element boundaries not found' };
+      const open = out.indexOf(`<${name}>`, songStart);
+      const close = out.indexOf(`</${name}>`, songStart);
+      if (open < 0 || close < 0 || close < open || open > songEnd || close > songEnd)
+        return { ok: false, error: `section ${name} not found inside SONG — refusing to edit a nonstandard file` };
+      out = out.slice(0, open) + `<${name}>` + body + out.slice(close);
+    }
+    return { ok: true, text: out };
+  }
+
+  // ── Event timeline for playback (player semantics, matching
+  //    moveToNextStep / getChannelHop / GRV handling) ─────
+  function buildEventTimeline(proj) {
+    const last = lastSongRow(proj);
+    if (last < 0) return null;
+    const CMD_KIL = 0x1E, CMD_HOP = 0x1B, CMD_GRV = 0x1A, CMD_VOL = 0x45, CMD_PAN = 0x2A;
+    const bpm = proj.tempo && proj.tempo > 0 ? proj.tempo : 120;
+    const tickSec = 60 / (bpm * 24);       // 24 ticks per beat, default step = 6 ticks
+    const grooveOf = g => {
+      const steps = (proj.grooves[g] || []).filter(v => v > 0 && v <= 0x80);
+      return steps.length ? steps : [6];
+    };
+    const events = [];
+    let endTick = 0;
+    for (let t = 0; t < CHANNELS; t++) {
+      let tick = 0, gSteps = grooveOf(0), gPos = 0, hopEntry = 0;
+      for (let row = 0; row <= last; row++) {
+        const c = gridCell(proj, row, t);
+        if (c === EMPTY) continue;
+        for (let cs = 0; cs < STEPS; cs++) {
+          const { phrase, transpose } = chainStep(proj, c, cs);
+          if (phrase === EMPTY || phrase >= geom(proj).phraseCount) continue;
+          const enterAt = hopEntry; hopEntry = 0;
+          for (let ps = enterAt; ps < STEPS; ps++) {
+            const st = phraseStep(proj, phrase, ps);
+            if (st.cmd1 === CMD_HOP || st.cmd2 === CMD_HOP) {
+              hopEntry = (st.cmd1 === CMD_HOP ? st.param1 : st.param2) & 0xF;
+              break;
+            }
+            if (st.cmd1 === CMD_GRV || st.cmd2 === CMD_GRV) {
+              const g = (st.cmd1 === CMD_GRV ? st.param1 : st.param2) & 0xFF;
+              if (g < GROOVE_COUNT) { gSteps = grooveOf(g); gPos = 0; }
+            }
+            const time = tick * tickSec;
+            if (st.cmd1 === CMD_KIL || st.cmd2 === CMD_KIL || st.note === NOTE_OFF)
+              events.push({ time, ch: t, type: 'off' });
+            for (const [cmd, param] of [[st.cmd1, st.param1], [st.cmd2, st.param2]]) {
+              if (cmd === CMD_VOL) events.push({ time, ch: t, type: 'vol', value: (param & 0xFF) / 255 });
+              if (cmd === CMD_PAN) events.push({ time, ch: t, type: 'pan', value: ((param & 0xFF) - 0x7F) / 127 });
+            }
+            if (st.note !== EMPTY && st.note !== NOTE_OFF && st.note <= 119) {
+              events.push({ time, ch: t, type: 'on', note: st.note,
+                transpose: transpose + proj.transpose, instr: st.instr });
+            }
+            tick += gSteps[gPos % gSteps.length];
+            gPos++;
+          }
+        }
+      }
+      endTick = Math.max(endTick, tick);
+    }
+    events.sort((a, b) => a.time - b.time);
+    return { events, duration: endTick * tickSec, bpm };
+  }
+
+  // ── Rewrite an instrument's slice points in project XML ──
+  // Removes every existing SLnn PARAM in the target INSTRUMENT block and
+  // inserts the new set (offset > 0 only, matching the firmware writer)
+  // before </INSTRUMENT>. Everything else is preserved byte-for-byte.
+  function rewriteInstrumentSlices(text, instrIdHex, slices) {
+    const idRe = new RegExp(`<INSTRUMENT\\b[^>]*\\bID="${escapeRe(instrIdHex)}"[^>]*>`);
+    const m = idRe.exec(text);
+    if (!m) return { ok: false, error: `instrument ID="${instrIdHex}" not found` };
+    if (m[0].endsWith('/>')) return { ok: false, error: `instrument ${instrIdHex} is a self-closing element` };
+    const start = m.index;
+    const end = text.indexOf('</INSTRUMENT>', start);
+    if (end < 0) return { ok: false, error: 'unterminated INSTRUMENT element' };
+    let block = text.slice(start, end);
+    // strip element-form SLnn params AND the attribute-form firmware quirk
+    block = block.replace(/\s*<PARAM\s+NAME="SL\d{2}"\s+VALUE="[^"]*"\s*\/>/g, '');
+    block = block.replace(/(<INSTRUMENT\b[^>]*?)(\s+SL\d{2}="[^"]*")+([^>]*>)/, (mm, a, _b, c) => a + c);
+    const lines = slices
+      .filter(sl => sl.offset > 0)
+      .sort((a, b) => a.index - b.index)
+      .map(sl => `\n            <PARAM NAME="SL${String(sl.index).padStart(2, '0')}" VALUE="${Math.round(sl.offset)}"/>`)
+      .join('');
+    block = block.replace(/\s*$/, '') + lines + '\n        ';
+    return { ok: true, text: text.slice(0, start) + block + text.slice(end) };
+  }
+
+  // ── Transient detection for auto-slicing breaks ───────
+  // Energy-envelope onset detector: windowed RMS, rising-edge threshold,
+  // minimum gap. Returns frame offsets (excluding 0).
+  function detectOnsets(data, sampleRate, maxSlices = 16, sensitivity = 1.0) {
+    const win = 512;
+    const n = Math.floor(data.length / win);
+    if (n < 4) return [];
+    const env = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      for (let j = 0; j < win; j++) { const v = data[i * win + j]; sum += v * v; }
+      env[i] = Math.sqrt(sum / win);
+    }
+    let mean = 0;
+    for (const v of env) mean += v;
+    mean /= n;
+    const thr = mean * (0.6 + 0.9 / Math.max(0.2, sensitivity));
+    const minGap = Math.max(2, Math.round(sampleRate * 0.05 / win));
+    const out = [];
+    let last = 0;   // treat frame 0 as an implicit onset
+    for (let i = 2; i < n; i++) {
+      const rise = env[i] - Math.min(env[i - 1], env[i - 2]);
+      if (env[i] > thr && rise > thr * 0.4 && i - last >= minGap) {
+        out.push(i * win);
+        last = i;
+        if (out.length >= maxSlices - 1) break;
+      }
+    }
+    return out;
+  }
+  // Snap a frame offset forward to the next zero crossing (declicks cuts)
+  function snapZeroCross(data, offset, maxSearch = 2048) {
+    const o = Math.max(1, Math.min(data.length - 1, Math.round(offset)));
+    for (let i = o; i < Math.min(data.length - 1, o + maxSearch); i++)
+      if ((data[i - 1] <= 0 && data[i] > 0) || (data[i - 1] >= 0 && data[i] < 0)) return i;
+    return o;
+  }
+
   return {
-    parseXml, decodeHexBuffer, u16leFrom, buildPti,
+    parseXml, decodeHexBuffer, u16leFrom, buildPti, buildPtt, rewriteConfigTheme, defaultConfigXml,
+    noteFromStr, encodeHexBuffer, rewriteSongSections, buildEventTimeline,
+    rewriteInstrumentSlices, detectOnsets, snapZeroCross,
     parseProject, parsePti, parseTheme, parseConfig, parseInstrumentEl,
     parseWavHeader, rewriteSampleRef,
     noteStr, cmdName, fxStr, hx2, hx4, colorHex, detectScales, buildMidi,
@@ -1807,17 +2119,22 @@ const Scanner = (() => {
   // missing = instrument sample refs not present in the pool
   // unusedPool = pool wavs no instrument references
   function computeSampleHealth(proj) {
-    const poolNames = new Set(proj.pool.map(s => s.name));
-    const refs = new Map(); // sample name -> [instrument]
+    // case-insensitive throughout: SD cards are FAT/exFAT, where
+    // kick.wav and Kick.wav are the same file — treating them as
+    // distinct would mark present samples missing and let a "repair"
+    // overwrite the real file
+    const poolNames = new Set(proj.pool.map(s => s.name.toLowerCase()));
+    const refs = new Map(); // lowercase sample name -> [instrument]
     for (const inst of proj.instruments) {
       if (inst.sample) {
-        if (!refs.has(inst.sample)) refs.set(inst.sample, []);
-        refs.get(inst.sample).push(inst);
+        const k = inst.sample.toLowerCase();
+        if (!refs.has(k)) refs.set(k, []);
+        refs.get(k).push(inst);
       }
     }
     proj.sampleRefs = refs.size;
-    proj.missing = [...refs.keys()].filter(nm => !poolNames.has(nm)).sort();
-    proj.unusedPool = proj.pool.filter(s => !refs.has(s.name)).map(s => s.name).sort();
+    proj.missing = [...refs.entries()].filter(([nm]) => !poolNames.has(nm)).map(([, insts]) => insts[0].sample).sort();
+    proj.unusedPool = proj.pool.filter(s => !refs.has(s.name.toLowerCase())).map(s => s.name).sort();
     proj.poolBytes = proj.pool.reduce((n,s) => n+s.size, 0);
     proj.unusedPoolBytes = proj.pool.filter(s => !refs.has(s.name)).reduce((n,s) => n+s.size, 0);
   }
@@ -2594,6 +2911,26 @@ const Demo = (() => {
 // ══════════════════════════════════════════════════════════
 const USB = (() => {
   const COLS = 32, ROWS = 24, CELLW = 10, CELLH = 10, SCALE = 3;
+
+  // Device font: the nILS 8x8 "Wide" font + the special-glyph page
+  // (0x80-0xFF: note symbols, meters, borders), both public domain,
+  // extracted from the picoTracker firmware's font.h. The firmware's
+  // other two fonts (ZX Origins faces) are not redistributable, so all
+  // three SETFONT indices render with this one. 224 glyphs x 10 rows of
+  // 10-bit pixels, bit 0 = leftmost, base64 of little-endian uint16s.
+  const FONT_B64 = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAMAAwADAAMAAwAAAAMAAAAAAAzADMAMwASAAAAAAAAAAAAAAAAADMAMwA/gHMAMwA/gHMAMwAAAAAADAA/AA2APwAsAGwAfwAMAAAAAAAAACGAcYAYAAwABgAjAGGAQAAAAB4AMwAzAB4ADwAZgHGALwBAAAAAIABwABgAAAAAAAAAAAAAAAAAAAAwABgADAAMAAwADAAYADAAAAAAAAMABgAMAAwADAAMAAYAAwAAAAAAAAAhADMAHgA/gF4AMwAhAAAAAAAAAAwADAAMAD+ATAAMAAwAAAAAAAAAAAAAAAAAAAAGAAYAAwAAAAAAAAAAAAAAAAA/gEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGAAYAAAAAAAAAYABwABgADAAGAAMAAYAAAAAAPwAhgHGAaYBlgGOAYYB/AAAAAAAcABgAGAAYABgAGAAYABgAAAAAAD+AIABgAH8AAYABgAGAP4BAAAAAP4AgAGAAfgAgAGAAYAB/gAAAAAAhgGGAYYB/gGAAYABgAGAAQAAAAD+AQYABgD+AIABgAGGAfwAAAAAAPwABgAGAP4AhgGGAYYB/AAAAAAA/gGAAYABgAGAAYABgAGAAQAAAAD8AIYBhgH8AIYBhgGGAfwAAAAAAPwAhgGGAYYB/AGAAYAB/AAAAAAAAAAAABgAGAAAABgAGAAAAAAAAAAAAAAAGAAYAAAAGAAYAAwAAAAAAGAAMAAYAAwADAAYADAAYAAAAAAAAAAAAPwBAAAAAPwBAAAAAAAAAAAYADAAYADAAMAAYAAwABgAAAAAAPwAhgGAAcAAYABgAAAAYAAAAAAA/ACGAbYBlgGWAfYBBgD8AAAAAAD8AIYBhgGGAf4BhgGGAYYBAAAAAP4AhgGGAf4AhgGGAYYB/gAAAAAA/ACGAQYABgAGAAYAhgH8AAAAAAD+AIYBhgGGAYYBhgGGAf4AAAAAAP4BBgAGAH4ABgAGAAYA/gEAAAAA/gEGAAYAfgAGAAYABgAGAAAAAAD8AIYBBgAGAOYBhgGGAfwAAAAAAIYBhgGGAf4BhgGGAYYBhgEAAAAA/gEwADAAMAAwADAAMAD+AQAAAADgAcAAwADAAMAAwADmAHwAAAAAAIYBxgBmAD4APgBmAMYAhgEAAAAABgAGAAYABgAGAAYABgD+AQAAAACGAc4B/gG2AYYBhgGGAYYBAAAAAIYBjgGeAb4B9gHmAcYBhgEAAAAA/ACGAYYBhgGGAYYBhgH8AAAAAAD+AIYBhgGGAf4ABgAGAAYAAAAAAPwAhgGGAYYBhgE2AWYA3AAAAAAA/gCGAYYBhgH+AIYBhgGGAQAAAAD8AIYBBgD8AIABgAGGAfwAAAAAAP4BMAAwADAAMAAwADAAMAAAAAAAhgGGAYYBhgGGAYYBhgH8AAAAAACGAYYBhgGGAYYBzAB4ADAAAAAAAIYBhgGGAYYBtgH+Ac4BhgEAAAAAhgGGAcwAeADMAIYBhgGGAQAAAACGAYYBhgHMAHgAMAAwADAAAAAAAP4BgAHAAHAAGAAMAAYA/gEAAAAA8AAwADAAMAAwADAAMADwAAAAAAACAAYADAAYADAAYADAAIABAAAAADwAMAAwADAAMAAwADAAPAAAAAAAMAB4AMwAhgECAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP4BAAAAAAYADAAYAAAAAAAAAAAAAAAAAAAAAAAAAPgAgAH8AYYBhgH8AQAAAAAGAAYA/gCGAYYBhgGGAf4AAAAAAAAAAAD8AIYBBgAGAIYB/AAAAAAAgAGAAfwBhgGGAYYBhgH8AQAAAAAAAAAA/ACGAf4BBgCGAfwAAAAAAPAAmAEYABgAfAAYABgAGAAAAAAAAAAAAPwBhgGGAYYB/AGAAfwAAAAGAAYA/gCGAYYBhgGGAYYBAAAAADAAAAA8ADAAMAAwADAA/AAAAAAAwAAAAPAAwADAAMAAwAB+AAAAAAAGAAYAhgHGAH4AxgCGAYYBAAAAADwAMAAwADAAMAAwADAA/AAAAAAAAAAAAP4AtgG2AYYBhgGGAQAAAAAAAAAA/gCGAYYBhgGGAYYBAAAAAAAAAAD8AIYBhgGGAYYB/AAAAAAAAAAAAP4AhgGGAYYB/gAGAAYAAAAAAAAA/AGGAYYBhgH8AYABgAEAAAAAAAD+AIYBBgAGAAYABgAAAAAAAAAAAPwABgD8AIABgAH+AAAAAAAMAAwAPgAMAAwADACMAfgAAAAAAAAAAACGAYYBhgGGAYYB/AAAAAAAAAAAAIYBhgGGAcwAeAAwAAAAAAAAAAAAhgGGAYYBtgG2AfwAAAAAAAAAAACGAcwAeAB4AMwAhgEAAAAAAAAAAIYBhgGGAfwBgAH+AAAAAAAAAAAA/AGAAfwABgAGAP4BAAAAAMAAYABgADgAOABgAGAAwAAAAAAAMAAwADAAMAAwADAAMAAwAAAAAAAMABgAGABwAHAAGAAYAAwAAAAAAAAAAAAYALwB9gBgAAAAAAAAAAAAeACEADIBCgEKATIBhAB4AAAAgAOAAYABgAGAAYABgAGAAYABgAP/AwAA7wHvAe8B7wHvAe8BAAD/A/8DAAAPAA8ADwAPAA8ADwAAAP8D/wMAAAAAAAAAAAAAAAAAAAAA/wP/AAAAAAIAAgADgAMAAgACAAJ/AvkDAQABAAEABwADAAEAAQAAAPwDAwADAAMADwAPAA8ADwADAAMAAwAAACAAMAB4ALAApACEAMwAeAAAAAAAQABAAEAAQABAAHgAfAA4AAAAAAAAAIgALAFOAU4BTgEsAYgAAAAAAAAACAAsAS4BzgAuASwBCAAAAAAAAAB4AMwAhACEAMwAeAAAAAAAAAAAAHgA/AD8APwA/AB4AAAAAAAAAMwAzADMAMwAzADMAMwAzAAAAIADwAPgA+AD4APgA+AD4APAA4ADBwAPAB8AHwAfAB8AHwAfAA8ABwAAABAAMABwAPAA8ABwADAAEAAAAAAAEAAwAFAAkACQAFAAMAAQAAAAAAAAAAAAAAAwAHgA/AAAAAAAAAAAAAAAAAAAAPwAeAAwAAAAAAAAAAAAAAAAAEgAxADKAcQASAAAAAAAAAAAAAAASACMAE4BjABIAAAAAAAAAAAAAABIAMwAzgHMAEgAAAAAAAAAIABgAOAA/gH+AeAAYAAgAAAAAAAwAHgA/AD+ATAAMAAwADAAAAAAADAAMAAwADAA/gH8AHgAMAAAAAAAEAAYABwA/gH+ARwAGAAQAAAAAAAYADgAeAD4APgAeAA4ABgAAAAAAMAAwAGIAYwB/gH+AAwACAAAAAAAAAD+Af4BGAA4APAB4AEAAAAAMAB4ADAAMgH/A/8DMgEwAHgAMAAAAP4B/gEGAD4APgAGAP4B/gEAAAAAAAAAAAAAAAAAAAAAAAAAAP8DAAAAAAAAAAAAAAAAAAAAAP8D/wMAAAAAAAAAAAAAAAAAAP8D/wP/AwAAAAAAAAAAAAAAAP8D/wP/A/8DAAAAAAAAAAAAAP8D/wP/A/8D/wMAAAAAAAAAAP8D/wP/A/8D/wP/AwAAAAAAAP8D/wP/A/8D/wP/A/8DAAAAAP8D/wP/A/8D/wP/A/8D/wMAAP8D/wP/A/8D/wP/A/8D/wP/A/8DGAAYABgAGAAYABgAGAAYAB8A/wOIA4gDiAOIA4gDiAOIA4gDjwP/A48AjwCPAI8AjwCPAI8AjwCPAwECAwOHA88D/wP/A/8D/wP/A/8D/wP/Af8AfwA/AD8AfwD/AP8B/wP/A/8D/wP/A/8D/wPPA4cDAwMBAv8D/gP8A/gD8APwA/gD/AP+A/8DVQEAAKoCAABVAQAAqgIAAP8DAABVAaoCVQGqAlUBqgJVAaoCVQGqAqoC/wNVAf8DqgL/A1UB/wOqAv8DMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwAD8APwAwADAAMAAwAAEAAQABAAEAAQABAAEAAQABAP8D/wOBA4EDgQOBA4EDgQOBA4EDgQP/Ax8AHwAfAB8AHwAfAB8AHwAfAP8DjwOPA48DjwOPA48DjwOPA48DzADMAM8AxwDAAMAAxwDPAMwAzADMAMwAzADMAMwAzADMAMwAzADMAAAAAAA/AH8A4ADAAMcAzwDMAMwAzADMAM8AxwDAAOAAfwA/AAAAAAABAP0B/QH9Af0B/QH9Af0BAQD/A/8DgQCBAIEAgQCBAIEAgQCBAIEDAAAAAAAAAAAPAB8AOAAwADAAMAAwADAAMABwAOADwAMAAAAAAAAAADAAMAAwADAA/wP/AwAAAAAAAAAAAAAAAAAAAAD/A/8DMAAwADAAMAAwADAAMAAwAPAD8AMwADAAMAAwAAAAAAAAAAAA/wP/AwAAAAAAAAAAMAAwADAAMAD/A/8DMAAwADAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAzADMAMwDjAMMABwA+APwAwAAAAAAAAAA8AP4AxwADACMA8wDzADMAMwAzADPA88DAAAAAP8D/wMAAAAAAAAAAP8D/wMAAAAAzwPPA8wAzADMAMwAzAOMAwwADACMA8wDzADMAAAAAAD/A/8DAAAAAP8D/wMAAAAAzADMAM8DhwMAAAAAhwPPA8wAzAAAAAAAAAAAAAAAAAAAAAAAAAAAAO8B/wH/Af8B/gD/Af8B/wHvAQAAAAAQARABoABAAKAAEAEQAQAAAAAAAAEBAAE1AU0DRQFFAT0BBAAEAAAAAAAAAOMAFAEUARQB5AAAAAAAQABAAEAATQJTAVEBUQFRAgAAAAAAAAAAAADjARQA4AAEAfMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAMAAwADgAHwAPAAAAAAAAAAAAAAAAAAAAAADAA+ADcAAwADAAMAD/A/8D/wP/A/8D/wP/A/8D/wP/AwAAAAAAAAAAAAD/A/8D/wP/A/8DHwAfAB8AHwAfAB8AHwAfAB8AHwDgA+AD4APgA+AD4APgA+AD4APgA/8D/wP/A/8D/wMAAAAAAAAAAAAAAAAAAAAAAAAAAAACgAPAA8AD4APgA8ADwAOAAwACAAAAAAAAAAAAAB8ADwAPAAcAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAEABwAPAA8AHwDwA/wD/gP+A/8D/wP/A/8D/wP/A/8D/wP/A/8D/wP/A/4D/gP8A/AD/wP/A/8D/wP/A/8D/wH/Af8APwA/AP8A/wH/Af8D/wP/A/8D/wP/A/8DAwADAAMAAwADAAMAAwADAP8D/wMPAA8ADwAPAA8ADwAPAA8A/wP/Az8APwA/AD8APwA/AD8APwD/A/8D/wD/AP8A/wD/AP8A/wD/AP8D/wMAAAAAAAAAAAAAAAAAAAAA/wMAAAAAEAA4AHwAEAAQAMYA/gAAAAAAAAAQABAAfAA4ABAAxgD+AAAAAAAAAAAAAAAAAAAAAAC2AbYBAAAAAPgAjAEGAwYDBgMCAwACAAAAAAAAgAHAAGAAYABgAGAAMQAfAAAAAAAAAAAAAAAAAoAD4AF4AB4AAAAAAOAB+AGeAYcBgQGAAYABgAEAAAAA/gGGAYYBhgGGAYYBhgGGAwAAAAD4ARgAGAAYABgAGAAYAB8AAAAAAAABgAPAA+ACcAA4ABwADgAAAAAAAAAAAAEBgwHHAe4AfAA4AAAAAABgAAwAAAMwAgYAwAACAJgBAAAAAIABBgAwAAEBAAAMAMMAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/A/4D/AP4A/AD4APAA4ADAAMAAv8D/wH/AH8APwAfAA8ABwADAAEAAAIAA4ADwAPgA/AD+AP8A/4D/wMBAAMABwAPAB8APwB/AP8A/wH/Aw==';
+  const FONT = (() => {
+    const bin = atob(FONT_B64);
+    const rows = new Uint16Array(bin.length / 2);
+    for (let i = 0; i < rows.length; i++)
+      rows[i] = bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8);
+    return rows; // glyph g row r = FONT[g*10 + r]; g 0-95 = ascii-0x20, 96+ = special-0x80
+  })();
+  function glyphIndex(ch) {
+    if (ch >= 0x20 && ch <= 0x7F) return ch - 0x20;
+    if (ch >= 0x80) return 96 + (ch - 0x80);
+    return 0;
+  }
   const MARKER = 0xFE, ESC = 0xFD, ESC_XOR = 0x20, OFFSET = 0x0F;
   let port = null, reader = null, running = false;
   let canvas = null, ctx = null;
@@ -2615,14 +2952,12 @@ const USB = (() => {
     ctx.fillRect(x, y, CELLW * SCALE, CELLH * SCALE);
     if (ch === 0x20) return;
     ctx.fillStyle = rgb(cellFg);
-    if (ch >= 0x21 && ch <= 0x7E) {
-      ctx.font = `bold ${9 * SCALE}px ui-monospace, Menlo, monospace`;
-      ctx.textBaseline = 'middle';
-      ctx.textAlign = 'center';
-      ctx.fillText(String.fromCharCode(ch), x + CELLW * SCALE / 2, y + CELLH * SCALE / 2 + SCALE);
-    } else {
-      // special glyph page (>= 0x80) — approximate with a block
-      ctx.fillRect(x + 2 * SCALE, y + 2 * SCALE, (CELLW - 4) * SCALE, (CELLH - 4) * SCALE);
+    const g = glyphIndex(ch) * 10;
+    for (let r = 0; r < 10; r++) {
+      const bits = FONT[g + r];
+      if (!bits) continue;
+      for (let b = 0; b < 10; b++)
+        if ((bits >> b) & 1) ctx.fillRect(x + b * SCALE, y + r * SCALE, SCALE, SCALE);
     }
   }
 
@@ -2681,7 +3016,12 @@ const USB = (() => {
 
   async function connect(statusCb) {
     onStatus = statusCb || (() => {});
-    if (!('serial' in navigator)) { onStatus('WebSerial not supported in this browser.', false); return false; }
+    if (!('serial' in navigator)) {
+      onStatus(window.isSecureContext
+        ? 'WebSerial not available — use desktop Chrome or Edge (not Firefox/Safari/mobile).'
+        : 'WebSerial needs a secure context — reload this page over https://.', false);
+      return false;
+    }
     try {
       port = await navigator.serial.requestPort();
       await port.open({ baudRate: 115200 });
@@ -2719,11 +3059,36 @@ const USB = (() => {
     if (running) disconnect();
   }
 
-  async function requestRefresh() {
+  async function requestRefresh() { await sendFrame([MARKER, 0x02]); }
+
+  async function sendFrame(bytes) {
     if (!port?.writable) return;
     const w = port.writable.getWriter();
-    try { await w.write(new Uint8Array([MARKER, 0x02])); }
+    try { await w.write(new Uint8Array(bytes)); }
     finally { w.releaseLock(); }
+  }
+
+  // ── Experimental remote input ─────────────────────────
+  // Proposed client→device opcode (not in stock firmware, which only
+  // dispatches on FULL_REFRESH and silently drops everything else):
+  //   0xFE 0x03 <mask-lo> <mask-hi>
+  // carrying the 9-bit button STATE mask from input.h (bit0 LEFT,
+  // 1 DOWN, 2 RIGHT, 3 UP, 4 ALT, 5 EDIT, 6 ENTER, 7 NAV, 8 PLAY);
+  // the firmware derives press/release by diffing successive masks,
+  // exactly as it does for the GPIO scan. Sent raw (fixed 4-byte frame,
+  // same style as the unescaped device→client TEXT frames).
+  let keyMask = 0, lastSent = -1;
+  async function setKeyBit(bit, down) {
+    const next = down ? (keyMask | (1 << bit)) : (keyMask & ~(1 << bit));
+    if (next === keyMask && lastSent !== -1) return;
+    keyMask = next;
+    lastSent = keyMask;
+    await sendFrame([MARKER, 0x03, keyMask & 0xFF, (keyMask >> 8) & 0x01]);
+  }
+  function releaseAllKeys() {
+    if (!keyMask) return;
+    keyMask = 0; lastSent = 0;
+    sendFrame([MARKER, 0x03, 0, 0]);
   }
 
   async function disconnect() {
@@ -2746,7 +3111,145 @@ const USB = (() => {
   }
 
   const isConnected = () => !!port;
-  return { connect, disconnect, requestRefresh, snapshotPng, isConnected, feed:  feed };
+  return { connect, disconnect, requestRefresh, snapshotPng, isConnected, feed, setKeyBit, releaseAllKeys };
+})();
+
+
+// ══════════════════════════════════════════════════════════
+// SONG PLAYER — Web Audio approximation of the tracker engine.
+// Sample-based channels with groove timing, chain+project transpose,
+// slices (untransposed, per firmware), loop modes, VOL/PAN/KIL/HOP/GRV.
+// Synth voices (SID/OPAL) and most FX are intentionally out of scope —
+// this is an honest sketch of the song, not the device's sound.
+// ══════════════════════════════════════════════════════════
+const SongPlayer = (() => {
+  let ctx = null, timer = null, state = null;
+
+  async function loadBuffers(sd, projDirName, parsed, isDemoPool) {
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    const wanted = new Set(parsed.instruments.map(i => i.sample).filter(Boolean));
+    const buffers = new Map();
+    for (const name of wanted) {
+      try {
+        const dir = await (await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(projDirName)).getDirectoryHandle('samples');
+        const f = await (await dir.getFileHandle(name)).getFile();
+        buffers.set(name, await actx.decodeAudioData(await f.arrayBuffer()));
+      } catch { /* missing or undecodable — channel stays silent */ }
+    }
+    return { actx, buffers };
+  }
+
+  function instrMeta(inst) {
+    const p = inst.params || {};
+    const num = (k, d) => { const v = parseInt(p[k], 10); return isNaN(v) ? d : v; };
+    return {
+      sample: inst.sample,
+      rootNote: num('root note', 60),
+      gain: Math.min(2, num('volume', num('level', 128)) / 128),
+      pan: (num('pan', 0x7F) - 0x7F) / 127,
+      loopMode: p.loopmode || 'none',
+      loopStart: num('loopstart', 0),
+      loopEnd: num('end', 0),
+      slices: (inst.slices || []).slice().sort((a, b) => a.index - b.index),
+    };
+  }
+
+  function stop() {
+    playToken++;
+    if (timer) { clearInterval(timer); timer = null; }
+    if (ctx) { try { ctx.close(); } catch {} ctx = null; }
+    const cb = state?.onEnd;
+    state = null;
+    cb?.();
+  }
+
+  let playToken = 0;
+  async function play(sd, proj, parsed, onProgress, onEnd) {
+    stop();
+    const token = ++playToken;
+    const tl = PT.buildEventTimeline(parsed);
+    if (!tl) { onEnd?.(); return false; }
+    const { actx, buffers } = await loadBuffers(sd, proj.dirName, parsed);
+    if (token !== playToken) { try { actx.close(); } catch {} return false; }  // stopped/replaced during load
+    ctx = actx;
+    const master = ctx.createGain();
+    master.gain.value = 0.9;
+    master.connect(ctx.destination);
+    const instr = new Map(parsed.instruments.map(i => [i.id, instrMeta(i)]));
+    const chans = [];
+    for (let c = 0; c < 8; c++) {
+      const g = ctx.createGain();
+      const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      if (pan) { g.connect(pan); pan.connect(master); } else g.connect(master);
+      chans.push({ g, pan, sources: [] });
+    }
+    const t0 = ctx.currentTime + 0.15;
+
+    // per-channel: compute each note's stop time (next on/off on channel)
+    const byCh = Array.from({ length: 8 }, () => []);
+    for (const e of tl.events) byCh[e.ch].push(e);
+    for (let c = 0; c < 8; c++) {
+      const evs = byCh[c];
+      for (let i = 0; i < evs.length; i++) {
+        const e = evs[i];
+        if (e.type === 'vol') chans[c].g.gain.setValueAtTime(e.value * 1.4, t0 + e.time);
+        else if (e.type === 'pan' && chans[c].pan) chans[c].pan.pan.setValueAtTime(e.value, t0 + e.time);
+        else if (e.type === 'on') {
+          const m = instr.get(e.instr);
+          if (!m || !m.sample) continue;
+          const buf = buffers.get(m.sample);
+          if (!buf) continue;
+          let stopAt = t0 + tl.duration;
+          for (let j = i + 1; j < evs.length; j++)
+            if (evs[j].type === 'on' || evs[j].type === 'off') { stopAt = t0 + evs[j].time; break; }
+          const src = ctx.createBufferSource();
+          src.buffer = buf;
+          const vg = ctx.createGain();
+          vg.gain.value = m.gain;
+          src.connect(vg); vg.connect(chans[c].g);
+          const sliceCount = m.slices.length;
+          let offset = 0, dur = null, rate = 1;
+          if (sliceCount && e.note >= PT.SLICE_NOTE_BASE && e.note < PT.SLICE_NOTE_BASE + 32) {
+            const idx = e.note - PT.SLICE_NOTE_BASE;
+            const sl = m.slices.find(x => x.index === idx);
+            if (!sl) continue;                       // inactive slice = silence
+            const next = m.slices.find(x => x.index > idx);
+            offset = sl.offset / buf.sampleRate;
+            dur = ((next ? next.offset : buf.length) - sl.offset) / buf.sampleRate;
+            rate = 1;                                // slices ignore transpose (firmware)
+          } else {
+            rate = Math.pow(2, (e.note + e.transpose - m.rootNote) / 12);
+            if (m.loopMode !== 'none' && m.loopEnd > m.loopStart) {
+              src.loop = true;
+              src.loopStart = m.loopStart / buf.sampleRate;
+              src.loopEnd = m.loopEnd / buf.sampleRate;
+            }
+          }
+          src.playbackRate.value = rate;
+          const start = t0 + e.time;
+          vg.gain.setValueAtTime(m.gain, Math.max(start, stopAt - 0.006));
+          vg.gain.linearRampToValueAtTime(0, stopAt);   // declick
+          try {
+            if (dur !== null && !src.loop) src.start(start, offset, Math.min(dur, stopAt - start + 0.01));
+            else { src.start(start, offset); src.stop(stopAt); }
+          } catch {}
+          chans[c].sources.push(src);
+        }
+      }
+    }
+    state = { onEnd, duration: tl.duration, t0 };
+    onProgress?.(0, tl.duration);
+    timer = setInterval(() => {
+      if (!ctx) return;
+      const t = ctx.currentTime - t0;
+      onProgress?.(Math.max(0, t), state.duration);
+      if (t >= state.duration + 0.3) stop();
+    }, 200);
+    return true;
+  }
+
+  const isPlaying = () => !!state;
+  return { play, stop, isPlaying };
 })();
 
 
@@ -2761,6 +3264,7 @@ const UI = (() => {
   // Chunked list rendering: renders the first `chunk` items, then keeps
   // appending as a sentinel scrolls into view. Keeps huge cards fast.
   function renderChunked(host, items, renderItem, wire, chunk = 150) {
+    host._chunkObs?.disconnect();
     host.innerHTML = '';
     let idx = 0;
     function append() {
@@ -2777,6 +3281,7 @@ const UI = (() => {
     host.appendChild(sentinel);
     const obs = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) append(); },
       { root: host.closest('.scroll-area'), rootMargin: '600px' });
+    host._chunkObs = obs;
     append();
     if (idx < items.length) obs.observe(sentinel);
   }
@@ -2801,6 +3306,8 @@ const UI = (() => {
   let modalProj = null, modalList = [];
   let sampbrRows = [], sampbrSelIdx = -1;
   let writeMode = false;
+  const fullCache = new Map(); // dirName → full parsed project (never persisted)
+  const dirtyPhrases = new Map(); // dirName → Set of edited phrase indices
 
   const cacheKey = () => sd ? `card:${sd.name}` : null;
 
@@ -2854,6 +3361,10 @@ const UI = (() => {
   }
 
   function afterScan(fromCache, savedAt) {
+    // keep full parses that carry unsaved edits — clearing them would
+    // silently destroy work the dirty bar still advertises
+    for (const k of [...fullCache.keys()])
+      if (!dirtyPhrases.has(k)) fullCache.delete(k);
     sampleNameMap = Scanner.buildSampleNameMap(lib.projects, lib.library);
     dupeNameMap = Scanner.buildInstrDupeMap(lib.ptis);
     renderHealth();
@@ -2875,6 +3386,7 @@ const UI = (() => {
   }
 
   function renderHealth() {
+    if (!lib) return;
     $('health-bar').classList.add('visible');
     $('h-projects').textContent = lib.projects.length;
     const bankInstr = lib.projects.reduce((n,p) => n+p.instruments.length, 0);
@@ -2923,6 +3435,7 @@ const UI = (() => {
   }
 
   function renderProjects() {
+    if (!lib) return;
     const list = filteredProjects();
     $('projs-stat').textContent = `${list.length} of ${lib.projects.length} projects`;
     const host = $('projs-list');
@@ -3046,7 +3559,7 @@ const UI = (() => {
     try { full = await readProjectFull(p); } catch(e) { body.innerHTML = `<div class="no-results">Could not read project: ${esc(e.message||e)}</div>`; return; }
     const parsed = full.parsed;
     if (!parsed) { body.innerHTML = '<div class="no-results">Could not parse project file.</div>'; return; }
-    modalProj._full = parsed;
+    fullCache.set(p.dirName, parsed);
     const hist = PT.detectScales(parsed);
     body.innerHTML = `
       <div class="sd-cols">
@@ -3103,11 +3616,12 @@ const UI = (() => {
     $('btn-modal-next').disabled = idx < 0 || idx >= modalList.length - 1;
   }
   function modalNav(delta) {
+    SongPlayer.stop();
     const idx = modalList.indexOf(modalProj);
     const next = modalList[idx + delta];
     if (next) openProjModal(next.dirName);
   }
-  function closeProjModal() { $('proj-modal').style.display = 'none'; modalProj = null; }
+  function closeProjModal() { SongPlayer.stop(); $('proj-modal').style.display = 'none'; modalProj = null; }
 
   // ── Pattern viewer ─────────────────────────────────────
   const CHAIN_PALETTE = ['#79b5e3','#34d399','#a78bfa','#f472b6','#fcd34d','#34d399','#fb923c','#f87171',
@@ -3115,10 +3629,11 @@ const UI = (() => {
 
   function togglePatternView() {
     const sec = $('modal-pattern-section');
-    if (!modalProj?._full) return;
+    const full = modalProj && fullCache.get(modalProj.dirName);
+    if (!full) return;
     if (sec.style.display !== 'none') { sec.style.display = 'none'; return; }
     sec.style.display = 'block';
-    renderPatterns(sec, modalProj, modalProj._full);
+    renderPatterns(sec, modalProj, full);
     sec.scrollIntoView({behavior:'smooth', block:'start'});
   }
 
@@ -3170,6 +3685,7 @@ const UI = (() => {
       <div class="pv-detail" id="pv-phrase-detail" style="display:none"></div>`;
     host.querySelectorAll('.pv-cell.chain').forEach(cell =>
       cell.addEventListener('click', () => showChain(parsed, parseInt(cell.dataset.chain, 10), host)));
+    updateSaveBar(host);
   }
 
   function showChain(parsed, c, host) {
@@ -3192,6 +3708,7 @@ const UI = (() => {
   function showPhrase(parsed, ph, host) {
     const det = host.querySelector('#pv-phrase-detail');
     det.style.display = 'block';
+    const editable = (parsed.geometry?.cmdWidth ?? 1) === 1;
     let rows = '';
     for (let s = 0; s < PT.STEPS; s++) {
       const st = PT.phraseStep(parsed, ph, s);
@@ -3203,14 +3720,166 @@ const UI = (() => {
         <span class="pfx">${esc(PT.fxStr(st.cmd1, st.param1))}  ${esc(PT.fxStr(st.cmd2, st.param2))}</span>
       </div>`;
     }
-    det.innerHTML = `<div class="pv-detail-title">Phrase ${PT.hx2(ph)}</div>${rows}`;
+    det.innerHTML = `<div class="pv-detail-title" style="display:flex;align-items:center;gap:10px">Phrase ${PT.hx2(ph)}
+      ${editable ? `<button class="btn ghost sm" id="btn-phrase-edit">✎ Edit</button>` : '<span style="opacity:.6">(legacy format — read only)</span>'}
+      <span style="flex:1"></span></div><div id="phrase-rows">${rows}</div>`;
+    det.querySelector('#btn-phrase-edit')?.addEventListener('click', () => editPhrase(parsed, ph, host));
     det.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  // ── Phrase editor (experimental) ───────────────────────
+  const CMD_OPTIONS = [0x2D, ...Object.keys(PT.COMMANDS).map(Number).filter(c => c !== 0x2D).sort((a,b)=>a-b)];
+  function editPhrase(parsed, ph, host) {
+    const det = host.querySelector('#pv-phrase-detail');
+    const cmdSel = (id, cur) => `<select class="fix-select pe-in" style="padding:1px 2px;font-size:10px" data-f="${id}">
+      ${CMD_OPTIONS.map(c => `<option value="${c}" ${c===cur?'selected':''}>${PT.cmdName(c)}</option>`).join('')}</select>`;
+    let rows = '';
+    for (let s = 0; s < PT.STEPS; s++) {
+      const st = PT.phraseStep(parsed, ph, s);
+      rows += `<div class="pv-pstep" style="grid-template-columns:18px 52px 34px 1fr" data-step="${s}">
+        <span class="pi">${PT.hx2(s)}</span>
+        <input class="fix-select pe-in" style="padding:1px 3px;font-size:10px;width:48px" data-f="note" value="${esc(PT.noteStr(st.note))}" title="note: C-3, C#4, OFF or ---">
+        <input class="fix-select pe-in" style="padding:1px 3px;font-size:10px;width:30px" data-f="instr" value="${st.instr===PT.EMPTY?'--':PT.hx2(st.instr)}" title="instrument (hex, -- for none)">
+        <span style="display:flex;gap:3px;align-items:center">
+          ${cmdSel('cmd1', st.cmd1)}<input class="fix-select pe-in" style="padding:1px 3px;font-size:10px;width:42px" data-f="param1" value="${PT.hx4(st.param1)}">
+          ${cmdSel('cmd2', st.cmd2)}<input class="fix-select pe-in" style="padding:1px 3px;font-size:10px;width:42px" data-f="param2" value="${PT.hx4(st.param2)}">
+        </span>
+      </div>`;
+    }
+    det.innerHTML = `<div class="pv-detail-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        Phrase ${PT.hx2(ph)} — editing
+        <button class="btn ghost sm" data-tsp="-12">-12</button><button class="btn ghost sm" data-tsp="-1">-1</button>
+        <button class="btn ghost sm" data-tsp="1">+1</button><button class="btn ghost sm" data-tsp="12">+12</button>
+        <span style="flex:1"></span>
+        <button class="btn ghost sm" id="btn-phrase-done">Done</button>
+      </div><div id="phrase-rows">${rows}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">Edits are held in memory until you press “Save edits to card” in the patterns header.</div>`;
+    const markDirty = () => {
+      if (!dirtyPhrases.has(modalProj.dirName)) dirtyPhrases.set(modalProj.dirName, new Set());
+      dirtyPhrases.get(modalProj.dirName).add(ph);
+      updateSaveBar(host);
+    };
+    const apply = (step, f, raw) => {
+      const k = ph * PT.STEPS + step;
+      const p = parsed.phrases;
+      if (f === 'note') {
+        const v = PT.noteFromStr(raw);
+        if (v === null) return false;
+        p.notes[k] = v;
+      } else if (f === 'instr') {
+        if (raw.trim() === '--' || raw.trim() === '') p.instr[k] = PT.EMPTY;
+        else { const v = parseInt(raw, 16); if (isNaN(v) || v > 0xFF) return false; p.instr[k] = v; }
+      } else if (f === 'cmd1' || f === 'cmd2') {
+        p[f][k] = parseInt(raw, 10);
+      } else {
+        const v = parseInt(raw, 16);
+        if (isNaN(v) || v > 0xFFFF) return false;
+        p[f][k] = v;
+      }
+      return true;
+    };
+    det.querySelectorAll('.pe-in').forEach(el =>
+      el.addEventListener('change', () => {
+        const step = parseInt(el.closest('[data-step]').dataset.step, 10);
+        const ok = apply(step, el.dataset.f, el.value);
+        el.style.borderColor = ok ? '' : 'var(--c-miss)';
+        if (ok) markDirty();
+      }));
+    det.querySelectorAll('[data-tsp]').forEach(b =>
+      b.addEventListener('click', () => {
+        const d = parseInt(b.dataset.tsp, 10);
+        for (let st = 0; st < PT.STEPS; st++) {
+          const k = ph * PT.STEPS + st, v = parsed.phrases.notes[k];
+          if (v !== PT.EMPTY && v !== PT.NOTE_OFF) {
+            const nv = v + d;
+            if (nv >= 0 && nv <= 119) parsed.phrases.notes[k] = nv;
+          }
+        }
+        markDirty();
+        editPhrase(parsed, ph, host);
+      }));
+    det.querySelector('#btn-phrase-done').addEventListener('click', () => showPhrase(parsed, ph, host));
+  }
+
+  function updateSaveBar(host) {
+    const n = dirtyPhrases.get(modalProj?.dirName)?.size ?? 0;
+    let bar = host.querySelector('#pv-save-bar');
+    if (!n) { bar?.remove(); return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'pv-save-bar';
+      bar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 12px;background:#1f1200;border:1px solid #4a2e00;border-radius:6px;font-size:12px;color:var(--warn)';
+      host.prepend(bar);
+    }
+    bar.innerHTML = `<span>✎ ${n} phrase${n>1?'s':''} edited (in memory only)</span>
+      <span style="flex:1"></span>
+      <button class="btn sm" id="btn-save-edits">💾 Save edits to card</button>
+      <button class="btn ghost sm" id="btn-discard-edits">Discard</button>`;
+    bar.querySelector('#btn-save-edits').addEventListener('click', () => saveEdits(host));
+    bar.querySelector('#btn-discard-edits').addEventListener('click', async () => {
+      dirtyPhrases.delete(modalProj.dirName);
+      fullCache.delete(modalProj.dirName);
+      openProjModal(modalProj.dirName);
+    });
+  }
+
+  async function saveEdits(host) {
+    const p = modalProj;
+    const parsed = p && fullCache.get(p.dirName);
+    if (!p || !parsed) {
+      const bar = host.querySelector('#pv-save-bar');
+      if (bar) bar.firstElementChild.textContent = 'Stale editor state — reopen the project and re-apply the edits.';
+      return;
+    }
+    if (!await ensureWrite()) return;
+    const bar = host.querySelector('#pv-save-bar');
+    const setBar = msg => { if (bar) bar.firstElementChild.textContent = msg; };
+    const projPath = `projects/${p.dirName}`;
+    const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+    let backedUp = false, original = null;
+    try {
+      const { file: curFile, bytes: curBytes, text } = await readCardFileForEdit(projPath, p.datName);
+      if (curFile.lastModified !== p.lastModified || curFile.size !== p.fileSize)
+        throw new Error('project changed on card since the last scan — rescan first (nothing written)');
+      const res = PT.rewriteSongSections(text, parsed);
+      if (!res.ok) throw new Error(res.error);
+      setBar('Backing up…');
+      original = curBytes;
+      await writeCardFile(`PTLibrarian_Backups/${stamp}/${p.dirName}`, p.datName, curBytes);
+      backedUp = true;
+      setBar('Writing…');
+      await writeCardFile(projPath, p.datName, res.text);
+      setBar('Verifying…');
+      const reread = PT.parseProject(await (await readCardFile(projPath, p.datName)).text());
+      if (!reread) throw new Error('verification failed: rewritten file does not parse');
+      const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+      for (const f of ['notes','instr','cmd1','param1','cmd2','param2'])
+        if (!same([...reread.phrases[f]], [...parsed.phrases[f]]))
+          throw new Error(`verification failed: ${f} mismatch after write`);
+      const edited = dirtyPhrases.get(p.dirName);
+      logRepair(true, 'edit-phrases', `${p.name}: ${edited.size} phrase(s) edited [${[...edited].map(PT.hx2).join(' ')}] — original backed up`);
+      dirtyPhrases.delete(p.dirName);
+      updateSaveBar(host);
+      await persist();
+      setCacheBar('Edits saved and verified — rescanning…', true);
+      await rescan(lib);
+      // refresh modal state so a second round of edits saves against the
+      // new mtime instead of failing the guard silently
+      modalProj = projByDir(p.dirName) ?? modalProj;
+      fullCache.set(p.dirName, parsed);
+    } catch(e) {
+      logRepair(false, 'edit-phrases', `${p.name}: ${e.message || e}`);
+      if (backedUp && original !== null) {
+        try { await writeCardFile(projPath, p.datName, original); setBar(`Failed: ${e.message || e} — original restored`); }
+        catch { setBar(`Failed: ${e.message || e} — RESTORE FAILED, backup at PTLibrarian_Backups/${stamp}/`); }
+      } else setBar(`Failed: ${e.message || e} (nothing written)`);
+    }
   }
 
   // ── MIDI export ────────────────────────────────────────
   async function exportMidi() {
     if (!modalProj) return;
-    let parsed = modalProj._full;
+    let parsed = fullCache.get(modalProj.dirName);
     if (!parsed) { try { parsed = (await readProjectFull(modalProj)).parsed; } catch { return; } }
     const bytes = PT.buildMidi(parsed, modalProj.name);
     if (!bytes) { alert('Nothing to export — the song grid is empty.'); return; }
@@ -3311,6 +3980,7 @@ const UI = (() => {
     return sampleNameMap.has(inst.sample.toLowerCase()) ? 'ok' : 'miss';
   }
   function renderInstruments() {
+    if (!lib) return;
     let list = allInstruments();
     const q = instrFilter.toLowerCase();
     if (q) list = list.filter(i => i.name.toLowerCase().includes(q) || (i.sample||'').toLowerCase().includes(q));
@@ -3323,7 +3993,7 @@ const UI = (() => {
       'missing':   (a,b) => (instrSampleState(b)==='miss'?1:0) - (instrSampleState(a)==='miss'?1:0),
     }[instrSort];
     list.sort(cmp);
-    $('instrs-stat').textContent = `${list.length} instruments (${lib.ptis.length} library, ${list.length - (instrTypeFilter.size||q?0:lib.ptis.length) >= 0 ? '' : ''}${instrInProj?'incl. project banks':'library only'})`;
+    $('instrs-stat').textContent = `${list.length} instruments · ${lib.ptis.length} in library · ${instrInProj ? 'incl. project banks' : 'library only'}`;
     const host = $('instrs-list');
     if (!list.length) { host.innerHTML = '<div class="no-results">No instruments match.</div>'; return; }
     const rowHtml = (i, idx) => {
@@ -3360,12 +4030,16 @@ const UI = (() => {
           ${i.sample ? `<div class="drow"><span class="dlabel">Sample</span><span class="dval ${instrSampleState(i)==='miss'?'miss':'dim'}">${esc(i.sample)}${instrSampleState(i)==='miss'?' — not found':''}</span></div>` : ''}
           <div class="drow"><span class="dlabel">Used in</span><span class="dval dim">${usage.length ? usage.map(p => `<span style="cursor:pointer;color:var(--accent)" class="use-link" data-proj="${esc(p.dirName)}">${esc(p.name)}</span>`).join(' · ') : 'nowhere'}</span></div>
           ${i.version ? `<div class="drow"><span class="dlabel">Firmware</span><span class="dval dim">${esc(i.version)}</span></div>` : ''}
-          ${i.source === 'project' ? `<div class="drow"><span class="dlabel"></span><button class="btn ghost sm btn-export-pti">⬇ Extract as .pti</button></div>` : ''}`;
+          ${i.source === 'project' ? `<div class="drow"><span class="dlabel"></span><span style="display:flex;gap:6px"><button class="btn ghost sm btn-export-pti">⬇ Extract as .pti</button>${i.sample && instrSampleState(i)==='ok' ? '<button class="btn ghost sm btn-slice-open">✂ Slice editor</button>' : ''}</span></div>` : ''}`;
         el.querySelectorAll('.use-link').forEach(l =>
           l.addEventListener('click', e => { e.stopPropagation(); switchTab('projects'); openProjModal(l.dataset.proj); }));
         el.querySelector('.btn-export-pti')?.addEventListener('click', e => {
           e.stopPropagation();
           exportPti(list[parseInt(el.dataset.idx, 10)]);
+        });
+        el.querySelector('.btn-slice-open')?.addEventListener('click', e => {
+          e.stopPropagation();
+          openSlicer(list[parseInt(el.dataset.idx, 10)]);
         });
       });
     });
@@ -3383,6 +4057,7 @@ const UI = (() => {
 
   // ── SAMPLES ────────────────────────────────────────────
   function renderSamples() {
+    if (!lib) return;
     const q = sampFilter.toLowerCase();
     const host = $('sampbr-list');
     sampbrRows = [];
@@ -3513,6 +4188,7 @@ const UI = (() => {
     </svg>`;
   }
   function renderThemes() {
+    if (!lib) return;
     const q = themeFilter.toLowerCase();
     const list = lib.themes.filter(t => t.fileName.toLowerCase().includes(q));
     $('themes-stat').textContent = `${list.length} themes`;
@@ -3520,8 +4196,9 @@ const UI = (() => {
       <div class="theme-card">
         <div class="theme-preview">${themePreviewSvg(t)}</div>
         <div class="theme-info">
-          <span class="theme-name">${esc(t.fileName.replace(/\.ptt$/i,''))}</span>
-          <button class="btn ghost sm" data-use="${i}" title="Apply this palette to the Librarian UI">Use</button>
+          <span class="theme-name">${esc(t.fileName.replace(/\.ptt$/i,''))}${lib.config?.values?.THEMENAME === t.fileName.replace(/\.ptt$/i,'') ? ' <span style="font-size:9px;color:var(--accent)" title="active on the device">● device</span>' : ''}</span>
+          <button class="btn ghost sm" data-use="${i}" title="Apply this palette to the Librarian UI (preview only)">Preview</button>
+          <button class="btn ghost sm" data-setdev="${i}" title="Write this theme into the card's .config.xml so the device boots with it">Set on device</button>
         </div>
         <div class="theme-swatches">
           ${PT.THEME_COLOR_NAMES.filter(n => t.colors[n] !== undefined).slice(0,8).map(n => `
@@ -3532,6 +4209,83 @@ const UI = (() => {
       </div>`).join('') || '<div class="no-results">No themes found in themes/.</div>';
     $('themes-grid').querySelectorAll('[data-use]').forEach(b =>
       b.addEventListener('click', () => applyTheme(list[parseInt(b.dataset.use, 10)])));
+    $('themes-grid').querySelectorAll('[data-setdev]').forEach(b =>
+      b.addEventListener('click', () => setDeviceTheme(list[parseInt(b.dataset.setdev, 10)], b)));
+  }
+
+  // ── Set device theme: paranoid .config.xml write ──────
+  async function setDeviceTheme(t, btn) {
+    if (!t || !await ensureWrite()) return;
+    const name = t.fileName.replace(/\.ptt$/i, '');
+    btn.disabled = true; btn.textContent = 'Writing…';
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    let original = null, backedUp = false;
+    try {
+      let text = null;
+      try { text = await (await readCardFile('', '.config.xml')).text(); }
+      catch (e) {
+        // Only a genuinely missing config may be recreated from scratch —
+        // any other failure must abort, or we would overwrite settings we
+        // could not read, with no backup.
+        if (e?.name !== 'NotFoundError') throw new Error('could not read .config.xml (' + (e.message || e) + ') — aborting, nothing written');
+      }
+      if (text !== null) {
+        original = text;
+        await writeCardFile(`PTLibrarian_Backups/${stamp}`, '.config.xml', text);
+        backedUp = true;
+      }
+      const out = text !== null ? PT.rewriteConfigTheme(text, name, t) : PT.defaultConfigXml(name, t);
+      await writeCardFile('', '.config.xml', out);
+      // verify: re-read, re-parse, colours must match
+      const reread = PT.parseConfig(await (await readCardFile('', '.config.xml')).text());
+      if (!reread || reread.values.THEMENAME !== name) throw new Error('verification failed: THEMENAME not set');
+      for (const nm of PT.THEME_COLOR_NAMES)
+        if (t.colors[nm] !== undefined && reread.colors[nm] !== t.colors[nm])
+          throw new Error(`verification failed: ${nm} mismatch`);
+      logRepair(true, 'set-theme', `device theme → ${name} (.config.xml${backedUp ? ', original backed up' : ', created'})`);
+      lib.config = reread;
+      await persist();
+      btn.textContent = '✓ Set';
+      setTimeout(() => { btn.disabled = false; btn.textContent = 'Set on device'; renderThemes(); }, 1200);
+    } catch(e) {
+      logRepair(false, 'set-theme', `${name}: ${e.message || e}`);
+      let restoreNote = '';
+      if (backedUp && original !== null) {
+        try { await writeCardFile('', '.config.xml', original); restoreNote = ' — original .config.xml restored'; }
+        catch { restoreNote = ` — RESTORE FAILED, backup at PTLibrarian_Backups/${stamp}/.config.xml`; }
+      }
+      btn.disabled = false; btn.textContent = 'Set on device';
+      setCacheBar(`Theme write failed: ${e.message || e}${restoreNote}`, false);
+    }
+  }
+
+  // ── Save the device's current colours as a .ptt ───────
+  async function saveDeviceTheme() {
+    if (!lib?.config || !Object.keys(lib.config.colors).length) {
+      setCacheBar('No colours found in .config.xml on this card.', false);
+      return;
+    }
+    if (!await ensureWrite()) return;
+    const themeObj = { font: parseInt(lib.config.values.UIFONT ?? '0', 10) || 0, colors: lib.config.colors };
+    const base = ((lib.config.values.THEMENAME || 'Device') + '-copy').slice(0, 16);
+    try {
+      const dir = await sd.getDirectoryHandle('themes', { create: true });
+      let name = base + '.ptt';
+      let free = false;
+      for (let n = 2; n < 200 && !free; n++) {
+        try { await dir.getFileHandle(name); name = `${base}${n}.ptt`; } catch { free = true; }
+      }
+      if (!free) throw new Error('could not find a free filename');
+      const w = await (await dir.getFileHandle(name, { create: true })).createWritable();
+      await w.write(PT.buildPtt(themeObj)); await w.close();
+      logRepair(true, 'export-theme', `device colours → themes/${name}`);
+      await persist();
+      setCacheBar(`Saved themes/${name} — rescanning…`, true);
+      await rescan(lib);
+      switchTab('themes');
+    } catch(e) {
+      setCacheBar('Theme export failed: ' + (e.message || e), false);
+    }
   }
   function applyTheme(t) {
     const r = document.documentElement.style;
@@ -3558,6 +4312,7 @@ const UI = (() => {
 
   // ── GROOVES ────────────────────────────────────────────
   function renderGrooves() {
+    if (!lib) return;
     const rows = [];
     for (const p of lib.projects)
       for (const g of p.grooves)
@@ -3577,6 +4332,7 @@ const UI = (() => {
 
   // ── RENDERS ────────────────────────────────────────────
   function renderRenders() {
+    if (!lib) return;
     const all = [...renders.map(r => ({...r, dir:'renders'})), ...recordings.map(r => ({...r, dir:'recordings'}))];
     $('renders-stat').textContent = `${renders.length} renders · ${recordings.length} recordings · ${fmtBytes(all.reduce((n,r)=>n+r.fileSize,0))}`;
     $('renders-list').innerHTML = all.length ? all.map(r => `
@@ -3611,6 +4367,7 @@ const UI = (() => {
     };
   }
   function renderProblems() {
+    if (!lib) return;
     const c = probCounts();
     for (const [k,v] of Object.entries(c)) {
       const el = $('pc-'+k);
@@ -3622,7 +4379,7 @@ const UI = (() => {
       const rows = [];
       for (const p of lib.projects)
         for (const nm of p.missing) {
-          const insts = p.instruments.filter(i => i.sample === nm);
+          const insts = p.instruments.filter(i => (i.sample || '').toLowerCase() === nm.toLowerCase());
           const cands = sampleNameMap.get(nm.toLowerCase());
           const nCands = cands ? cands.library.length + cands.projects.length : 0;
           rows.push(`<div class="prob-row clickable" data-proj="${esc(p.dirName)}">
@@ -3770,7 +4527,7 @@ const UI = (() => {
     const lines = [`picoTracker Librarian report — ${new Date().toLocaleString()}`, `Card: ${sd?.name}`, ''];
     lines.push(`=== MISSING SAMPLES (${c.broken}) ===`);
     for (const p of lib.projects)
-      for (const nm of p.missing) lines.push(`  ${p.name}: ${nm} (used by ${p.instruments.filter(i=>i.sample===nm).map(i=>i.name).join(', ')})`);
+      for (const nm of p.missing) lines.push(`  ${p.name}: ${nm} (used by ${p.instruments.filter(i=>(i.sample||'').toLowerCase()===nm.toLowerCase()).map(i=>i.name).join(', ')})`);
     lines.push('', `=== UNUSED POOL SAMPLES (${c.unusedpool}) ===`);
     for (const p of lib.projects)
       for (const nm of p.unusedPool) lines.push(`  ${p.name}: ${nm}`);
@@ -3806,7 +4563,7 @@ const UI = (() => {
           copyOptions.push({kind:'copy', label:`projects/${cp.proj}/samples/${nm}`, srcDir:`projects`, srcPath:`${lib.projects.find(x=>x.name===cp.proj)?.dirName}/samples/${nm}`});
       }
       const repointOptions = p.pool.map(s => ({kind:'repoint', label:`→ ${s.name}`, newName:s.name}));
-      return { name: nm, insts: p.instruments.filter(i => i.sample === nm),
+      return { name: nm, insts: p.instruments.filter(i => (i.sample || '').toLowerCase() === nm.toLowerCase()),
         options: [...copyOptions, ...repointOptions], selected: copyOptions.length ? 0 : -1 };
     });
     $('fix-modal').classList.add('open');
@@ -3866,17 +4623,37 @@ const UI = (() => {
     const dir = await getPathDir(dirPath, false);
     return await (await dir.getFileHandle(name)).getFile();
   }
+  // Read a project file for rewriting: returns { file, bytes, text }.
+  // Refuses files that would not survive a decode/encode round trip
+  // (non-UTF-8 bytes or a BOM): our rewrites operate on text, and
+  // writing lossy text back would corrupt bytes we never touched.
+  async function readCardFileForEdit(dirPath, name) {
+    const file = await readCardFile(dirPath, name);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF)
+      throw new Error('file has a BOM — refusing to rewrite (please report this file)');
+    let text;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+    catch { throw new Error('file contains non-UTF-8 bytes — refusing to rewrite (please report this file)'); }
+    return { file, bytes, text };
+  }
   async function writeCardFile(dirPath, name, data) {
     const dir = await getPathDir(dirPath, true);
     const w = await (await dir.getFileHandle(name, {create:true})).createWritable();
     await w.write(data); await w.close();
   }
-  async function appendAudit(line) {
-    try {
-      let prev = '';
-      try { prev = await (await readCardFile('PTLibrarian_Backups', 'audit-log.txt')).text(); } catch {}
-      await writeCardFile('PTLibrarian_Backups', 'audit-log.txt', prev + line + '\n');
-    } catch(e) { console.warn('audit log write failed', e); }
+  let auditChain = Promise.resolve();
+  function appendAudit(line) {
+    // serialize read-modify-write appends — concurrent batch repairs
+    // would otherwise lose audit lines to last-write-wins
+    auditChain = auditChain.then(async () => {
+      try {
+        let prev = '';
+        try { prev = await (await readCardFile('PTLibrarian_Backups', 'audit-log.txt')).text(); } catch {}
+        await writeCardFile('PTLibrarian_Backups', 'audit-log.txt', prev + line + '\n');
+      } catch(e) { console.warn('audit log write failed', e); }
+    });
+    return auditChain;
   }
   function logRepair(ok, action, detail) {
     repairLog.push({ts: Date.now(), ok, action, detail});
@@ -3896,12 +4673,12 @@ const UI = (() => {
 
     try {
       // mtime guard: refuse if the project changed since the scan
-      const curFile = await readCardFile(projPath, p.datName);
+      const { file: curFile, bytes: curBytes, text: curText } = await readCardFileForEdit(projPath, p.datName);
       if (curFile.lastModified !== p.lastModified || curFile.size !== p.fileSize) {
         setStatus('Project file changed since the last scan — rescan first (no writes made).', 'err');
         return;
       }
-      let text = await curFile.text();
+      let text = curText;
       let textDirty = false;
 
       for (const ch of fixChoices) {
@@ -3913,6 +4690,9 @@ const UI = (() => {
             ? await readCardFile('samples' + (opt.srcPath.includes('/') ? '/'+opt.srcPath.slice(0, opt.srcPath.lastIndexOf('/')) : ''), opt.srcPath.split('/').pop())
             : await readCardFile('projects/' + opt.srcPath.slice(0, opt.srcPath.lastIndexOf('/')), opt.srcPath.split('/').pop());
           const bytes = await srcFile.arrayBuffer();
+          if (bytes.byteLength < 44 || !PT.parseWavHeader(new Uint8Array(bytes.slice(0, 4096)), bytes.byteLength))
+            throw new Error(`source for ${ch.name} is not a readable wav`);
+          await getPathDir(projPath, false);
           await writeCardFile(`${projPath}/samples`, ch.name, bytes);
           const verify = await readCardFile(`${projPath}/samples`, ch.name);
           if (verify.size !== bytes.byteLength) throw new Error(`copy verification failed for ${ch.name}`);
@@ -3930,10 +4710,15 @@ const UI = (() => {
 
       if (textDirty) {
         setStatus('Backing up project file…');
-        datOriginal = await curFile.arrayBuffer();
+        datOriginal = curBytes;
         await writeCardFile(backupPath, p.datName, datOriginal);
         datBackedUp = true;
         setStatus('Writing project file…');
+        {
+          const recheck = await readCardFile(projPath, p.datName);
+          if (recheck.lastModified !== p.lastModified || recheck.size !== p.fileSize)
+            throw new Error('project changed on card during the repair — nothing written to it');
+        }
         await writeCardFile(projPath, p.datName, text);
         // verify
         const reread = await (await readCardFile(projPath, p.datName)).text();
@@ -3972,6 +4757,250 @@ const UI = (() => {
     }
   }
 
+  // ── SLICE EDITOR ───────────────────────────────────────
+  const Slicer = {
+    proj: null, inst: null, buffer: null, data: null,
+    markers: [],           // offsets in DECODED (context-rate) frames
+    srcRate: 0, srcFrames: 0,  // the wav's native rate/length — SLnn units
+    maxSlices: 15, dragIdx: -1, actx: null, dirty: false,
+  };
+  // decodeAudioData resamples to the AudioContext rate, but SLnn offsets
+  // are frames of the file at its native rate — convert at the boundary
+  const toCtxFrames = o => Math.round(o * Slicer.data.length / Slicer.srcFrames);
+  function sliceMarkersToDeviceFrames() {
+    return Slicer.markers.map(m =>
+      Math.max(1, Math.min(Slicer.srcFrames - 1, Math.round(m * Slicer.srcFrames / Slicer.data.length))));
+  }
+  async function openSlicer(inst) {
+    if (!inst || inst.source !== 'project' || !inst.sample) return;
+    const p = inst.proj;
+    $('slice-modal').style.display = 'flex';
+    $('slice-title').textContent = `${p.name} · ${inst.idHex} ${inst.name} — ${inst.sample}`;
+    $('slice-status').textContent = 'Loading sample…';
+    $('btn-slice-save').disabled = true;
+    try {
+      const dir = await (await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(p.dirName)).getDirectoryHandle('samples');
+      const f = await (await dir.getFileHandle(inst.sample)).getFile();
+      const bytes = await f.arrayBuffer();
+      const hdr = PT.parseWavHeader(new Uint8Array(bytes.slice(0, 4096)), bytes.byteLength);
+      if (!hdr || !hdr.sampleRate || !hdr.duration)
+        throw new Error('could not read the wav header — slice offsets would be unreliable');
+      Slicer.srcRate = hdr.sampleRate;
+      Slicer.srcFrames = Math.round(hdr.duration * hdr.sampleRate);
+      Slicer.actx = Slicer.actx || new (window.AudioContext || window.webkitAudioContext)();
+      Slicer.buffer = await Slicer.actx.decodeAudioData(bytes);
+      Slicer.data = Slicer.buffer.getChannelData(0);
+    } catch(e) {
+      $('slice-status').textContent = 'Could not load sample: ' + (e.message || e);
+      return;
+    }
+    Slicer.proj = p;
+    Slicer.inst = inst;
+    Slicer.maxSlices = inst.type === 'SAMPLESOURCE' ? 31 : 15;
+    // stored SLnn offsets are native-rate frames — convert for display
+    Slicer.markers = (inst.slices || []).map(sl => toCtxFrames(sl.offset))
+      .filter(o => o > 0 && o < Slicer.data.length).sort((a,b) => a-b);
+    Slicer.dirty = false;
+    $('btn-slice-save').disabled = false;
+    $('slice-status').textContent = '';
+    drawSlicer();
+  }
+  function closeSlicer() { $('slice-modal').style.display = 'none'; Slicer.proj = null; }
+
+  function drawSlicer() {
+    const c = $('slice-wave'), ctx = c.getContext('2d');
+    const W = c.width, H = c.height, d = Slicer.data;
+    ctx.fillStyle = '#0d1012';
+    ctx.fillRect(0, 0, W, H);
+    // waveform
+    ctx.strokeStyle = '#79b5e3';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const step = Math.max(1, Math.floor(d.length / W));
+    for (let x = 0; x < W; x++) {
+      let min = 1, max = -1;
+      const base = Math.floor(x / W * d.length);
+      for (let j = 0; j < step; j++) { const v = d[base + j] || 0; if (v < min) min = v; if (v > max) max = v; }
+      const y1 = (1 - max) / 2 * H, y2 = (1 - min) / 2 * H;
+      ctx.moveTo(x + .5, y1); ctx.lineTo(x + .5, Math.max(y2, y1 + 1));
+    }
+    ctx.stroke();
+    // region tints + markers
+    const bounds = [0, ...Slicer.markers, d.length];
+    for (let i = 0; i < bounds.length - 1; i++) {
+      const x0 = bounds[i] / d.length * W, x1 = bounds[i + 1] / d.length * W;
+      if (i % 2) { ctx.fillStyle = 'rgba(121,181,227,.05)'; ctx.fillRect(x0, 0, x1 - x0, H); }
+      ctx.fillStyle = '#7b858c';
+      ctx.font = '10px monospace';
+      ctx.fillText(String(i + 1), x0 + 3, 12);
+    }
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2;
+    for (const m of Slicer.markers) {
+      const x = m / d.length * W;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath(); ctx.moveTo(x - 5, 0); ctx.lineTo(x + 5, 0); ctx.lineTo(x, 9); ctx.fill();
+    }
+    // chips
+    $('slice-chips').innerHTML = bounds.slice(0, -1).map((b, i) => `
+      <span class="ipchip mod" style="cursor:pointer" data-slice="${i}">
+        <span class="ipk">${i + 1}</span>
+        <span class="ipv">${(b / Slicer.buffer.sampleRate).toFixed(2)}s</span>
+        ${i > 0 ? `<span class="ipk" style="cursor:pointer;color:var(--c-miss)" data-del="${i - 1}">✕</span>` : ''}
+      </span>`).join('');
+    $('slice-chips').querySelectorAll('[data-slice]').forEach(ch =>
+      ch.addEventListener('click', e => {
+        if (e.target.dataset.del !== undefined) return;
+        auditionSlice(parseInt(ch.dataset.slice, 10));
+      }));
+    $('slice-chips').querySelectorAll('[data-del]').forEach(x =>
+      x.addEventListener('click', e => {
+        e.stopPropagation();
+        Slicer.markers.splice(parseInt(x.dataset.del, 10), 1);
+        Slicer.dirty = true;
+        drawSlicer();
+      }));
+    const n = Slicer.markers.length + 1;
+    $('slice-stat').textContent = `${n} slice${n>1?'s':''} (max ${Slicer.maxSlices + 1}) · ${Slicer.buffer.duration.toFixed(2)}s · ${Slicer.buffer.sampleRate}Hz`;
+  }
+
+  let sliceSrc = null;
+  function auditionSlice(i) {
+    const d = Slicer.data, sr = Slicer.buffer.sampleRate;
+    const bounds = [0, ...Slicer.markers, d.length];
+    if (i < 0 || i >= bounds.length - 1) return;
+    try { sliceSrc?.stop(); } catch {}
+    const src = Slicer.actx.createBufferSource();
+    src.buffer = Slicer.buffer;
+    src.connect(Slicer.actx.destination);
+    src.start(0, bounds[i] / sr, (bounds[i + 1] - bounds[i]) / sr);
+    sliceSrc = src;
+  }
+
+  function slicerFrameAt(evt) {
+    const c = $('slice-wave'), r = c.getBoundingClientRect();
+    return Math.round((evt.clientX - r.left) / r.width * Slicer.data.length);
+  }
+  function initSlicerEvents() {
+    const c = $('slice-wave');
+    const near = frame => {
+      const tol = Slicer.data.length / c.getBoundingClientRect().width * 6;
+      let best = -1, bd = tol;
+      Slicer.markers.forEach((m, i) => { const d0 = Math.abs(m - frame); if (d0 < bd) { bd = d0; best = i; } });
+      return best;
+    };
+    c.addEventListener('pointerdown', e => {
+      if (!Slicer.proj) return;
+      const f = slicerFrameAt(e);
+      const idx = near(f);
+      if (idx >= 0) { Slicer.dragIdx = idx; c.setPointerCapture(e.pointerId); }
+    });
+    c.addEventListener('pointermove', e => {
+      if (Slicer.dragIdx < 0) return;
+      Slicer.markers[Slicer.dragIdx] = Math.max(1, Math.min(Slicer.data.length - 1, slicerFrameAt(e)));
+      drawSlicer();
+    });
+    c.addEventListener('pointerup', e => {
+      if (Slicer.dragIdx >= 0) {
+        if ($('slice-zc').checked)
+          Slicer.markers[Slicer.dragIdx] = PT.snapZeroCross(Slicer.data, Slicer.markers[Slicer.dragIdx]);
+        Slicer.markers.sort((a, b) => a - b);
+        Slicer.dragIdx = -1;
+        Slicer.dirty = true;
+        drawSlicer();
+        return;
+      }
+      if (!Slicer.proj) return;
+      // plain click = audition the slice under the cursor
+      const f = slicerFrameAt(e);
+      const bounds = [0, ...Slicer.markers, Slicer.data.length];
+      for (let i = 0; i < bounds.length - 1; i++)
+        if (f >= bounds[i] && f < bounds[i + 1]) { auditionSlice(i); break; }
+    });
+    c.addEventListener('dblclick', e => {
+      if (!Slicer.proj || Slicer.markers.length >= Slicer.maxSlices) return;
+      let f = slicerFrameAt(e);
+      if ($('slice-zc').checked) f = PT.snapZeroCross(Slicer.data, f);
+      Slicer.markers.push(Math.max(1, f));
+      Slicer.markers.sort((a, b) => a - b);
+      Slicer.dirty = true;
+      drawSlicer();
+    });
+    $('btn-slice-detect').addEventListener('click', () => {
+      const sens = parseFloat($('slice-sens').value);
+      let on = PT.detectOnsets(Slicer.data, Slicer.buffer.sampleRate, Slicer.maxSlices + 1, sens);
+      if ($('slice-zc').checked) on = on.map(o => PT.snapZeroCross(Slicer.data, o));
+      Slicer.markers = [...new Set(on)].sort((a, b) => a - b);
+      Slicer.dirty = true;
+      drawSlicer();
+      $('slice-status').textContent = on.length ? `${on.length + 1} slices from transients — drag to fine-tune, click regions to audition.` : 'No clear transients found — try a higher sensitivity.';
+    });
+    $('btn-slice-equal').addEventListener('click', () => {
+      const n = Math.max(2, Math.min(Slicer.maxSlices + 1, parseInt($('slice-n').value, 10) || 8));
+      const step = Slicer.data.length / n;
+      let ms = Array.from({ length: n - 1 }, (_, i) => Math.round((i + 1) * step));
+      if ($('slice-zc').checked) ms = ms.map(o => PT.snapZeroCross(Slicer.data, o));
+      Slicer.markers = ms;
+      Slicer.dirty = true;
+      drawSlicer();
+    });
+    $('btn-slice-clear').addEventListener('click', () => { Slicer.markers = []; Slicer.dirty = true; drawSlicer(); });
+    $('btn-slice-close').addEventListener('click', closeSlicer);
+    $('btn-slice-cancel').addEventListener('click', closeSlicer);
+    $('slice-modal').addEventListener('click', e => { if (e.target === $('slice-modal')) closeSlicer(); });
+    $('btn-slice-save').addEventListener('click', saveSlices);
+    document.addEventListener('keydown', e => {
+      if ($('slice-modal').style.display === 'none' || /^(input|select)$/i.test(e.target.tagName)) return;
+      const k = e.key === '0' ? 9 : parseInt(e.key, 10) - 1;
+      if (!isNaN(k) && k >= 0) { e.preventDefault(); auditionSlice(k); }
+    });
+  }
+
+  async function saveSlices() {
+    const p = Slicer.proj, inst = Slicer.inst;
+    if (!p || !inst || !await ensureWrite()) return;
+    const setStatus = m => $('slice-status').textContent = m;
+    $('btn-slice-save').disabled = true;
+    const projPath = `projects/${p.dirName}`;
+    const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+    let backedUp = false, original = null;
+    try {
+      const { file: curFile, bytes: curBytes, text } = await readCardFileForEdit(projPath, p.datName);
+      if (curFile.lastModified !== p.lastModified || curFile.size !== p.fileSize)
+        throw new Error('project changed on card since the last scan — rescan first (nothing written)');
+      const slices = sliceMarkersToDeviceFrames().map((o, i) => ({ index: i + 1, offset: o }));
+      const res = PT.rewriteInstrumentSlices(text, inst.idHex, slices);
+      if (!res.ok) throw new Error(res.error);
+      setStatus('Backing up…');
+      original = curBytes;
+      await writeCardFile(`PTLibrarian_Backups/${stamp}/${p.dirName}`, p.datName, curBytes);
+      backedUp = true;
+      setStatus('Writing…');
+      await writeCardFile(projPath, p.datName, res.text);
+      setStatus('Verifying…');
+      const reread = PT.parseProject(await (await readCardFile(projPath, p.datName)).text());
+      if (!reread) throw new Error('verification failed: rewritten file does not parse');
+      const ni = reread.instruments.find(x => x.idHex === inst.idHex);
+      if (!ni) throw new Error('verification failed: instrument missing after write');
+      const want = slices.filter(sl => sl.offset > 0).map(sl => `${sl.index}:${Math.round(sl.offset)}`).join(',');
+      const got = (ni?.slices || []).map(sl => `${sl.index}:${sl.offset}`).join(',');
+      if (want !== got) throw new Error(`verification failed: slices mismatch (${got})`);
+      logRepair(true, 'edit-slices', `${p.name}: ${inst.idHex} ${inst.name}: ${slices.length} slice(s) — original backed up`);
+      await persist();
+      setStatus('Saved and verified ✓ — rescanning…');
+      closeSlicer();
+      await rescan(lib);
+    } catch(e) {
+      logRepair(false, 'edit-slices', `${p.name}: ${inst.idHex}: ${e.message || e}`);
+      if (backedUp && original !== null) {
+        try { await writeCardFile(projPath, p.datName, original); setStatus(`Failed: ${e.message || e} — original restored.`); }
+        catch { setStatus(`Failed: ${e.message || e} — RESTORE FAILED, backup at PTLibrarian_Backups/${stamp}/`); }
+      } else setStatus(`Failed: ${e.message || e} (nothing written)`);
+      $('btn-slice-save').disabled = false;
+    }
+  }
+
   // ── EXTRACT INSTRUMENT AS .PTI ─────────────────────────
   async function exportPti(inst) {
     if (!inst) return;
@@ -3982,10 +5011,12 @@ const UI = (() => {
       try {
         const dir = await sd.getDirectoryHandle('instruments', {create: true});
         let name = base + '.pti';
-        for (let n = 2; n < 100; n++) {
+        let free = false;
+        for (let n = 2; n < 200 && !free; n++) {
           try { await dir.getFileHandle(name); name = `${base}${n}.pti`; }
-          catch { break; }
+          catch { free = true; }
         }
+        if (!free) throw new Error('could not find a free filename');
         const w = await (await dir.getFileHandle(name, {create: true})).createWritable();
         await w.write(xml); await w.close();
         logRepair(true, 'export-pti', `${inst.srcLabel} → instruments/${name}`);
@@ -4005,8 +5036,12 @@ const UI = (() => {
   // ── BATCH REPAIR: fix all exact-name matches ───────────
   function exactFixables() {
     const jobs = [];
+    const seen = new Set();
     for (const p of lib.projects)
       for (const nm of p.missing) {
+        const dk = p.dirName + ':' + nm.toLowerCase();
+        if (seen.has(dk)) continue;
+        seen.add(dk);
         const cand = sampleNameMap.get(nm.toLowerCase());
         if (!cand) continue;
         let src = null;
@@ -4040,6 +5075,9 @@ const UI = (() => {
           srcFile = await readCardFile(`projects/${job.src.proj}/samples`, job.name);
         }
         const bytes = await srcFile.arrayBuffer();
+        if (bytes.byteLength < 44 || !PT.parseWavHeader(new Uint8Array(bytes.slice(0, 4096)), bytes.byteLength))
+          throw new Error('source is not a readable wav — skipped');
+        await getPathDir(`projects/${job.proj.dirName}`, false);   // never resurrect a deleted project
         await writeCardFile(`projects/${job.proj.dirName}/samples`, job.name, bytes);
         const verify = await readCardFile(`projects/${job.proj.dirName}/samples`, job.name);
         if (verify.size !== bytes.byteLength) throw new Error('size mismatch after copy');
@@ -4066,6 +5104,7 @@ const UI = (() => {
     return { projs, bytes, missing, samples };
   }
   function renderSets() {
+    if (!lib) return;
     const q = setFilter.toLowerCase();
     const list = lib.projects.filter(p => p.name.toLowerCase().includes(q));
     $('set-stat').textContent = `${setSel.size} selected`;
@@ -4115,7 +5154,7 @@ const UI = (() => {
         for (const d of dirNames) {
           setLog('ok', `Adding ${d}…`);
           const pd = await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(d);
-          for await (const entry of Scanner.walkFiles(pd, `projects/${d}`)) {
+          for await (const entry of Scanner.walkFiles(pd, `${name}/projects/${d}`)) {
             const f = await entry.handle.getFile();
             await zip.add(entry.path, new Uint8Array(await f.arrayBuffer()), f.lastModified);
             count++;
@@ -4161,6 +5200,7 @@ const UI = (() => {
     return BACKUP_DIRS.filter(d => $('inc-'+d)?.checked);
   }
   function renderBackupCounts() {
+    if (!lib) return;
     $('cnt-projects').textContent = `${lib.projects.length}`;
     $('cnt-samples').textContent = `${lib.library.length} · ${fmtBytes(lib.library.reduce((n,s)=>n+s.size,0))}`;
     $('cnt-instruments').textContent = `${lib.ptis.length}`;
@@ -4183,6 +5223,7 @@ const UI = (() => {
       <span class="bar-val">${fmt ? fmt(v) : v}</span></div>`).join('')}</div>`;
   }
   function renderStats() {
+    if (!lib) return;
     const projs = lib.projects;
     const allI = allInstruments();
     const typeCounts = {};
@@ -4297,6 +5338,12 @@ const UI = (() => {
     $('btn-open').addEventListener('click', () => openCard());
     $('btn-open-empty').addEventListener('click', () => openCard());
     $('btn-demo').addEventListener('click', () => openCard(Demo.buildCard(), {demo: true}));
+    $('btn-usb-only').addEventListener('click', () => {
+      $('empty-state').style.display = 'none';
+      $('main').classList.add('visible');
+      $('sd-label').textContent = 'No SD card — USB only';
+      switchTab('device');
+    });
     $('btn-rescan').addEventListener('click', () => rescan(null));
     Cache.loadHandle().then(rec => {
       if (rec?.handle) {
@@ -4325,6 +5372,22 @@ const UI = (() => {
     $('proj-modal').addEventListener('click', e => { if (e.target === $('proj-modal')) closeProjModal(); });
     $('btn-modal-prev').addEventListener('click', () => modalNav(-1));
     $('btn-modal-next').addEventListener('click', () => modalNav(1));
+    $('btn-modal-play').addEventListener('click', async () => {
+      if (SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
+      if (!modalProj) return;
+      let parsed = fullCache.get(modalProj.dirName);
+      if (!parsed) { try { parsed = (await readProjectFull(modalProj)).parsed; fullCache.set(modalProj.dirName, parsed); } catch { return; } }
+      const btn = $('btn-modal-play');
+      btn.disabled = true;
+      btn.textContent = '… loading';
+      const baseMeta = $('modal-meta').textContent;
+      const ok = await SongPlayer.play(sd, modalProj, parsed,
+        (t, d) => { $('modal-meta').textContent = `▶ ${fmtDur(t)} / ${fmtDur(d)}`; },
+        () => { btn.textContent = '▶ Play'; $('modal-meta').textContent = baseMeta; });
+      btn.disabled = false;
+      btn.textContent = ok ? '■ Stop' : '▶ Play';
+      if (!ok) $('modal-meta').textContent = baseMeta;
+    });
     $('btn-modal-patterns').addEventListener('click', togglePatternView);
     $('btn-modal-midi').addEventListener('click', exportMidi);
     $('btn-modal-diff').addEventListener('click', () => modalProj && startDiff(modalProj));
@@ -4349,6 +5412,7 @@ const UI = (() => {
     // Themes
     $('theme-q').addEventListener('input', debounce(e => { themeFilter = e.target.value; renderThemes(); }));
     $('btn-theme-reset').addEventListener('click', resetTheme);
+    $('btn-theme-fromdev').addEventListener('click', saveDeviceTheme);
 
     // Problems
     document.querySelectorAll('.prob-btn').forEach(b =>
@@ -4414,12 +5478,15 @@ const UI = (() => {
       const inInput = /^(input|select|textarea)$/i.test(e.target.tagName);
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); lib && openSearch(); return; }
       if (e.key === 'Escape') {
-        closeSearch(); closeDiff(); closeFixModal();
+        closeSearch(); closeDiff(); closeFixModal(); closeSlicer();
         $('samp-modal').classList.remove('open');
         closeProjModal();
         return;
       }
       if (inInput || !lib) return;
+      // modals own the keyboard while open
+      if ($('slice-modal').style.display !== 'none' || $('fix-modal').classList.contains('open') ||
+          $('diff-modal').classList.contains('open') || $('samp-modal').classList.contains('open')) return;
       if ($('proj-modal').style.display !== 'none') {
         if (e.key === 'ArrowLeft') modalNav(-1);
         if (e.key === 'ArrowRight') modalNav(1);
@@ -4438,12 +5505,46 @@ const UI = (() => {
     });
 
     // Device (USB Remote UI)
+    let usbInput = false;
     const usbStatus = (msg, connected) => {
       $('usb-status').textContent = msg;
       $('btn-usb-refresh').disabled = !connected;
       $('btn-usb-png').disabled = !connected;
+      $('btn-usb-input').disabled = !connected;
       $('btn-usb-connect').textContent = connected ? 'DISCONNECT' : 'CONNECT USB';
+      if (!connected && usbInput) toggleUsbInput();
     };
+    function toggleUsbInput() {
+      usbInput = !usbInput;
+      $('btn-usb-input').classList.toggle('on', usbInput);
+      $('usb-pad').style.display = usbInput ? 'flex' : 'none';
+      if (!usbInput) USB.releaseAllKeys();
+    }
+    const USB_KEYS = { ArrowLeft:0, ArrowDown:1, ArrowRight:2, ArrowUp:3,
+      a:4, x:5, z:6, s:7, ' ':8 };
+    document.addEventListener('keydown', e => {
+      if (!usbInput || curTab !== 'device' || e.repeat || e.metaKey || e.ctrlKey) return;
+      const bit = USB_KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+      if (bit === undefined) return;
+      e.preventDefault(); e.stopPropagation();
+      USB.setKeyBit(bit, true);
+    }, true);
+    document.addEventListener('keyup', e => {
+      if (!usbInput || curTab !== 'device') return;
+      const bit = USB_KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+      if (bit === undefined) return;
+      e.preventDefault();
+      USB.setKeyBit(bit, false);
+    }, true);
+    $('btn-usb-input').addEventListener('click', toggleUsbInput);
+    document.querySelectorAll('.usb-key').forEach(b => {
+      const bit = parseInt(b.dataset.bit, 10);
+      const down = e => { e.preventDefault(); USB.setKeyBit(bit, true); };
+      const up = e => { e.preventDefault(); USB.setKeyBit(bit, false); };
+      b.addEventListener('pointerdown', down);
+      b.addEventListener('pointerup', up);
+      b.addEventListener('pointerleave', up);
+    });
     $('btn-usb-connect').addEventListener('click', () =>
       USB.isConnected() ? USB.disconnect() : USB.connect(usbStatus));
     $('btn-usb-refresh').addEventListener('click', () => USB.requestRefresh());
@@ -4455,6 +5556,7 @@ const UI = (() => {
       navigator.serviceWorker.register('sw.js').catch(() => {});
     }
 
+    initSlicerEvents();
     refreshSavedSets();
   }
 
