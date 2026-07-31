@@ -157,13 +157,14 @@ await page.click('#btn-modal-patterns');
 await page.waitForTimeout(400);
 await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
 await page.waitForTimeout(200);
-await page.evaluate(() => document.querySelector('.pv-cstep .cp')?.click());
+await page.evaluate(() => document.querySelector('.pv-cstep .cgo')?.click());
 await page.waitForTimeout(200);
 // the grid is directly editable now — no separate "edit" mode toggle
 const canEdit = await page.evaluate(() =>
   !!document.querySelector('.pe-row[data-step="0"] .pe-c[data-f="note"][tabindex="0"]'));
 check('editor: phrase grid is editable in place', canEdit);
-check('editor: keyboard help shown', await page.evaluate(() => !!document.querySelector('.pe-help')));
+check('editor: keyboard help shown', await page.evaluate(() =>
+  !!document.querySelector('#pv-phrase-detail .pe-help')));
 // focus the note cell at step 0, type a new note, commit with Enter
 await page.click('.pe-row[data-step="0"] .pe-c[data-f="note"]');
 await page.waitForTimeout(100);
@@ -190,12 +191,75 @@ await page.click('#btn-modal-patterns');
 await page.waitForTimeout(400);
 await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
 await page.waitForTimeout(200);
-await page.evaluate(() => document.querySelector('.pv-cstep .cp')?.click());
+await page.evaluate(() => document.querySelector('.pv-cstep .cgo')?.click());
 await page.waitForTimeout(300);
 const savedNote = await page.evaluate(() =>
   document.querySelector('#phrase-rows .pe-row[data-step="0"] .pe-note')?.textContent.trim());
 check('editor: saved edit persisted to card (E-4 at step 0)', savedNote === 'E-4');
 check('editor: phrase audition button present', await page.evaluate(() => !!document.getElementById('btn-ph-play')));
+
+// ── 7a2. arrangement editing: song grid + chain steps ───
+// Both write through the same paranoid path as repairs, so this asserts the
+// edit survives write + reparse, not just that the DOM changed.
+await page.evaluate(() => document.querySelector('.pv-cell.empty[data-row]')?.focus());
+const emptyCell = await page.evaluate(() => {
+  const c = document.querySelector('.pv-cell.empty[data-row]');
+  return c ? { row: c.dataset.row, ch: c.dataset.ch } : null;
+});
+check('grid: an empty cell was available to fill', !!emptyCell);
+await page.evaluate(() => {
+  const c = document.querySelector('.pv-cell.empty[data-row]');
+  c.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+});
+await page.waitForTimeout(200);
+await page.evaluate(() => {
+  const inp = document.querySelector('.pv-cell .pe-edit');
+  if (inp) inp.value = '02';
+});
+await page.keyboard.press('Enter');
+await page.waitForTimeout(300);
+check('grid: placing a chain marks the song dirty', await page.evaluate(() =>
+  (document.getElementById('pv-save-bar')?.textContent || '').includes('song grid')));
+const placed = await page.evaluate(sel =>
+  document.querySelector(`.pv-cell[data-row="${sel.row}"][data-ch="${sel.ch}"]`)?.textContent.trim(), emptyCell);
+check('grid: the cell now shows the placed chain', placed === '02');
+// edit a chain step's phrase
+await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
+await page.waitForTimeout(250);
+check('chain: step list is editable', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cstep [data-f="phrase"][tabindex="0"]').length === 16));
+await page.evaluate(() => {
+  const c = document.querySelector('.pv-cstep [data-f="transpose"]');
+  c.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+});
+await page.waitForTimeout(200);
+await page.evaluate(() => { const i = document.querySelector('.pv-cstep .pe-edit'); if (i) i.value = '-5'; });
+await page.keyboard.press('Enter');
+await page.waitForTimeout(300);
+check('chain: editing a step marks chains dirty', await page.evaluate(() =>
+  (document.getElementById('pv-save-bar')?.textContent || '').includes('chain')));
+check('chain: transpose shows the new value', await page.evaluate(() =>
+  document.querySelector('.pv-cstep [data-f="transpose"]')?.textContent.trim() === '-5'));
+// save and confirm it survived the write + reparse
+await page.click('#btn-save-edits');
+await page.waitForTimeout(2500);
+check('arrangement: save cleared the dirty bar', await page.evaluate(() =>
+  !document.getElementById('pv-save-bar')));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
+await page.evaluate(() => document.querySelector('.proj-item .proj-row')?.click());
+await page.waitForTimeout(200);
+await page.evaluate(() => document.querySelector('.proj-item .btn-det-open')?.click());
+await page.waitForTimeout(800);
+await page.click('#btn-modal-patterns');
+await page.waitForTimeout(500);
+const reread = await page.evaluate(sel =>
+  document.querySelector(`.pv-cell[data-row="${sel.row}"][data-ch="${sel.ch}"]`)?.textContent.trim(), emptyCell);
+check('arrangement: placed chain persisted to the card', reread === '02');
+await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
+await page.waitForTimeout(250);
+check('arrangement: chain transpose persisted to the card', await page.evaluate(() =>
+  document.querySelector('.pv-cstep [data-f="transpose"]')?.textContent.trim() === '-5'));
 
 // ── 7b. sliced playback uses the wav's own sample rate ──
 // Must run BEFORE the slicer test below, which overwrites Night Bass's
@@ -303,8 +367,16 @@ await page.click('.btn-det-open');
 await page.waitForTimeout(700);
 await page.click('#btn-modal-patterns');
 await page.waitForTimeout(400);
-check('patterns: zoom + expand controls present', await page.evaluate(() =>
-  !!document.getElementById('pv-zoom') && !!document.getElementById('btn-pv-expand')));
+// zoom slider, expand toggle and the transposed timeline are gone: the grid
+// is always full-size and the timeline duplicated it with swapped axes
+check('patterns: zoom slider and expand toggle removed', await page.evaluate(() =>
+  !document.getElementById('pv-zoom') && !document.getElementById('btn-pv-expand')));
+check('patterns: redundant timeline removed', await page.evaluate(() =>
+  !document.querySelector('#modal-pattern-section .tl-svg')));
+check('patterns: workspace is full-size by default', await page.evaluate(() => {
+  const box = document.querySelector('.proj-modal-box');
+  return box.getBoundingClientRect().width > window.innerWidth * 0.9;
+}));
 check('patterns: chain colour pickers present', await page.evaluate(() =>
   document.querySelectorAll('.pv-chainrow input[type=color]').length > 0));
 // the chain list must be ascending by chain number, not song-usage order
@@ -324,10 +396,11 @@ check('patterns: detail panel sits beside the grid', await page.evaluate(() => {
   if (!grid || !side) return false;
   return side.getBoundingClientRect().left >= grid.getBoundingClientRect().right - 2;
 }));
-check('patterns: timeline spans the pane width', await page.evaluate(() => {
-  const svg = document.querySelector('.tl-svg'), wrap = document.querySelector('.tl-svg-wrap');
-  return svg && wrap && svg.getBoundingClientRect().width > wrap.getBoundingClientRect().width * 0.95;
-}));
+// grid cells are editable in place, and empty cells invite a chain
+check('patterns: grid cells are focusable for editing', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cell[data-row][tabindex="0"]').length > 0));
+check('patterns: empty cells are click-to-place', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cell.empty[data-row]').length > 0));
 check('patterns: chain list is grouped by high nibble', await page.evaluate(() =>
   document.querySelectorAll('.pv-chaingroup').length >= 1));
 // ↺ Colours is disabled until you actually pick a custom colour

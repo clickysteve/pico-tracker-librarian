@@ -143,9 +143,16 @@
     /* PROJECTS — LIST ROWS */
     .proj-item { border-bottom:1px solid var(--border); }
     .proj-row { display:grid;
-      grid-template-columns:26px minmax(140px,1fr) 64px 60px 60px 70px 86px 90px;
+      grid-template-columns:14px minmax(140px,1fr) 64px 60px 60px 70px 86px 90px auto;
       align-items:center; gap:0 12px; padding:9px 20px;
       cursor:pointer; user-select:none; transition:background .1s; }
+    /* Row actions: a small chevron means expand, a labelled ▶ Play means
+       preview. The two affordances never share a shape. */
+    .p-actions { display:flex; gap:6px; justify-self:end; opacity:0; transition:opacity .12s; }
+    .proj-row:hover .p-actions, .proj-item.open .p-actions { opacity:1; }
+    .p-actions .btn { white-space:nowrap; }
+    .proj-play.playing { border-color:var(--accent); color:var(--accent); }
+    @media (max-width:1200px) { .p-actions { opacity:1; } }
     .proj-row:hover { background:var(--surface); }
     .proj-item.open .proj-row { background:var(--surface); }
     .p-chev { color:var(--muted); transition:transform .15s; font-size:9px; }
@@ -185,8 +192,14 @@
     .proj-item.open .proj-detail { display:block; }
     .sd-cols { display:grid; grid-template-columns:1fr 1fr; gap:28px; }
     .sd-col { min-width:0; }
-    .det-title { font-size:10px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase;
-      color:var(--muted); margin-bottom:8px; }
+    /* Section headings and fact rows were both too small and too dark to
+       read comfortably; lift the size and the label contrast. */
+    .det-title { font-size:11px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+      color:var(--text); opacity:.72; margin-bottom:8px; }
+    .det-facts { display:flex; flex-wrap:wrap; gap:5px 8px; font-size:12.5px; color:var(--muted); }
+    .det-facts span { background:var(--surface2); border:1px solid var(--border);
+      border-radius:4px; padding:3px 8px; }
+    .det-facts b { color:var(--text); font-weight:600; font-family:monospace; }
     .iblock { display:flex; flex-wrap:wrap; gap:4px; }
     .ichip { display:inline-flex; align-items:center; gap:6px; padding:5px 10px;
       background:var(--surface2); border:1px solid var(--border); border-radius:4px;
@@ -219,10 +232,11 @@
     /* PROJECT MODAL */
     .proj-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:100;
       display:flex; align-items:center; justify-content:center; padding:24px; }
+    /* The workspace is always full-size — there was a toggle for this and
+       no reason anyone would want the small version. */
     .proj-modal-box { background:var(--surface); border:1px solid var(--border2);
-      border-radius:10px; width:min(1240px,95vw); height:92vh; max-height:92vh;
-      display:flex; flex-direction:column; overflow:hidden; transition:width .15s; }
-    .proj-modal-box.pv-max { width:97vw; height:97vh; max-height:97vh; }
+      border-radius:10px; width:97vw; height:96vh; max-height:96vh;
+      display:flex; flex-direction:column; overflow:hidden; }
     .modal-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); padding:0 16px; flex-shrink:0; background:var(--surface); }
     .modal-tab { background:none; border:none; border-bottom:2px solid transparent; color:var(--muted);
       padding:9px 14px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; }
@@ -590,8 +604,10 @@
     .pv-chainrow .cp-count { color:var(--border2); font-size:9px; min-width:20px; text-align:right; }
     .pv-chainrow .cp-play { cursor:pointer; color:var(--muted); margin-left:auto; }
     .pv-chainrow .cp-play:hover { color:var(--accent); }
-    .pv-cell { width:var(--pvw,30px); height:var(--pvh,22px); display:flex; align-items:center; justify-content:center;
-      font-size:calc(var(--pvw,30px) * .34); font-family:monospace; border-radius:3px;
+    /* Cells size themselves from the space available rather than a slider:
+       the grid gets as big as it can and stays legible. */
+    .pv-cell { width:var(--pvw,44px); height:var(--pvh,32px); display:flex; align-items:center; justify-content:center;
+      font-size:clamp(11px, calc(var(--pvw,44px) * .36), 20px); font-family:monospace; border-radius:3px;
       background:var(--surface2); color:var(--border2); cursor:default; user-select:none; }
     .pv-cell.chain { background:var(--accent-dim); color:var(--accent); cursor:pointer; }
     .pv-cell.chain:hover { background:#1a3a5c; }
@@ -606,6 +622,20 @@
       text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
     /* one step per line, top to bottom — a chain reads in play order */
     .pv-csteps { display:flex; flex-direction:column; }
+    .pv-cs-head, .pv-cstep { display:grid; grid-template-columns:26px 54px 46px 1fr; gap:6px; align-items:center; }
+    .pv-cs-head { font-size:9px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted);
+      padding-bottom:4px; border-bottom:1px solid var(--border); margin-bottom:3px; }
+    .pv-cstep .cp, .pv-cstep .ct { padding:2px 5px; border-radius:3px; cursor:text;
+      border:1px solid transparent; outline:none; font-family:monospace; }
+    .pv-cstep .cp:focus, .pv-cstep .ct:focus { border-color:var(--accent); background:var(--surface); }
+    .pv-cstep .cp.empty { color:var(--border2); }
+    .pv-cstep .cgo { cursor:pointer; color:var(--muted); font-size:13px; }
+    .pv-cstep .cgo:hover { color:var(--accent); }
+    .pv-cell.empty { cursor:pointer; }
+    .pv-cell.empty:hover { background:var(--accent-dim); color:var(--accent); }
+    .pv-cell:focus { outline:1px solid var(--accent); outline-offset:-1px; }
+    .pv-cell .pe-edit { width:100%; text-align:center; background:var(--surface);
+      border:none; outline:none; color:var(--text); font-family:monospace; font-size:inherit; padding:0; }
     .pv-cstep { display:flex; gap:8px; padding:3px 0; font-size:11px; font-family:monospace;
       border-bottom:1px solid var(--border); align-items:center; }
     .pv-cstep:last-child { border-bottom:none; }
@@ -763,7 +793,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.1 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.2 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -1970,6 +2000,10 @@ const PT = (() => {
       return { ok: false, error: 'this project uses a legacy beta command encoding — editing is disabled for safety' };
     const ph = parsed.phrases;
     const sections = [
+      // the arrangement: song grid, chain step lists, per-step transposes
+      ['SONG', encodeHexBuffer(Uint8Array.from(parsed.grid))],
+      ['CHAINS', encodeHexBuffer(Uint8Array.from(parsed.chains))],
+      ['TRANSPOSES', encodeHexBuffer(Uint8Array.from(parsed.transposes))],
       ['NOTES', encodeHexBuffer(ph.notes)],
       ['INSTRUMENTS', encodeHexBuffer(ph.instr)],
       ['COMMAND1', encodeHexBuffer(Uint8Array.from(ph.cmd1))],
@@ -1987,8 +2021,13 @@ const PT = (() => {
       if (songEnd < 0) songEnd = out.indexOf('<TABLES');
       if (songStart < 0 || songEnd < 0 || songEnd < songStart)
         return { ok: false, error: 'SONG element boundaries not found' };
-      const open = out.indexOf(`<${name}>`, songStart);
-      const close = out.indexOf(`</${name}>`, songStart);
+      // Search strictly INSIDE the outer <SONG>. The song grid is itself a
+      // <SONG> element nested in it, so starting at songStart would match
+      // the outer open tag against the inner close tag and splice out the
+      // whole arrangement.
+      const inner = songStart + '<SONG>'.length;
+      const open = out.indexOf(`<${name}>`, inner);
+      const close = out.indexOf(`</${name}>`, inner);
       if (open < 0 || close < 0 || close < open || open > songEnd || close > songEnd)
         return { ok: false, error: `section ${name} not found inside SONG — refusing to edit a nonstandard file` };
       out = out.slice(0, open) + `<${name}>` + body + out.slice(close);
@@ -3671,6 +3710,8 @@ const UI = (() => {
   let writeMode = false;
   const fullCache = new Map(); // dirName → full parsed project (never persisted)
   const dirtyPhrases = new Map(); // dirName → Set of edited phrase indices
+  const dirtyChains = new Map();  // dirName → Set of edited chain indices
+  const dirtyGrid = new Set();    // dirNames whose song grid was edited
 
   const cacheKey = () => sd ? `card:${sd.name}` : null;
 
@@ -3825,8 +3866,8 @@ const UI = (() => {
     }
     renderChunked(host, list, p => `
       <div class="proj-item" data-proj="${esc(p.dirName)}">
-        <div class="proj-row">
-          <button class="play-btn proj-play" data-proj="${esc(p.dirName)}" title="preview this project">▶</button>
+        <div class="proj-row" title="Click to expand this project">
+          <span class="p-chev" aria-hidden="true">▸</span>
           <span class="p-name">${esc(p.name)}${p.autosaveNewer?'<span class="p-auto">autosave</span>':''}${lib.currentProject===p.dirName?' <span style="color:var(--accent);font-size:10px" title="last project opened on the device (.current)">●</span>':''}</span>
           <span class="p-meta">${p.tempo??'—'} BPM</span>
           <span class="p-meta">${p.instruments.length} inst</span>
@@ -3834,6 +3875,11 @@ const UI = (() => {
           <span class="p-meta">${fmtBytes(p.poolBytes)}</span>
           <span class="p-meta">${fmtDate(p.lastModified)}</span>
           ${missBadge(p, 'p-miss')}
+          <span class="p-actions">
+            <button class="btn ghost sm proj-play" data-proj="${esc(p.dirName)}" title="Preview this project in the browser">▶ Play</button>
+            <button class="btn ghost sm proj-patterns" title="Open the full-screen workspace on the Patterns tab">▦ Patterns</button>
+            <button class="btn ghost sm proj-compare" title="Compare this project with another">⇌ Compare</button>
+          </span>
         </div>
         <div class="proj-detail"></div>
       </div>`, host2 => {
@@ -3843,6 +3889,15 @@ const UI = (() => {
         el.querySelector('.proj-play').addEventListener('click', e => {
           e.stopPropagation();
           rowPlayToggle(el.querySelector('.proj-play'));
+        });
+        el.querySelector('.proj-patterns').addEventListener('click', async e => {
+          e.stopPropagation();
+          await openProjModal(el.dataset.proj);
+          togglePatternView();
+        });
+        el.querySelector('.proj-compare').addEventListener('click', e => {
+          e.stopPropagation();
+          startDiff(projByDir(el.dataset.proj));
         });
       });
     });
@@ -3873,12 +3928,18 @@ const UI = (() => {
               <span class="ichip-name" style="${i.used?'':'opacity:.45'}">${esc(i.name)}</span>
             </span>`).join('') || '<span style="color:var(--muted);font-size:11px">none</span>'}
           </div>
-          <div class="det-title" style="margin-top:12px">Project</div>
-          <div style="font-size:11px;color:var(--muted);line-height:1.8">
-            ${p.tempo??'—'} BPM · master ${p.master??'—'} · transpose ${p.transpose>0?'+':''}${p.transpose}<br>
-            scale: ${esc(p.scale??'—')}${p.scaleRoot?' ('+esc(p.scaleRoot)+')':''}<br>
-            ${p.songRows} song rows · ${p.chainsUsed} chains · ${p.phrasesUsed} phrases · ${p.tablesUsed} tables<br>
-            firmware ${esc(p.version??'?')} · saved ${fmtDate(p.lastModified)}${p.hasAutosave?' · has autosave':''}
+          <div class="det-title" style="margin-top:14px">Project</div>
+          <div class="det-facts">
+            <span><b>${p.tempo??'—'}</b> BPM</span>
+            <span>master <b>${p.master??'—'}</b></span>
+            <span>transpose <b>${p.transpose>0?'+':''}${p.transpose}</b></span>
+            <span>scale <b>${esc(p.scale??'—')}</b>${p.scaleRoot?' ('+esc(p.scaleRoot)+')':''}</span>
+            <span><b>${p.songRows}</b> song rows</span>
+            <span><b>${p.chainsUsed}</b> chains</span>
+            <span><b>${p.phrasesUsed}</b> phrases</span>
+            <span><b>${p.tablesUsed}</b> tables</span>
+            <span>firmware <b>${esc(p.version??'?')}</b></span>
+            <span>saved <b>${fmtDate(p.lastModified)}</b>${p.hasAutosave?' · has autosave':''}</span>
           </div>
         </div>
         <div class="sd-col">
@@ -3899,8 +3960,7 @@ const UI = (() => {
         </div>
       </div>
       <div style="margin-top:12px;display:flex;gap:8px">
-        <button class="btn ghost sm btn-det-open">⤢ Details & patterns</button>
-        <button class="btn ghost sm btn-det-diff">⇌ Compare</button>
+        <button class="btn ghost sm btn-det-open">⤢ Open workspace</button>
         ${p.missing.length && `<button class="btn sm btn-det-fix">🔧 Repair ${p.missing.length} missing</button>` || ''}
       </div>`;
     det.querySelector('.btn-det-open')?.addEventListener('click', e => { e.stopPropagation(); openProjModal(p.dirName); });
@@ -3927,16 +3987,16 @@ const UI = (() => {
     if (!p) return;
     let parsed = fullCache.get(p.dirName);
     if (!parsed) {
-      btn.textContent = '…';
+      btn.textContent = '… Loading';
       try { parsed = (await readProjectFull(p)).parsed; fullCache.set(p.dirName, parsed); }
-      catch { btn.textContent = '▶'; return; }
+      catch { btn.textContent = '▶ Play'; return; }
     }
     rowPlayBtn = btn;
     const ok = await SongPlayer.play(sd, p, parsed, null, () => {
-      btn.textContent = '▶'; btn.classList.remove('playing');
+      btn.textContent = '▶ Play'; btn.classList.remove('playing');
       if (rowPlayBtn === btn) rowPlayBtn = null;
     });
-    btn.textContent = ok ? '■' : '▶';
+    btn.textContent = ok ? '■ Stop' : '▶ Play';
     if (ok) btn.classList.add('playing');
   }
 
@@ -4291,31 +4351,10 @@ const UI = (() => {
         if (!chainColor.has(c)) chainColor.set(c, chainColorOf(p, c, groupChainColor(c)));
       }
 
-    // Timeline SVG — stretches to the full width of the pane. Row width is
-    // whatever divides the available space, so a 26-row song fills the bar
-    // just as a 200-row one does.
-    const RH = 15, GAP = 1, LEFT = 22;
-    const H = CH * (RH + GAP) + 18;
-    const VBW = 1000;                                   // viewBox units; scaled by CSS
-    const rw = (VBW - LEFT - 4) / (last + 1);
-    let svg = `<svg class="tl-svg" viewBox="0 0 ${VBW} ${H}" preserveAspectRatio="none" width="100%" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
-    for (let t = 0; t < CH; t++) {
-      svg += `<text x="0" y="${t*(RH+GAP)+11}" fill="#7b858c" font-size="9" font-family="monospace">${t+1}</text>`;
-      for (let r = 0; r <= last; r++) {
-        const c = PT.gridCell(parsed, r, t);
-        if (c === PT.EMPTY) continue;
-        svg += `<rect x="${(LEFT + r*rw).toFixed(2)}" y="${t*(RH+GAP)}" width="${Math.max(1, rw-0.6).toFixed(2)}" height="${RH}" fill="${chainColor.get(c)}"/>`;
-      }
-    }
-    const lblEvery = Math.max(1, Math.ceil((last + 1) / 32));
-    for (let r = 0; r <= last; r += lblEvery)
-      svg += `<text x="${(LEFT + r*rw).toFixed(2)}" y="${H-3}" fill="#3a4046" font-size="8" font-family="monospace">${PT.hx2(r)}</text>`;
-    svg += '</svg>';
-
     // Song grid table — column tracks follow the zoom var (a fixed 30px
     // here was why cells clipped their text at larger zoom levels). The
     // leading ▶ column plays that whole song row across all 8 channels.
-    let grid = `<div class="pv-grid" style="grid-template-columns:18px repeat(${CH+1},var(--pvw,30px))">`;
+    let grid = `<div class="pv-grid" style="grid-template-columns:18px repeat(${CH+1},var(--pvw,44px))">`;
     grid += `<div class="pv-cell clbl"></div><div class="pv-cell clbl"></div>`;
     for (let t = 0; t < CH; t++) grid += `<div class="pv-cell clbl">C${t+1}</div>`;
     for (let r = 0; r <= last; r++) {
@@ -4324,8 +4363,8 @@ const UI = (() => {
       for (let t = 0; t < CH; t++) {
         const c = PT.gridCell(parsed, r, t);
         grid += c === PT.EMPTY
-          ? `<div class="pv-cell">··</div>`
-          : `<div class="pv-cell chain" data-chain="${c}" style="color:${chainColor.get(c)||'var(--accent)'}">${PT.hx2(c)}</div>`;
+          ? `<div class="pv-cell empty" data-row="${r}" data-ch="${t}" tabindex="0" title="Row ${PT.hx2(r)} · channel ${t+1} — click to place a chain">··</div>`
+          : `<div class="pv-cell chain" data-chain="${c}" data-row="${r}" data-ch="${t}" tabindex="0" style="color:${chainColor.get(c)||'var(--accent)'}" title="Chain ${PT.hx2(c)} at row ${PT.hx2(r)} · channel ${t+1}. Click to open, double-click or type to change.">${PT.hx2(c)}</div>`;
       }
     }
     grid += '</div>';
@@ -4352,21 +4391,17 @@ const UI = (() => {
 
     host.innerHTML = `
       <div class="pv-hdr">
-        <span class="pv-hdr-title">Timeline — ${last+1} rows</span>
-        <input id="pv-zoom" type="range" min="22" max="52" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--pvw')) || 30}" style="width:100px;accent-color:var(--accent)" title="cell size">
+        <span class="pv-hdr-title">Song grid — ${last+1} rows · ▶ plays a whole row · click a cell to set its chain</span>
         <button class="btn ghost sm" id="btn-pv-recolour" ${customColours ? '' : 'disabled'}
           title="${customColours ? `Discard your ${customColours} custom chain colour${customColours>1?'s':''} and go back to the by-group palette` : 'No custom chain colours to reset — pick one with a swatch first'}">↺ Colours</button>
-        <button class="btn ghost sm" id="btn-pv-expand" title="Grow the window to nearly full screen">⛶ Expand</button>
       </div>
-      <div class="tl-svg-wrap">${svg}</div>
-      <div class="pv-hdr" style="margin-top:14px"><span class="pv-hdr-title">Song grid — ▶ plays a whole row · click a chain to open it</span></div>
       <div class="pv-body">
         ${chainList}
         <div class="pv-grid-wrap">${grid}</div>
         <div class="pv-side">
           <div class="pv-detail" id="pv-chain-detail" style="display:none"></div>
           <div class="pv-detail" id="pv-phrase-detail" style="display:none"></div>
-          <div class="pv-side-hint" id="pv-side-hint">Click a chain in the grid or the list to inspect it here, then a phrase inside it to edit.</div>
+          <div class="pv-side-hint" id="pv-side-hint">Click a chain in the grid or the list to open it here, then a phrase inside it to edit. Click an empty grid cell to place a chain.</div>
         </div>
       </div>`;
     host.querySelectorAll('.pv-rowplay').forEach(b =>
@@ -4377,14 +4412,61 @@ const UI = (() => {
       await persist();
       renderPatterns(host, p, parsed);
     });
+    // Grid cells: a chain cell opens that chain; typing (or double-click, or
+    // clicking an empty cell) edits which chain sits there.
+    const gridEditable = (parsed.geometry?.cmdWidth ?? 1) === 1;
+    const chainMax = PT.CHAIN_COUNT - 1;   // geometry carries no chain count
+    const markGridDirty = () => { dirtyGrid.add(p.dirName); updateSaveBar(host); };
+    const editGridCell = (cell, seed) => {
+      if (!gridEditable || cell.querySelector('input')) return;
+      const r = parseInt(cell.dataset.row, 10), t = parseInt(cell.dataset.ch, 10);
+      const cur = PT.gridCell(parsed, r, t);
+      const inp = document.createElement('input');
+      inp.className = 'pe-edit';
+      inp.value = seed !== undefined ? seed : (cur === PT.EMPTY ? '' : PT.hx2(cur));
+      cell.textContent = '';
+      cell.appendChild(inp);
+      inp.focus();
+      if (seed === undefined) inp.select();
+      let done = false;
+      const commit = () => {
+        if (done) return;
+        done = true;
+        const s = inp.value.trim();
+        let ok = true;
+        if (s === '' || s === '--' || s === '··') parsed.grid[r * PT.CHANNELS + t] = PT.EMPTY;
+        else {
+          const v = parseInt(s, 16);
+          if (isNaN(v) || v < 0 || v > chainMax) ok = false;
+          else parsed.grid[r * PT.CHANNELS + t] = v;
+        }
+        if (ok) markGridDirty();
+        renderPatterns(host, p, parsed);
+      };
+      inp.addEventListener('blur', commit);
+      inp.addEventListener('keydown', ev => {
+        ev.stopPropagation();
+        if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+        else if (ev.key === 'Escape') { ev.preventDefault(); done = true; renderPatterns(host, p, parsed); }
+      });
+    };
     host.querySelectorAll('.pv-cell.chain').forEach(cell =>
       cell.addEventListener('click', () => showChain(parsed, parseInt(cell.dataset.chain, 10), host)));
-    host.querySelector('#pv-zoom').addEventListener('input', e => {
-      document.documentElement.style.setProperty('--pvw', e.target.value + 'px');
-      document.documentElement.style.setProperty('--pvh', Math.round(e.target.value * 0.73) + 'px');
+    host.querySelectorAll('.pv-cell.empty').forEach(cell =>
+      cell.addEventListener('click', () => editGridCell(cell)));
+    host.querySelectorAll('.pv-cell[data-row]').forEach(cell => {
+      cell.addEventListener('dblclick', e => { e.stopPropagation(); editGridCell(cell); });
+      cell.addEventListener('keydown', ev => {
+        if (!gridEditable) return;
+        if (ev.key === 'Enter') { ev.preventDefault(); editGridCell(cell); }
+        else if (ev.key === 'Delete' || ev.key === 'Backspace') {
+          ev.preventDefault();
+          parsed.grid[parseInt(cell.dataset.row,10) * PT.CHANNELS + parseInt(cell.dataset.ch,10)] = PT.EMPTY;
+          markGridDirty();
+          renderPatterns(host, p, parsed);
+        } else if (/^[0-9a-fA-F]$/.test(ev.key)) { ev.preventDefault(); editGridCell(cell, ev.key); }
+      });
     });
-    host.querySelector('#btn-pv-expand').addEventListener('click', () =>
-      document.querySelector('.proj-modal-box').classList.toggle('pv-max'));
     host.querySelectorAll('.pv-chainrow input[type=color]').forEach(inp =>
       inp.addEventListener('change', async () => {
         chainColors[`${p.dirName}:${inp.dataset.chain}`] = inp.value;
@@ -4437,24 +4519,100 @@ const UI = (() => {
     for (let r = 0; r <= PT.lastSongRow(parsed); r++)
       for (let ch = 0; ch < PT.CHANNELS; ch++)
         if (PT.gridCell(parsed, r, ch) === c) uses.push(`${PT.hx2(r)}·C${ch+1}`);
+    const editable = (parsed.geometry?.cmdWidth ?? 1) === 1;
+    const phraseMax = (parsed.geometry?.phraseCount ?? PT.PHRASE_COUNT) - 1;
     let rows = '';
     for (let st = 0; st < PT.STEPS; st++) {
       const {phrase, transpose} = PT.chainStep(parsed, c, st);
-      rows += `<div class="pv-cstep"><span class="ci">${PT.hx2(st)}</span>` + (phrase === PT.EMPTY
-        ? `<span class="ct">--</span>`
-        : `<span class="cp" data-p="${phrase}">P${PT.hx2(phrase)}</span><span class="ct">${transpose ? 'tsp '+(transpose>0?'+':'')+transpose : ''}</span>`) + `</div>`;
+      rows += `<div class="pv-cstep" data-step="${st}">
+        <span class="ci">${PT.hx2(st)}</span>
+        <span class="cp ${phrase === PT.EMPTY ? 'empty' : ''}" data-f="phrase" data-step="${st}"
+          tabindex="${editable ? 0 : -1}" title="${editable ? 'Click to set the phrase (hex, or -- for none)' : ''}"
+          ${phrase === PT.EMPTY ? '' : `data-p="${phrase}"`}>${phrase === PT.EMPTY ? '--' : PT.hx2(phrase)}</span>
+        <span class="ct" data-f="transpose" data-step="${st}" tabindex="${editable ? 0 : -1}"
+          title="${editable ? 'Transpose for this step, in semitones' : ''}">${transpose ? (transpose>0?'+':'')+transpose : '·'}</span>
+        ${phrase === PT.EMPTY ? '' : `<span class="cgo" data-p="${phrase}" title="open phrase ${PT.hx2(phrase)}">›</span>`}
+      </div>`;
     }
     const pRef = modalProj;
-    det.innerHTML = `<div class="pv-detail-title" style="display:flex;align-items:center;gap:10px">
-        Chain ${PT.hx2(c)}
+    det.innerHTML = `<div class="pv-detail-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span>Chain ${PT.hx2(c)}</span>
         <span class="cp-play" style="cursor:pointer;font-size:13px" title="preview this chain">▶</span>
         <span style="font-weight:400;letter-spacing:0;text-transform:none">used at ${uses.length} spot${uses.length===1?'':'s'}: ${uses.slice(0,12).map(esc).join('  ')}${uses.length>12?' …':''}</span>
       </div>
-      <div class="pv-csteps">${rows}</div>`;
+      <div class="pv-cs-head"><span>#</span><span>phrase</span><span>tsp</span><span></span></div>
+      <div class="pv-csteps">${rows}</div>
+      ${editable ? `<div class="pe-help">Click a phrase or transpose cell and type. <b>Enter</b> commits · <b>Del</b> clears ·
+        phrases are hex <code>00</code>–<code>${PT.hx2(phraseMax)}</code>, transpose is a signed number like <code>-12</code>.
+        Edits stay in memory until you press “Save edits to card”.</div>` : ''}`;
     det.querySelector('.cp-play').addEventListener('click', e => previewChain(pRef, parsed, c, e.target));
-    det.querySelectorAll('.cp').forEach(el =>
+    det.querySelectorAll('.cgo').forEach(el =>
       el.addEventListener('click', () => showPhrase(parsed, parseInt(el.dataset.p, 10), host)));
+    if (editable) wireChainEdit(det, parsed, c, host, phraseMax);
     host.querySelector('#pv-phrase-detail').style.display = 'none';
+  }
+
+  // Inline editing of a chain's step list: which phrase plays at each of
+  // the 16 steps, and its per-step transpose. Same in-memory-then-save
+  // model as the phrase editor.
+  function wireChainEdit(det, parsed, c, host, phraseMax) {
+    const markDirty = () => {
+      if (!dirtyChains.has(modalProj.dirName)) dirtyChains.set(modalProj.dirName, new Set());
+      dirtyChains.get(modalProj.dirName).add(c);
+      updateSaveBar(host);
+    };
+    const apply = (step, f, raw) => {
+      const k = c * PT.STEPS + step;
+      const s = String(raw).trim();
+      if (f === 'phrase') {
+        if (s === '' || s === '--' || s === '·') { parsed.chains[k] = PT.EMPTY; return true; }
+        const v = parseInt(s, 16);
+        if (isNaN(v) || v < 0 || v > phraseMax) return false;
+        parsed.chains[k] = v;
+      } else {
+        if (s === '' || s === '·') { parsed.transposes[k] = 0; return true; }
+        const v = parseInt(s, 10);
+        if (isNaN(v) || v < -128 || v > 127) return false;
+        parsed.transposes[k] = v & 0xFF;
+      }
+      return true;
+    };
+    det.querySelectorAll('[data-f]').forEach(cell => {
+      const begin = seed => {
+        if (cell.querySelector('input')) return;
+        const step = parseInt(cell.dataset.step, 10), f = cell.dataset.f;
+        const cur = cell.textContent.trim();
+        const inp = document.createElement('input');
+        inp.className = 'pe-edit';
+        inp.value = seed !== undefined ? seed : (cur === '--' || cur === '·' ? '' : cur);
+        cell.textContent = '';
+        cell.appendChild(inp);
+        inp.focus();
+        if (seed === undefined) inp.select();
+        let done = false;
+        const commit = () => {
+          if (done) return;
+          done = true;
+          if (inp.value.trim() !== cur) { if (apply(step, f, inp.value)) markDirty(); }
+          showChain(parsed, c, host);
+        };
+        inp.addEventListener('blur', commit);
+        inp.addEventListener('keydown', ev => {
+          ev.stopPropagation();
+          if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+          else if (ev.key === 'Escape') { ev.preventDefault(); done = true; showChain(parsed, c, host); }
+        });
+      };
+      cell.addEventListener('click', e => { e.stopPropagation(); begin(); });
+      cell.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter') { ev.preventDefault(); begin(); }
+        else if (ev.key === 'Delete' || ev.key === 'Backspace') {
+          ev.preventDefault();
+          if (apply(parseInt(cell.dataset.step, 10), cell.dataset.f, '')) markDirty();
+          showChain(parsed, c, host);
+        } else if (ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey) { ev.preventDefault(); begin(ev.key); }
+      });
+    });
   }
 
   // ── Phrase editor ──────────────────────────────────────
@@ -4738,22 +4896,31 @@ const UI = (() => {
   }
 
   function updateSaveBar(host) {
-    const n = dirtyPhrases.get(modalProj?.dirName)?.size ?? 0;
+    const d = modalProj?.dirName;
+    const nP = dirtyPhrases.get(d)?.size ?? 0;
+    const nC = dirtyChains.get(d)?.size ?? 0;
+    const gridDirty = dirtyGrid.has(d);
     let bar = host.querySelector('#pv-save-bar');
-    if (!n) { bar?.remove(); return; }
+    if (!nP && !nC && !gridDirty) { bar?.remove(); return; }
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'pv-save-bar';
       bar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 12px;background:#1f1200;border:1px solid #4a2e00;border-radius:6px;font-size:12px;color:var(--warn)';
       host.prepend(bar);
     }
-    bar.innerHTML = `<span>✎ ${n} phrase${n>1?'s':''} edited (in memory only)</span>
+    const parts = [];
+    if (gridDirty) parts.push('song grid');
+    if (nC) parts.push(`${nC} chain${nC>1?'s':''}`);
+    if (nP) parts.push(`${nP} phrase${nP>1?'s':''}`);
+    bar.innerHTML = `<span>✎ ${parts.join(' · ')} edited (in memory only)</span>
       <span style="flex:1"></span>
       <button class="btn sm" id="btn-save-edits">💾 Save edits to card</button>
       <button class="btn ghost sm" id="btn-discard-edits">Discard</button>`;
     bar.querySelector('#btn-save-edits').addEventListener('click', () => saveEdits(host));
     bar.querySelector('#btn-discard-edits').addEventListener('click', async () => {
       dirtyPhrases.delete(modalProj.dirName);
+      dirtyChains.delete(modalProj.dirName);
+      dirtyGrid.delete(modalProj.dirName);
       fullCache.delete(modalProj.dirName);
       openProjModal(modalProj.dirName);
     });
@@ -4792,9 +4959,20 @@ const UI = (() => {
       for (const f of ['notes','instr','cmd1','param1','cmd2','param2'])
         if (!same([...reread.phrases[f]], [...parsed.phrases[f]]))
           throw new Error(`verification failed: ${f} mismatch after write`);
-      const edited = dirtyPhrases.get(p.dirName);
-      logRepair(true, 'edit-phrases', `${p.name}: ${edited.size} phrase(s) edited [${[...edited].map(PT.hx2).join(' ')}] — original backed up`);
+      // the arrangement is written too, so verify it byte-for-byte as well
+      for (const f of ['grid','chains','transposes'])
+        if (!same([...reread[f]], [...parsed[f]]))
+          throw new Error(`verification failed: ${f} mismatch after write`);
+      const eP = dirtyPhrases.get(p.dirName), eC = dirtyChains.get(p.dirName);
+      const what = [
+        dirtyGrid.has(p.dirName) ? 'song grid' : null,
+        eC?.size ? `chains [${[...eC].map(PT.hx2).join(' ')}]` : null,
+        eP?.size ? `phrases [${[...eP].map(PT.hx2).join(' ')}]` : null,
+      ].filter(Boolean).join(', ');
+      logRepair(true, 'edit-song', `${p.name}: ${what} edited — original backed up`);
       dirtyPhrases.delete(p.dirName);
+      dirtyChains.delete(p.dirName);
+      dirtyGrid.delete(p.dirName);
       updateSaveBar(host);
       await persist();
       setCacheBar('Edits saved and verified — rescanning…', true);

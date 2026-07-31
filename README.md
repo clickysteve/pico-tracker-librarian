@@ -34,8 +34,8 @@ Cards that have been near a Mac collect AppleDouble junk (`._kick.wav`, `.DS_Sto
 
 - **Slice editor** — open any sample instrument's wav on a big waveform: zoom in with the scroll wheel or the −/+/Fit buttons (a full-file strip underneath shows where you are and drags to scroll), drag slice markers, double-click to add, audition slices by clicking regions or with number-key pads, auto-chop breakbeats with transient detection (adjustable sensitivity), equal-divide clean loops, and snap everything to zero-crossings. Saving rewrites just that instrument's SLnn points with the usual backup + verify + rollback.
 
-### Inspect
-- **Pattern viewer** — a full-width chain-coloured timeline, the song grid with a zoom slider and a ▶ on every row that plays that row across all 8 channels, an ordered chain list down the left (bucketed by number group, with usage counts, colours, preview and hover-to-highlight), and chain/phrase detail panels beside the grid rather than under it. Chain colours are derived from the chain number: the high nibble picks a hue family so the 00s, 10s and 20s each read as a group, while lightness strides within a group to keep neighbours distinct.
+### Arrange
+- **Pattern editor** — the song grid at full size with a ▶ on every row that plays that row across all 8 channels, an ordered chain list down the left (bucketed by number group, with usage counts, colours, preview and hover-to-highlight), and chain/phrase detail panels beside the grid. Click any grid cell to place, change or clear the chain that sits there; open a chain to edit its 16 steps (phrase and per-step transpose) in place. Arrangement edits are held in memory and written through the same backup-verify-rollback path as everything else. Chain colours are derived from the chain number: the high nibble picks a hue family so the 00s, 10s and 20s each read as a group, while lightness strides within a group to keep neighbours distinct.
 - **Project overview** — four headline cards (BPM, playback length, scale, samples) over grouped Song / Instruments / File panels, a clickable full-width song map, FX-usage and groove summaries, collapsible instrument and sample sections, grouped instrument parameters with level bars, and auditionable sample rows with one-click access to the slice editor.
 - **Compare** — diff two projects: shared/unique instruments and samples, metadata side by side.
 - **MIDI export** — download any project as a standard MIDI file (type 1, 24 PPQ, one track per channel, chain + project transpose applied, per-channel GRV groove switches and HOP flow honoured).
@@ -75,10 +75,10 @@ The entire app is a single `index.html` — deliberately, so it can be hosted an
 Tests are zero-dependency Node scripts that extract the `PT` module straight out of `index.html`:
 
 ```bash
-node tests/parser.test.mjs   # format unit tests (87: formats, MIDI timing, slice/loop units, theme writing)
+node tests/parser.test.mjs   # format unit tests (92: formats, MIDI timing, slice/loop units, theme writing)
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
 node tests/audio.test.mjs    # renders the mix offline: no clipping, correct slice offsets
-node tests/e2e.mjs           # browser end-to-end, 58 checks (needs: npm i -D playwright)
+node tests/e2e.mjs           # browser end-to-end, 70 checks (needs: npm i -D playwright)
 ```
 
 The USB mirror's font is the 8x8 Wide face and special-glyph page by nILS (public domain), as shipped in the picoTracker firmware; the firmware's other two fonts are not redistributable and are intentionally not embedded.

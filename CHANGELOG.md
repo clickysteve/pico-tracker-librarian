@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.9.2 — arrangement editing, clearer affordances
+
+- **You can edit the arrangement.** Click any song-grid cell to place,
+  change or clear the chain that sits there (type hex, `Del` to clear).
+  Open a chain and its 16 steps are editable in place: which phrase plays
+  and its per-step transpose. Saved through the same
+  backup → write → re-read → verify → rollback path as everything else,
+  now verifying the grid, chains and transposes byte-for-byte too.
+  - This needed a fix first: the song grid is a `<SONG>` element nested
+    inside the outer `<SONG>`, so the section writer's open/close search
+    matched the outer open tag against the inner close tag and spliced out
+    the whole arrangement. Now scoped strictly inside, with a test that
+    leaves the file unparseable if the naive version comes back.
+- **Play and expand no longer look alike.** Rows lead with a small
+  chevron for expand/collapse and carry labelled **▶ Play**, **▦ Patterns**
+  and **⇌ Compare** buttons. Patterns and Compare are reachable without
+  expanding the row first.
+- **The redundant timeline is gone.** It plotted channel on Y and song row
+  on X while the grid directly below plotted song row on Y and channel on
+  X — the same data with swapped axes, which is why it read wrong. The
+  grid does the job; the Overview song map remains as the at-a-glance view.
+- **The workspace opens full-size**, and the grid sizes itself to the
+  space available. The zoom slider and the Expand toggle are gone.
+- **Project detail text is bigger and lighter** — the facts row was 11px
+  in muted grey; it's now a readable set of labelled values.
+
 ## v0.9.1 — playback: distortion and dropped notes
 
 Chased with the open firmware's `SampleInstrument.cpp` as ground truth and

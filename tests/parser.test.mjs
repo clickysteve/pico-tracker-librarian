@@ -952,5 +952,65 @@ t('loopWindow clamps loop points to the decoded buffer', () => {
   eq(w.end, 2, 'loop end clamped to the 2s buffer');
 });
 
+// ── v0.9.2: arrangement editing round-trips ────────────
+// The song grid is a <SONG> element nested inside the outer <SONG>, so a
+// naive open/close search splices out the whole arrangement.
+t('rewriteSongSections round-trips an edited song grid', () => {
+  const p = PT.parseProject(buildProjectXml());
+  p.grid[0 * PT.CHANNELS + 3] = 0x05;          // put chain 05 on row 0, ch 4
+  p.grid[1 * PT.CHANNELS + 0] = PT.EMPTY;      // clear row 1, ch 1
+  const res = PT.rewriteSongSections(buildProjectXml(), p);
+  ok(res.ok, res.error);
+  const back = PT.parseProject(res.text);
+  ok(back, 'rewritten file must still parse');
+  eq(PT.gridCell(back, 0, 3), 0x05);
+  eq(PT.gridCell(back, 1, 0), PT.EMPTY);
+  eq(PT.gridCell(back, 0, 0), 0x00, 'untouched cells preserved');
+});
+t('rewriteSongSections preserves everything else when the grid changes', () => {
+  const src = buildProjectXml();
+  const p = PT.parseProject(src);
+  p.grid[7] = 0x09;
+  const back = PT.parseProject(PT.rewriteSongSections(src, p).text);
+  eq(back.tempo, p.tempo, 'project settings intact');
+  eq(back.instruments.length, p.instruments.length, 'instrument bank intact');
+  eq(back.tables.length, p.tables.length, 'tables intact');
+  eq([...back.phrases.notes].join(), [...p.phrases.notes].join(), 'phrases intact');
+  eq([...back.grooves.map(g => g.join('.'))].join(), [...p.grooves.map(g => g.join('.'))].join(), 'grooves intact');
+});
+t('rewriteSongSections round-trips edited chain steps and transposes', () => {
+  const src = buildProjectXml();
+  const p = PT.parseProject(src);
+  p.chains[0 * PT.STEPS + 2] = 0x07;                    // chain 00 step 2 -> phrase 07
+  p.transposes[0 * PT.STEPS + 2] = 0xF4;                // -12
+  p.chains[0 * PT.STEPS + 0] = PT.EMPTY;                // clear step 0
+  const res = PT.rewriteSongSections(src, p);
+  ok(res.ok, res.error);
+  const back = PT.parseProject(res.text);
+  eq(PT.chainStep(back, 0, 2).phrase, 0x07);
+  eq(PT.chainStep(back, 0, 2).transpose, -12, 'negative transpose survives the round trip');
+  eq(PT.chainStep(back, 0, 0).phrase, PT.EMPTY);
+  eq(PT.chainStep(back, 1, 0).phrase, 0x02, 'other chains untouched');
+});
+t('rewriteSongSections keeps the nested SONG structure intact', () => {
+  const src = buildProjectXml();
+  const p = PT.parseProject(src);
+  p.grid[0] = 0x04;
+  const out = PT.rewriteSongSections(src, p).text;
+  // one outer <SONG> plus one nested grid <SONG>, and matching closes
+  const opens = (out.match(/<SONG>/g) || []).length;
+  const closes = (out.match(/<\/SONG>/g) || []).length;
+  eq(opens, 2, 'outer SONG + nested grid SONG');
+  eq(closes, 2, 'both closed');
+  ok(out.includes('<CHAINS>') && out.includes('<TRANSPOSES>'), 'sibling sections survive');
+  ok(out.indexOf('<INSTRUMENTBANK') > out.indexOf('</SONG>'), 'bank still follows the song');
+});
+t('rewriteSongSections still refuses legacy 2-byte command files', () => {
+  const p = PT.parseProject(buildProjectXml());
+  p.geometry = { ...(p.geometry || {}), cmdWidth: 2 };
+  const res = PT.rewriteSongSections(buildProjectXml(), p);
+  ok(!res.ok, 'must refuse');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
