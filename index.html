@@ -695,6 +695,12 @@
     .pv-cell.chain.live { outline:2px solid var(--accent); outline-offset:-2px; }
     .pv-gutter.live .pv-rowplay { color:var(--accent); opacity:1; }
     .pv-chainrow.live { background:var(--accent-dim); }
+    .btn.on { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+    .pe-piano-cfg { display:inline-flex; align-items:center; gap:4px; font-size:10px;
+      color:var(--muted); letter-spacing:0; text-transform:none; font-weight:400; }
+    .pe-piano-cfg b { color:var(--accent); font-family:monospace; min-width:1ch; text-align:center; }
+    .pe-help-piano { background:var(--accent-dim); border:1px solid var(--accent-brd);
+      border-radius:5px; padding:7px 9px; margin-top:8px; }
     /* PICK LIST */
     .pick { position:fixed; z-index:400; width:270px; background:var(--surface);
       border:1px solid var(--accent-brd); border-radius:7px; box-shadow:0 10px 34px rgba(0,0,0,.6);
@@ -859,7 +865,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.6 Alpha</span>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.7 Alpha</span>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -3798,6 +3804,13 @@ const UI = (() => {
   const dirtyPhrases = new Map(); // dirName → Set of edited phrase indices
   const dirtyChains = new Map();  // dirName → Set of edited chain indices
   const dirtyGrid = new Set();    // dirNames whose song grid was edited
+  const isDirty = d => !!d && (dirtyGrid.has(d) ||
+    (dirtyPhrases.get(d)?.size ?? 0) > 0 || (dirtyChains.get(d)?.size ?? 0) > 0);
+  const dirtySummary = d => [
+    dirtyGrid.has(d) ? 'the song grid' : null,
+    dirtyChains.get(d)?.size ? `${dirtyChains.get(d).size} chain(s)` : null,
+    dirtyPhrases.get(d)?.size ? `${dirtyPhrases.get(d).size} phrase(s)` : null,
+  ].filter(Boolean).join(', ');
   let pvSpareRows = 8;            // blank song rows shown past the end
   let pvRowClip = null;           // copied song row (8 chain values)
   // Block selection in the song grid. A single cell is just a 1x1 block, so
@@ -3805,6 +3818,23 @@ const UI = (() => {
   let pvSel = null;               // {r0,t0,r1,t1} normalised selection
   let pvFocus = null;             // {r,t} last focused cell, survives re-render
   let pvBlockClip = null;         // {w,h,cells:[[chain,…],…]}
+  let pvUndo = [];                // arrangement undo: grid/chains/transposes snapshots
+  function pushArrUndo(parsed) {
+    pvUndo.push({
+      grid: Uint8Array.from(parsed.grid),
+      chains: Uint8Array.from(parsed.chains),
+      transposes: Uint8Array.from(parsed.transposes),
+    });
+    if (pvUndo.length > 50) pvUndo.shift();
+  }
+  function popArrUndo(parsed) {
+    const u = pvUndo.pop();
+    if (!u) return false;
+    parsed.grid.set(u.grid);
+    parsed.chains.set(u.chains);
+    parsed.transposes.set(u.transposes);
+    return true;
+  }
 
   const cacheKey = () => sd ? `card:${sd.name}` : null;
 
@@ -3863,7 +3893,7 @@ const UI = (() => {
     // keep full parses that carry unsaved edits — clearing them would
     // silently destroy work the dirty bar still advertises
     for (const k of [...fullCache.keys()])
-      if (!dirtyPhrases.has(k)) fullCache.delete(k);
+      if (!isDirty(k)) fullCache.delete(k);
     sampleNameMap = Scanner.buildSampleNameMap(lib.projects, lib.library);
     dupeNameMap = Scanner.buildInstrDupeMap(lib.ptis);
     renderHealth();
@@ -4113,16 +4143,30 @@ const UI = (() => {
     if (!p) return;
     modalProj = p;
     modalList = filteredProjects();
+    // Grid selection, focus and clipboards are per-project: carrying them
+    // across would let a Delete or a paste land on rows in a project the
+    // user never selected.
+    pvSel = null; pvFocus = null; pvBlockClip = null; pvRowClip = null; pvUndo = [];
+    peClipRow = null; peClipPhrase = null; peUndo = [];
     $('proj-modal').style.display = 'flex';
     $('modal-title').textContent = p.name;
     $('modal-meta').textContent = `${p.tempo??'—'} BPM · fw ${p.version??'?'} · ${fmtDate(p.lastModified)}`;
     const body = $('modal-body');
     body.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>Reading project…</div>';
-    let full = null;
-    try { full = await readProjectFull(p); } catch(e) { body.innerHTML = `<div class="no-results">Could not read project: ${esc(e.message||e)}</div>`; return; }
-    const parsed = full.parsed;
-    if (!parsed) { body.innerHTML = '<div class="no-results">Could not parse project file.</div>'; return; }
-    fullCache.set(p.dirName, parsed);
+    let parsed = null;
+    // Reuse the in-memory parse when it carries unsaved edits. Re-reading
+    // the card would discard them while the dirty flags survived, so the
+    // save bar would offer to "save" data that had already been thrown
+    // away — and report success.
+    if (isDirty(p.dirName) && fullCache.has(p.dirName)) {
+      parsed = fullCache.get(p.dirName);
+    } else {
+      let full = null;
+      try { full = await readProjectFull(p); } catch(e) { body.innerHTML = `<div class="no-results">Could not read project: ${esc(e.message||e)}</div>`; return; }
+      parsed = full.parsed;
+      if (!parsed) { body.innerHTML = '<div class="no-results">Could not parse project file.</div>'; return; }
+      fullCache.set(p.dirName, parsed);
+    }
     const hist = PT.detectScales(parsed);
 
     // stat strip
@@ -4385,7 +4429,15 @@ const UI = (() => {
     const next = modalList[idx + delta];
     if (next) openProjModal(next.dirName);
   }
-  function closeProjModal() { SongPlayer.stop(); $('proj-modal').style.display = 'none'; modalProj = null; }
+  function closeProjModal(force) {
+    const d = modalProj?.dirName;
+    if (!force && isDirty(d) &&
+        !confirm(`${modalProj.name} has unsaved edits (${dirtySummary(d)}).\n\nClose anyway? The edits stay in memory and the project will reopen with them, but they are not on the card.`))
+      return;
+    SongPlayer.stop();
+    $('proj-modal').style.display = 'none';
+    modalProj = null;
+  }
 
   // ── Pattern viewer ─────────────────────────────────────
   // Chains are numbered in groups on the device (00-0F, 10-1F, …) and
@@ -4438,8 +4490,9 @@ const UI = (() => {
     return chainColors[`${p.dirName}:${c}`] ?? fallback;
   }
   function renderPatterns(host, p, parsed) {
+    // An empty grid still renders: it's the only way to place a first chain
+    // in a new project, and after a Ctrl+A/Delete it's the only way back.
     const last = PT.lastSongRow(parsed);
-    if (last < 0) { host.innerHTML = '<div class="pv-hdr"><span class="pv-hdr-title">Patterns</span></div><div style="color:var(--muted);font-size:12px">Song grid is empty.</div>'; return; }
     const CH = 8;
     const chainColor = new Map();
     const chainUse = new Map();
@@ -4542,6 +4595,7 @@ const UI = (() => {
       b.addEventListener('click', e => {
         e.stopPropagation();
         if (!pvRowClip) return;
+        pushArrUndo(parsed);
         const r = parseInt(b.dataset.row, 10);
         for (let t = 0; t < CH; t++) parsed.grid[r * PT.CHANNELS + t] = pvRowClip[t];
         dirtyGrid.add(p.dirName);
@@ -4561,6 +4615,7 @@ const UI = (() => {
     const chainMax = PT.CHAIN_COUNT - 1;   // geometry carries no chain count
     const markGridDirty = () => { dirtyGrid.add(p.dirName); updateSaveBar(host); };
     const setCell = (r, t, v) => {
+      pushArrUndo(parsed);
       parsed.grid[r * PT.CHANNELS + t] = v === null ? PT.EMPTY : v;
       markGridDirty();
       renderPatterns(host, p, parsed);
@@ -4628,6 +4683,7 @@ const UI = (() => {
     };
     const pasteBlock = (r0, t0) => {
       if (!pvBlockClip) return;
+      pushArrUndo(parsed);
       for (let dr = 0; dr < pvBlockClip.h; dr++)
         for (let dt = 0; dt < pvBlockClip.w; dt++) {
           const r = r0 + dr, t = t0 + dt;
@@ -4640,6 +4696,7 @@ const UI = (() => {
     const clearBlock = () => {
       const b = selBox();
       if (!b) return;
+      pushArrUndo(parsed);
       for (let r = b.r0; r <= b.r1; r++)
         for (let t = b.t0; t <= b.t1; t++) parsed.grid[r * PT.CHANNELS + t] = PT.EMPTY;
       markGridDirty();
@@ -4665,7 +4722,8 @@ const UI = (() => {
         if (ev.key === 'ArrowDown')  return move(Math.min(shownRows - 1, r + 1), t);
         if (ev.key === 'ArrowLeft')  return move(r, Math.max(0, t - 1));
         if (ev.key === 'ArrowRight') return move(r, Math.min(CH - 1, t + 1));
-        if (ev.key === 'Escape') { ev.preventDefault(); clearSel(); return; }
+        // Escape means "drop the selection" here, not "close the project"
+        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); clearSel(); return; }
         if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'a') {
           ev.preventDefault();
           pvSel = { r0: 0, t0: 0, r1: shownRows - 1, t1: CH - 1 };
@@ -4673,6 +4731,11 @@ const UI = (() => {
           return;
         }
         if (!gridEditable) return;
+        if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'z') {
+          ev.preventDefault();
+          if (popArrUndo(parsed)) { markGridDirty(); renderPatterns(host, p, parsed); }
+          return;
+        }
         if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'c') { ev.preventDefault(); copyBlock(); return; }
         if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'v') {
           ev.preventDefault();
@@ -4796,6 +4859,7 @@ const UI = (() => {
     const apply = (step, f, raw) => {
       const k = c * PT.STEPS + step;
       const s = String(raw).trim();
+      pushArrUndo(parsed);
       if (f === 'phrase') {
         if (s === '' || s === '--' || s === '·') { parsed.chains[k] = PT.EMPTY; return true; }
         const v = parseInt(s, 16);
@@ -4826,6 +4890,7 @@ const UI = (() => {
               return { value: v, label: PT.hx2(v), hint: 'use this phrase', group: '' };
             },
             onPick: v => {
+              pushArrUndo(parsed);
               parsed.chains[c * PT.STEPS + step] = v === null ? PT.EMPTY : v;
               markDirty();
               showChain(parsed, c, host);
@@ -4857,6 +4922,7 @@ const UI = (() => {
       };
       cell.addEventListener('click', e => { e.stopPropagation(); begin(); });
       cell.addEventListener('keydown', ev => {
+        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); cell.blur(); return; }
         if (ev.key === 'Enter') { ev.preventDefault(); begin(); }
         else if (ev.key === 'Delete' || ev.key === 'Backspace') {
           ev.preventDefault();
@@ -4918,6 +4984,40 @@ const UI = (() => {
     }
     for (const c of chains)
       sec.querySelector(`.pv-chainrow[data-chain="${c}"]`)?.classList.add('live');
+  }
+
+  // ── Optional QWERTY piano entry ────────────────────────
+  // Off by default. When on, the note column takes tracker-style keyboard
+  // input: two rows of keys spanning two octaves, entry auto-advances, and
+  // the instrument is filled in from the previous note so a melody can be
+  // typed straight down the column.
+  const PIANO_KEYS = {
+    // lower octave (relative semitone from C)
+    z:0, s:1, x:2, d:3, c:4, v:5, g:6, b:7, h:8, n:9, j:10, m:11,
+    ',':12, l:13, '.':14, ';':15, '/':16,
+    // upper octave
+    q:12, 2:13, w:14, 3:15, e:16, r:17, 5:18, t:19, 6:20, y:21, 7:22, u:23,
+    i:24, 9:25, o:26, 0:27, p:28,
+  };
+  const PIANO_OFF_KEY = 'a';        // adjacent to z, unused by the layout
+  let pianoOn = localStorage.getItem('ptPiano') === '1';
+  let pianoOct = parseInt(localStorage.getItem('ptPianoOct') || '3', 10);
+  let pianoStep = parseInt(localStorage.getItem('ptPianoStep') || '1', 10);
+  const setPiano = v => { pianoOn = v; localStorage.setItem('ptPiano', v ? '1' : '0'); };
+  const setPianoOct = v => {
+    pianoOct = Math.max(0, Math.min(7, v));
+    localStorage.setItem('ptPianoOct', String(pianoOct));
+  };
+  const setPianoStep = v => {
+    pianoStep = Math.max(0, Math.min(8, v));
+    localStorage.setItem('ptPianoStep', String(pianoStep));
+  };
+  // note value for a key, or null if it isn't a piano key
+  function pianoNote(key) {
+    const k = String(key).toLowerCase();
+    if (!(k in PIANO_KEYS)) return null;
+    const v = (pianoOct + 2) * 12 + PIANO_KEYS[k];   // noteStr: octave = v/12 - 2
+    return (v >= 0 && v <= 119) ? v : null;
   }
 
   // ── Pick-list popup ────────────────────────────────────
@@ -5166,11 +5266,26 @@ const UI = (() => {
           <button class="btn ghost sm" id="btn-ph-paste" title="Paste over this phrase"${peClipPhrase ? '' : ' disabled'}>Paste</button>
           <button class="btn ghost sm" id="btn-ph-clear" title="Clear every step">Clear</button>
           <button class="btn ghost sm" id="btn-ph-undo" title="Undo the last edit"${peUndo.length ? '' : ' disabled'}>↶ Undo</button>
+          <span class="pe-sep"></span>
+          <button class="btn ghost sm${pianoOn ? ' on' : ''}" id="btn-ph-piano"
+            title="Type notes with the keyboard: z s x d c v g b h n j m for one octave, q 2 w 3 e r 5 t 6 y 7 u for the next, ${PIANO_OFF_KEY} for note-off">🎹 Piano${pianoOn ? ' on' : ''}</button>
+          ${pianoOn ? `<span class="pe-piano-cfg">
+            oct <button class="btn ghost sm" id="btn-ph-octdn" title="Octave down (also: [ )">−</button>
+            <b id="ph-oct">${pianoOct}</b>
+            <button class="btn ghost sm" id="btn-ph-octup" title="Octave up (also: ] )">+</button>
+            step <button class="btn ghost sm" id="btn-ph-stepdn" title="Smaller edit step">−</button>
+            <b id="ph-step">${pianoStep}</b>
+            <button class="btn ghost sm" id="btn-ph-stepup" title="Larger edit step">+</button>
+          </span>` : ''}
         ` : '<span style="opacity:.6;font-weight:400;letter-spacing:0;text-transform:none">read only</span>'}
         <span style="flex:1"></span>
       </div>
       <div class="pe-head"><span class="pe-i">#</span><span>note</span><span>ins</span><span>fx1</span><span>val</span><span>fx2</span><span>val</span></div>
       <div id="phrase-rows" class="pe-grid">${rows}</div>
+      ${editable && pianoOn ? `<div class="pe-help pe-help-piano">🎹 <b>Piano entry on.</b> With the cursor in the <b>note</b> column:
+        <code>z s x d c v g b h n j m</code> plays C–B in octave <b>${pianoOct}</b>,
+        <code>q 2 w 3 e r 5 t 6 y 7 u</code> the octave above, <code>${PIANO_OFF_KEY}</code> is note-off.
+        <b>[</b> and <b>]</b> change octave. Each entry fills the instrument from the step above and moves down <b>${pianoStep}</b>.</div>` : ''}
       ${editable ? `<div class="pe-help">Click a cell and type. <b>↑↓←→</b> move · <b>Enter</b> edit · <b>Del</b> clear cell ·
         <b>⌘/Ctrl+C</b> copy step · <b>⌘/Ctrl+V</b> paste step · <b>⌘/Ctrl+Z</b> undo.
         Notes take <code>C-3</code>, <code>C#4</code>, <code>OFF</code> or <code>---</code>; values are hex.
@@ -5204,15 +5319,15 @@ const UI = (() => {
         p.notes[k] = v;
       } else if (f === 'instr') {
         if (s === '--' || s === '') p.instr[k] = PT.EMPTY;
-        else { const v = parseInt(s, 16); if (isNaN(v) || v > 0xFF) return false; p.instr[k] = v; }
+        else { const v = parseInt(s, 16); if (isNaN(v) || v < 0 || v > 0xFF) return false; p.instr[k] = v; }
       } else if (f === 'cmd1' || f === 'cmd2') {
         const byName = CMD_OPTIONS.find(c => PT.cmdName(c).toLowerCase() === s.toLowerCase());
         const v = byName !== undefined ? byName : parseInt(s, 16);
-        if (isNaN(v) || v > 0xFF) return false;
+        if (isNaN(v) || v < 0 || v > 0xFF) return false;
         p[f][k] = v;
       } else {
         const v = parseInt(s || '0', 16);
-        if (isNaN(v) || v > 0xFFFF) return false;
+        if (isNaN(v) || v < 0 || v > 0xFFFF) return false;
         p[f][k] = v;
       }
       return true;
@@ -5325,6 +5440,39 @@ const UI = (() => {
           markDirty(); rerender(); focusCell();
           return;
         }
+        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); cell.blur(); return; }
+        // Piano entry: only in the note column, only when switched on, and
+        // never while a modifier is held (so ⌘C/⌘V/⌘Z still work).
+        if (pianoOn && f === 'note' && !mod && !ev.altKey) {
+          if (ev.key === '[' || ev.key === ']') {
+            ev.preventDefault();
+            setPianoOct(pianoOct + (ev.key === ']' ? 1 : -1));
+            rerender(); focusCell();
+            return;
+          }
+          const isOff = ev.key.toLowerCase() === PIANO_OFF_KEY;
+          const nv = isOff ? PT.NOTE_OFF : pianoNote(ev.key);
+          if (nv !== null) {
+            ev.preventDefault();
+            pushUndo();
+            const k = peKey(ph, step), pb = parsed.phrases;
+            pb.notes[k] = nv;
+            // carry the instrument down from the nearest note above, the
+            // way a tracker does, so a melody needs one column not two
+            if (!isOff && pb.instr[k] === PT.EMPTY) {
+              for (let up = step - 1; up >= 0; up--) {
+                const iv = pb.instr[peKey(ph, up)];
+                if (iv !== PT.EMPTY) { pb.instr[k] = iv; break; }
+              }
+              if (pb.instr[k] === PT.EMPTY && parsed.instruments.length)
+                pb.instr[k] = parsed.instruments[0].id;
+            }
+            markDirty();
+            if (pianoStep > 0) peCursor.step = Math.min(PT.STEPS - 1, step + pianoStep);
+            rerender(); focusCell();
+            return;
+          }
+        }
         switch (ev.key) {
           case 'ArrowUp':    ev.preventDefault(); peCursor.step = Math.max(0, step - 1); focusCell(); break;
           case 'ArrowDown':  ev.preventDefault(); peCursor.step = Math.min(PT.STEPS - 1, step + 1); focusCell(); break;
@@ -5404,6 +5552,14 @@ const UI = (() => {
       markDirty();
       rerender();
     });
+    det.querySelector('#btn-ph-piano').addEventListener('click', () => {
+      setPiano(!pianoOn);
+      rerender(); focusCell();
+    });
+    det.querySelector('#btn-ph-octdn')?.addEventListener('click', () => { setPianoOct(pianoOct - 1); rerender(); focusCell(); });
+    det.querySelector('#btn-ph-octup')?.addEventListener('click', () => { setPianoOct(pianoOct + 1); rerender(); focusCell(); });
+    det.querySelector('#btn-ph-stepdn')?.addEventListener('click', () => { setPianoStep(pianoStep - 1); rerender(); focusCell(); });
+    det.querySelector('#btn-ph-stepup')?.addEventListener('click', () => { setPianoStep(pianoStep + 1); rerender(); focusCell(); });
     det.querySelector('#btn-ph-undo').addEventListener('click', () => {
       const u = peUndo.pop();
       if (!u) return;
@@ -5447,6 +5603,7 @@ const UI = (() => {
       <button class="btn ghost sm" id="btn-discard-edits">Discard</button>`;
     bar.querySelector('#btn-save-edits').addEventListener('click', () => saveEdits(host));
     bar.querySelector('#btn-discard-edits').addEventListener('click', async () => {
+      if (!confirm(`Discard ${dirtySummary(modalProj.dirName)} in ${modalProj.name}?\n\nThis cannot be undone.`)) return;
       dirtyPhrases.delete(modalProj.dirName);
       dirtyChains.delete(modalProj.dirName);
       dirtyGrid.delete(modalProj.dirName);
@@ -5455,7 +5612,9 @@ const UI = (() => {
     });
   }
 
+  let saveInFlight = false;
   async function saveEdits(host) {
+    if (saveInFlight) return;                 // double-click must not run two passes
     const p = modalProj;
     const parsed = p && fullCache.get(p.dirName);
     if (!p || !parsed) {
@@ -5464,11 +5623,14 @@ const UI = (() => {
       return;
     }
     if (!await ensureWrite()) return;
+    saveInFlight = true;
+    const saveBtn = host.querySelector('#btn-save-edits');
+    if (saveBtn) saveBtn.disabled = true;
     const bar = host.querySelector('#pv-save-bar');
-    const setBar = msg => { if (bar) bar.firstElementChild.textContent = msg; };
+    const setBar = msg => { if (bar && bar.firstElementChild) bar.firstElementChild.textContent = msg; };
     const projPath = `projects/${p.dirName}`;
     const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    let backedUp = false, original = null;
+    let backedUp = false, original = null, committed = false;
     try {
       const { file: curFile, bytes: curBytes, text } = await readCardFileForEdit(projPath, p.datName);
       if (curFile.lastModified !== p.lastModified || curFile.size !== p.fileSize)
@@ -5498,6 +5660,7 @@ const UI = (() => {
         eC?.size ? `chains [${[...eC].map(PT.hx2).join(' ')}]` : null,
         eP?.size ? `phrases [${[...eP].map(PT.hx2).join(' ')}]` : null,
       ].filter(Boolean).join(', ');
+      committed = true;   // past this point the card holds a verified good file
       logRepair(true, 'edit-song', `${p.name}: ${what} edited — original backed up`);
       dirtyPhrases.delete(p.dirName);
       dirtyChains.delete(p.dirName);
@@ -5511,11 +5674,23 @@ const UI = (() => {
       modalProj = projByDir(p.dirName) ?? modalProj;
       fullCache.set(p.dirName, parsed);
     } catch(e) {
-      logRepair(false, 'edit-phrases', `${p.name}: ${e.message || e}`);
-      if (backedUp && original !== null) {
-        try { await writeCardFile(projPath, p.datName, original); setBar(`Failed: ${e.message || e} — original restored`); }
-        catch { setBar(`Failed: ${e.message || e} — RESTORE FAILED, backup at PTLibrarian_Backups/${stamp}/`); }
-      } else setBar(`Failed: ${e.message || e} (nothing written)`);
+      // Only roll back if the failure happened before the write verified.
+      // Afterwards the card is correct and reverting would destroy a good
+      // save over, say, a rendering error in the tail.
+      if (committed) {
+        logRepair(false, 'edit-song', `${p.name}: saved OK but post-save step failed: ${e.message || e}`);
+        setCacheBar(`Saved, but refreshing the view failed: ${e.message || e}`, false);
+      } else {
+        logRepair(false, 'edit-song', `${p.name}: ${e.message || e}`);
+        if (backedUp && original !== null) {
+          try { await writeCardFile(projPath, p.datName, original); setBar(`Failed: ${e.message || e} — original restored`); }
+          catch { setBar(`Failed: ${e.message || e} — RESTORE FAILED, backup at PTLibrarian_Backups/${stamp}/`); }
+        } else setBar(`Failed: ${e.message || e} (nothing written)`);
+      }
+    } finally {
+      saveInFlight = false;
+      const b = host.querySelector('#btn-save-edits');
+      if (b) b.disabled = false;
     }
   }
 
@@ -7673,6 +7848,10 @@ const UI = (() => {
     });
 
     // Keyboard
+    window.addEventListener('beforeunload', e => {
+      const any = dirtyGrid.size || dirtyPhrases.size || dirtyChains.size;
+      if (any) { e.preventDefault(); e.returnValue = ''; }
+    });
     document.addEventListener('keydown', e => {
       const inInput = /^(input|select|textarea)$/i.test(e.target.tagName);
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); lib && openSearch(); return; }

@@ -18,9 +18,22 @@ const check = (name, cond) => {
   else { fail++; console.error(`  FAIL ${name}`); }
 };
 
+// Escape inside an editor clears the selection rather than closing the
+// project, so close the workspace explicitly.
+const closeProjectModal = async () => {
+  await page.evaluate(() => {
+    const m = document.getElementById('proj-modal');
+    if (m && m.style.display !== 'none') document.getElementById('btn-modal-close').click();
+    document.getElementById('slice-modal')?.style?.display === 'flex' && document.getElementById('btn-slice-close').click();
+  });
+  await page.waitForTimeout(250);
+};
+
 const errors = [];
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+// The app now confirms destructive/unsaved-work actions; accept them all.
+page.on('dialog', d => d.accept());
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
 await page.goto('file://' + join(root, 'index.html'));
@@ -184,7 +197,7 @@ await page.click('#btn-save-edits');
 await page.waitForTimeout(2000);
 // reopen the same project fresh and confirm the edit persisted in the (in-memory) card
 const firstProj = await page.evaluate(() => document.querySelector('.proj-item')?.dataset.proj);
-await page.keyboard.press('Escape');
+await closeProjectModal();
 await page.waitForTimeout(300);
 await page.evaluate(() => document.querySelector('.proj-item .proj-row')?.click());
 await page.waitForTimeout(200);
@@ -244,7 +257,7 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(250);
 check('chain: phrase column opens a pick list', await page.evaluate(() => !!document.querySelector('.pick')));
-await page.keyboard.press('Escape');
+await page.keyboard.press('Escape');          // dismiss the picker, not the project
 await page.waitForTimeout(150);
 await page.evaluate(() => {
   const c = document.querySelector('.pv-cstep [data-f="transpose"]');
@@ -263,7 +276,7 @@ await page.click('#btn-save-edits');
 await page.waitForTimeout(2500);
 check('arrangement: save cleared the dirty bar', await page.evaluate(() =>
   !document.getElementById('pv-save-bar')));
-await page.keyboard.press('Escape');
+await closeProjectModal();
 await page.waitForTimeout(300);
 await page.evaluate(() => document.querySelector('.proj-item .proj-row')?.click());
 await page.waitForTimeout(200);
@@ -344,7 +357,7 @@ await page.evaluate(() => {
 await page.waitForTimeout(150);
 check('picker: an unlisted value can still be chosen', await page.evaluate(() =>
   [...document.querySelectorAll('.pick-item .pick-lbl')].some(n => n.textContent.trim() === 'A4')));
-await page.keyboard.press('Escape');
+await page.keyboard.press('Escape');          // dismiss the picker, not the project
 await page.waitForTimeout(150);
 
 // block selection: shift+arrows mark a range, which copies/pastes/clears
@@ -396,10 +409,191 @@ await page.waitForTimeout(80);
 check('select: Esc clears the selection', await page.evaluate(() =>
   document.querySelectorAll('.pv-cell.sel').length === 0));
 
+// ── 7a2b. optional QWERTY piano entry ───────────────────
+// open a chain, then a phrase inside it, so the phrase editor is on screen
+await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
+await page.waitForTimeout(300);
+await page.evaluate(() => document.querySelector('.pv-cstep .cgo:not(.off)')?.click());
+await page.waitForTimeout(350);
+check('piano: off by default with a toggle offered', await page.evaluate(() => {
+  const b = document.getElementById('btn-ph-piano');
+  return !!b && !b.classList.contains('on');
+}));
+await page.click('#btn-ph-piano');
+await page.waitForTimeout(250);
+check('piano: toggling on shows the octave and step controls', await page.evaluate(() =>
+  document.getElementById('btn-ph-piano').classList.contains('on') &&
+  !!document.getElementById('ph-oct') && !!document.getElementById('ph-step')));
+// type a melody down the note column: z=C, x=D, c=E at the current octave
+const beforeOct = await page.evaluate(() => +document.getElementById('ph-oct').textContent);
+await page.evaluate(async () => {
+  const press = k => {
+    const c = document.querySelector('.pe-row.cur .pe-c[data-f="note"]')
+           || document.querySelector('.pe-row[data-step="0"] .pe-c[data-f="note"]');
+    c.focus();
+    c.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+  };
+  const first = document.querySelector('.pe-row[data-step="0"] .pe-c[data-f="note"]');
+  first.focus();
+  first.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', bubbles: true }));
+  await new Promise(r => setTimeout(r, 120));
+  press('x');
+  await new Promise(r => setTimeout(r, 120));
+  press('c');
+  await new Promise(r => setTimeout(r, 120));
+});
+await page.waitForTimeout(300);
+const typed = await page.evaluate(() => [0,1,2].map(i =>
+  document.querySelector(`.pe-row[data-step="${i}"] .pe-note`)?.textContent.trim()));
+check('piano: typing z x c enters C, D and E on consecutive steps',
+  typed[0] === `C-${beforeOct}` && typed[1] === `D-${beforeOct}` && typed[2] === `E-${beforeOct}`);
+check('piano: the instrument is carried down with the notes', await page.evaluate(() =>
+  [0,1,2].every(i => {
+    const t = document.querySelector(`.pe-row[data-step="${i}"] .pe-instr`)?.textContent.trim();
+    return t && t !== '--';
+  })));
+// octave keys
+await page.evaluate(() => {
+  const c = document.querySelector('.pe-row[data-step="0"] .pe-c[data-f="note"]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true }));
+});
+await page.waitForTimeout(250);
+check('piano: ] raises the octave', await page.evaluate(o =>
+  +document.getElementById('ph-oct').textContent === o + 1, beforeOct));
+// note-off, and modifiers must still reach the editor rather than the piano
+await page.evaluate(() => {
+  const c = document.querySelector('.pe-row[data-step="4"] .pe-c[data-f="note"]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+});
+await page.waitForTimeout(250);
+check('piano: a enters a note-off', await page.evaluate(() =>
+  document.querySelector('.pe-row[data-step="4"] .pe-note')?.textContent.trim() === 'OFF'));
+await page.evaluate(() => {
+  const c = document.querySelector('.pe-row[data-step="0"] .pe-c[data-f="note"]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));
+});
+await page.waitForTimeout(250);
+check('piano: Cmd+Z still undoes rather than typing a note', await page.evaluate(() =>
+  document.querySelector('.pe-row[data-step="4"] .pe-note')?.textContent.trim() !== 'OFF'));
+await page.click('#btn-ph-piano');     // back off for the rest of the run
+await page.waitForTimeout(250);
+check('piano: toggles back off', await page.evaluate(() =>
+  !document.getElementById('btn-ph-piano').classList.contains('on')));
+
+// ── 7a3. unsaved edits must survive navigation ──────────
+// Regression guards. Previously: Escape inside an editor closed the
+// project; reopening it re-read the card and threw the edits away while
+// the dirty flags survived, so Save wrote the ORIGINAL bytes back and
+// reported "saved and verified" — with a false line in the on-card audit
+// log. Selection and clipboards also leaked between projects.
+await page.evaluate(() => {
+  const c = document.querySelector('.pv-cell.empty[data-row]') || document.querySelector('.pv-cell[data-row]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+});
+await page.waitForTimeout(200);
+check('safety: Escape in the grid does not close the project', await page.evaluate(() =>
+  document.getElementById('proj-modal').style.display !== 'none'));
+// make an edit, leave the project, come back: it must still be there
+const dirtyBefore = await page.evaluate(() => {
+  const cell = document.querySelector('.pv-cell.empty[data-row]');
+  return cell ? { row: cell.dataset.row, ch: cell.dataset.ch } : null;
+});
+if (dirtyBefore) {
+  await page.evaluate(sel => {
+    const c = document.querySelector(`.pv-cell[data-row="${sel.row}"][data-ch="${sel.ch}"]`);
+    c.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    c.focus();
+    c.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+  }, dirtyBefore);
+  await page.waitForTimeout(250);
+}
+// clear a specific populated cell and remember exactly which one
+const clearedCell = await page.evaluate(() => {
+  const c = document.querySelector('.pv-cell.chain[data-row]');
+  const at = { row: c.dataset.row, ch: c.dataset.ch };
+  c.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+  return at;
+});
+await page.waitForTimeout(300);
+check('safety: clearing a cell marks the project dirty',
+  await page.evaluate(() => !!document.getElementById('pv-save-bar')));
+check('safety: the cell really cleared', await page.evaluate(at =>
+  document.querySelector(`.pv-cell[data-row="${at.row}"][data-ch="${at.ch}"]`)
+    ?.classList.contains('empty'), clearedCell));
+const projName = await page.evaluate(() => document.getElementById('modal-title').textContent);
+await closeProjectModal();
+await page.waitForTimeout(300);
+await page.evaluate(nm => {
+  const row = [...document.querySelectorAll('.proj-item')].find(r => r.textContent.includes(nm));
+  row?.querySelector('.btn-det-open')?.click();
+}, projName);
+await page.waitForTimeout(900);
+await page.click('#btn-modal-patterns');
+await page.waitForTimeout(500);
+// The dirty flag alone proves nothing — it survived the old bug too, which
+// is what made the bug silent. Assert the EDITED DATA came back.
+check('safety: unsaved edits survive closing and reopening the project',
+  await page.evaluate(at =>
+    !!document.getElementById('pv-save-bar') &&
+    document.querySelector(`.pv-cell[data-row="${at.row}"][data-ch="${at.ch}"]`)
+      ?.classList.contains('empty'), clearedCell));
+// undo puts it back
+await page.evaluate(() => {
+  const c = document.querySelector('.pv-cell[data-row]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));
+});
+await page.waitForTimeout(300);
+check('safety: the song grid has undo', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cell.chain').length > 0));
+// selection must not follow us to another project
+await page.evaluate(() => {
+  const c = document.querySelector('.pv-cell[data-row="0"][data-ch="0"]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }));
+});
+await page.waitForTimeout(150);
+await page.evaluate(() => document.getElementById('btn-modal-next').click());
+await page.waitForTimeout(1000);
+await page.click('#btn-modal-patterns');
+await page.waitForTimeout(400);
+check('safety: selection does not leak into the next project', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cell.sel').length === 0));
+// an emptied grid must still be editable, not a dead end
+await page.evaluate(() => {
+  const c = document.querySelector('.pv-cell[data-row]');
+  if (!c) return;
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true }));
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+});
+await page.waitForTimeout(400);
+check('safety: an emptied grid stays editable', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cell[data-row]').length > 0));
+check('safety: an emptied grid still offers save/discard', await page.evaluate(() =>
+  !!document.getElementById('pv-save-bar')));
+await page.evaluate(() => {
+  const c = document.querySelector('.pv-cell[data-row]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));
+});
+await page.waitForTimeout(300);
+await page.evaluate(() => {
+  const bar = document.getElementById('pv-save-bar');
+  bar?.querySelector('#btn-discard-edits')?.click();
+});
+await page.waitForTimeout(1200);
+
 // ── 7b. sliced playback uses the wav's own sample rate ──
 // Must run BEFORE the slicer test below, which overwrites Night Bass's
 // markers with 8 equal divisions.
-await page.keyboard.press('Escape');
+await closeProjectModal();
 await page.click('.tab-btn[data-tab="projects"]');
 await page.waitForTimeout(300);
 // scope to NIGHTDRIVE's own row: other rows may still be expanded from
@@ -435,11 +629,10 @@ check('player: no slice starts past the end of its buffer',
   sliceStarts.every(s => s.offset < s.bufDur));
 await page.click('#btn-modal-play');
 await page.waitForTimeout(200);
-await page.keyboard.press('Escape');
+await closeProjectModal();
 await page.waitForTimeout(200);
 
 // ── 8. slice editor on the demo card ───────────────────
-await page.keyboard.press('Escape');
 await page.click('.tab-btn[data-tab="instruments"]');
 await page.waitForTimeout(300);
 // find the Night Bass row (has slices + sample present)
@@ -492,7 +685,7 @@ const slicesAfter = await page.evaluate(() => {
 check('slicer: 7 markers persisted to card (8 slices)', slicesAfter === 7);
 
 // ── 8b. chain preview + unused-pool trash on the demo card ─
-await page.keyboard.press('Escape');
+await closeProjectModal();
 await page.click('.tab-bin, .tab-btn[data-tab="projects"]').catch(() => {});
 await page.click('.tab-btn[data-tab="projects"]');
 await page.waitForTimeout(300);
@@ -563,7 +756,7 @@ check('patterns: row trigger started playback', await page.evaluate(() => {
 }));
 await page.evaluate(() => { const b = document.querySelector('.pv-rowplay'); if (b.textContent === '■') b.click(); });
 await page.waitForTimeout(200);
-await page.keyboard.press('Escape');
+await closeProjectModal();
 await page.click('.tab-btn[data-tab="problems"]');
 await page.waitForTimeout(200);
 await page.evaluate(() => document.querySelector('[data-psec="unusedpool"]').click());
@@ -597,7 +790,6 @@ await page.click('.btn-trash-one');
 await page.waitForTimeout(2200);
 await page.evaluate(() => document.querySelector('[data-psec="trash"]').click());
 await page.waitForTimeout(600);
-page.once('dialog', d => d.accept());
 await page.click('.btn-trash-del');
 await page.waitForTimeout(1200);
 check('trash: permanent delete removes the file', await page.evaluate(() =>

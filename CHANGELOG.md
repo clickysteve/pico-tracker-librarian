@@ -1,5 +1,53 @@
 # Changelog
 
+## v0.9.7 — data-loss fixes, arrangement undo, optional piano entry
+
+Two independent reviews of the editor found the same cluster of data-loss
+bugs. These were live in 0.9.2–0.9.6. If you edited an arrangement in
+those versions, check your projects against your backups.
+
+- **Reopening a project destroyed its unsaved edits, then reported saving
+  them.** `openProjModal` always re-read the card and replaced the cached
+  parse, but the dirty flags survived — so the save bar still offered to
+  save, and Save wrote the *original* bytes back, verified them
+  successfully, and wrote a line into the on-card audit log describing an
+  edit that never happened. The cached parse is now kept whenever it holds
+  unsaved work.
+- **Escape closed the project.** In the song grid it cleared the selection
+  and then bubbled to the global handler, which closed the modal, straight
+  into the bug above; in the phrase and chain editors it closed the modal
+  outright. Escape now stays inside the editor, and closing a project with
+  unsaved edits asks first. Closing the tab does too.
+- **Selection, focus and clipboards leaked between projects.** A block
+  selected in one project stayed selected, and focused, after navigating to
+  the next — so `Delete` could wipe rows in a project you never touched,
+  and paste could write one song's chain numbers into another's. All
+  per-project editor state resets on project switch.
+- **Any rescan discarded grid-only and chain-only edits**, because the
+  guard checked only `dirtyPhrases`. Saving slices, restoring from trash or
+  pressing Rescan silently lost arrangement work.
+- **Emptying the grid removed the editor.** `Ctrl+A` then `Delete` left a
+  static "Song grid is empty" message with no save, no discard and no way
+  back — and no way to place a first chain in a new project either.
+- **Undo for the arrangement.** The song grid and chain editor had none;
+  `Ctrl+Z` now steps back through 50 changes to the grid, chains and
+  transposes. **Discard** now says what it is about to throw away.
+- **Rollback no longer reverts a good save.** The rollback window covered
+  the whole save, including steps after verification succeeded, so a
+  failure while refreshing the view would have reverted a correct write.
+- **Save ignores a second click** while one is in flight.
+- Instrument and FX fields rejected values above range but not below;
+  `-1` wrapped to `0xFF` and wrote an undefined command to the card.
+
+New:
+
+- **Optional QWERTY piano entry** in the phrase editor, off by default.
+  `z s x d c v g b h n j m` plays C–B, `q 2 w 3 e r 5 t 6 y 7 u` the octave
+  above, `a` is note-off, `[` and `]` change octave. Each entry carries the
+  instrument down from the step above and advances by a configurable edit
+  step, so a melody is typed down one column. Modifier combinations still
+  reach the editor, so `⌘Z` undoes rather than typing a note.
+
 ## v0.9.6 — block selection, real delete, experimental warning
 
 - **Block selection in the pattern editor.** Shift+arrows or shift+click
