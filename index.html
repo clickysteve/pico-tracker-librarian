@@ -143,21 +143,22 @@
     /* PROJECTS — LIST ROWS */
     .proj-item { border-bottom:1px solid var(--border); }
     .proj-row { display:grid;
-      grid-template-columns:14px minmax(140px,1fr) 64px 60px 60px 70px 86px 90px auto;
+      grid-template-columns:16px auto minmax(0,1fr) 64px 60px 60px 70px 86px 90px;
       align-items:center; gap:0 12px; padding:9px 20px;
       cursor:pointer; user-select:none; transition:background .1s; }
     /* Row actions: a small chevron means expand, a labelled ▶ Play means
        preview. The two affordances never share a shape. */
-    .p-actions { display:flex; gap:6px; justify-self:end; opacity:0; transition:opacity .12s; }
+    /* sit immediately after the project name, not stranded at the far right */
+    .p-actions { display:flex; gap:6px; justify-self:start; opacity:0; transition:opacity .12s; }
     .proj-row:hover .p-actions, .proj-item.open .p-actions { opacity:1; }
     .p-actions .btn { white-space:nowrap; }
     .proj-play.playing { border-color:var(--accent); color:var(--accent); }
     @media (max-width:1200px) { .p-actions { opacity:1; } }
     .proj-row:hover { background:var(--surface); }
     .proj-item.open .proj-row { background:var(--surface); }
-    .p-chev { color:var(--muted); transition:transform .15s; font-size:9px; }
+    .p-chev { color:var(--muted); transition:transform .15s; font-size:13px; line-height:1; }
     .proj-item.open .p-chev { transform:rotate(90deg); }
-    .p-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .p-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:34ch; }
     .p-meta { font-size:11px; color:var(--muted); white-space:nowrap; }
     .p-auto { font-size:9px; color:var(--warn); border:1px solid #4a2e00; background:#1f1200;
       padding:1px 5px; border-radius:3px; margin-left:6px; vertical-align:middle; }
@@ -273,7 +274,7 @@
       cursor:pointer; user-select:none; transition:background .1s; }
     .instr-row:hover { background:var(--surface); }
     .instr-item.open .instr-row { background:var(--surface); }
-    .i-chev  { color:var(--muted); transition:transform .15s; font-size:9px; }
+    .i-chev  { color:var(--muted); transition:transform .15s; font-size:13px; line-height:1; }
     .instr-item.open .i-chev { transform:rotate(90deg); }
     .i-lname { font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .i-src { font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -324,7 +325,7 @@
       background:var(--surface2); border-bottom:1px solid var(--border);
       cursor:pointer; user-select:none; padding:7px 20px; transition:background .1s; }
     .grp-hdr:hover { background:#24292d; }
-    .grp-chev { font-size:9px; color:var(--muted); transition:transform .15s; flex-shrink:0; }
+    .grp-chev { font-size:12px; color:var(--muted); transition:transform .15s; flex-shrink:0; line-height:1; }
     .grp.open > .grp-hdr .grp-chev { transform:rotate(90deg); }
     .grp-name { font-size:11px; font-weight:600; letter-spacing:.3px; color:var(--muted); flex:1; }
     .grp-cnt  { font-size:11px; color:var(--border2); }
@@ -535,7 +536,7 @@
       line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .ov-hero-k { font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
       color:var(--muted); margin-top:3px; }
-    .ov-hero-sub { font-size:10px; color:var(--border2); margin-top:2px;
+    .ov-hero-sub { font-size:12px; color:var(--muted); margin-top:3px;
       overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .ov-panels { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; }
     .ov-panel { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 11px; }
@@ -548,7 +549,7 @@
     .ov-line b.badv { color:var(--c-miss); }
     .ov-fold { cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; }
     .ov-fold:hover { color:var(--accent); }
-    .ov-chev { display:inline-block; font-size:8px; transition:transform .12s; transform:rotate(-90deg); }
+    .ov-chev { display:inline-block; font-size:11px; transition:transform .12s; transform:rotate(-90deg); }
     .ov-fold.open .ov-chev { transform:none; }
     .ichip-slice { margin-left:5px; cursor:pointer; color:var(--muted); font-size:11px;
       padding:0 2px; border-radius:3px; }
@@ -567,12 +568,13 @@
     .pv-hdr { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
     .pv-hdr-title { font-size:10px; font-weight:700; letter-spacing:1.5px;
       text-transform:uppercase; color:var(--muted); flex:1; }
-    .pv-grid-wrap { overflow-x:auto; overflow-y:auto; padding-bottom:4px; max-height:74vh; min-width:0; }
+    /* room between the last channel column and the scrollbar */
+    .pv-grid-wrap { overflow-x:auto; overflow-y:auto; padding:0 18px 6px 0; max-height:74vh; min-width:0; }
     .pv-grid-wrap::-webkit-scrollbar { width:4px; height:4px; }
     .pv-grid-wrap::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
     .pv-grid { display:grid; gap:1px; width:max-content; }
     /* chain list | song grid | detail panels, side by side */
-    .pv-body { display:grid; grid-template-columns:auto auto minmax(280px,1fr); gap:16px; align-items:start; }
+    .pv-body { display:grid; grid-template-columns:auto auto minmax(280px,1fr); gap:16px 26px; align-items:start; }
     @media (max-width:1100px) { .pv-body { grid-template-columns:auto 1fr; }
       .pv-side { grid-column:1/-1; } }
     .pv-side { min-width:0; position:sticky; top:0; max-height:74vh; overflow-y:auto; }
@@ -581,11 +583,16 @@
     .pv-side .pv-detail { max-height:none; }
     .pv-side-hint { font-size:11px; color:var(--muted); background:var(--surface2);
       border:1px dashed var(--border2); border-radius:6px; padding:14px; line-height:1.6; }
-    .pv-rowplay { display:flex; align-items:center; justify-content:center; cursor:pointer;
-      color:var(--border2); font-size:9px; border-radius:3px; user-select:none;
-      height:var(--pvh,22px); }
-    .pv-rowplay:hover { color:var(--accent); background:var(--accent-dim); }
-    .pv-rowplay.playing { color:var(--accent); background:var(--accent-dim); }
+    .pv-gutter { display:flex; align-items:center; gap:3px; height:var(--pvh,32px); }
+    .pv-gutter > span { cursor:pointer; color:var(--border2); font-size:10px; border-radius:3px;
+      user-select:none; padding:2px 3px; opacity:.45; transition:opacity .1s; }
+    .pv-grid:hover .pv-gutter > span { opacity:1; }
+    .pv-gutter > span:hover { color:var(--accent); background:var(--accent-dim); }
+    .pv-rowplay.playing { color:var(--accent); background:var(--accent-dim); opacity:1; }
+    /* rows past the end of the song: available, but visibly not part of it */
+    .pv-cell.spare { opacity:.4; }
+    .pv-cell.rlbl.spare { opacity:.3; }
+    .pv-cell.empty.spare:hover { opacity:1; }
     .pv-chaingroup { font-size:8px; font-weight:700; letter-spacing:1px; color:var(--border2);
       padding:5px 6px 2px; text-transform:uppercase; }
     .pv-chainlist { flex-shrink:0; display:flex; flex-direction:column; gap:2px;
@@ -653,6 +660,30 @@
     .pv-pstep .pn.empty { color:var(--border2); font-weight:400; }
     .pv-pstep .pv2 { color:var(--muted); }
     .pv-pstep .pfx { color:var(--c-mid); }
+    /* PICK LIST */
+    .pick { position:fixed; z-index:400; width:270px; background:var(--surface);
+      border:1px solid var(--accent-brd); border-radius:7px; box-shadow:0 10px 34px rgba(0,0,0,.6);
+      display:flex; flex-direction:column; overflow:hidden; }
+    .pick-filter { border:none; border-bottom:1px solid var(--border); background:var(--surface2);
+      color:var(--text); font-size:12px; padding:8px 10px; outline:none; font-family:monospace; }
+    .pick-list { max-height:300px; overflow-y:auto; }
+    .pick-list::-webkit-scrollbar { width:5px; }
+    .pick-list::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+    .pick-group { font-size:9px; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
+      padding:7px 10px 3px; }
+    .pick-group:empty { display:none; padding:0; }
+    .pick-item { display:flex; align-items:center; gap:8px; padding:5px 10px; cursor:pointer; font-size:12px; }
+    .pick-item.on { background:var(--accent-dim); }
+    .pick-item:hover { background:var(--surface2); }
+    .pick-dot { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+    .pick-dot.blank { background:transparent; }
+    .pick-lbl { font-family:monospace; color:var(--text); flex:1;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .pick-hint { font-size:10px; color:var(--muted); flex-shrink:0; }
+    .pick-none { padding:10px; font-size:11px; color:var(--muted); }
+    .pick-foot { border-top:1px solid var(--border); padding:5px 10px; font-size:9.5px; color:var(--muted); }
+    .pick-foot b { color:var(--text); }
+
     /* PHRASE EDITOR */
     .pe-sep { width:1px; height:16px; background:var(--border2); }
     .pe-head, .pe-row { display:grid; grid-template-columns:24px 58px 34px 62px 50px 62px 50px;
@@ -793,7 +824,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.2 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.3 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -3712,6 +3743,8 @@ const UI = (() => {
   const dirtyPhrases = new Map(); // dirName → Set of edited phrase indices
   const dirtyChains = new Map();  // dirName → Set of edited chain indices
   const dirtyGrid = new Set();    // dirNames whose song grid was edited
+  let pvSpareRows = 8;            // blank song rows shown past the end
+  let pvRowClip = null;           // copied song row (8 chain values)
 
   const cacheKey = () => sd ? `card:${sd.name}` : null;
 
@@ -3869,17 +3902,17 @@ const UI = (() => {
         <div class="proj-row" title="Click to expand this project">
           <span class="p-chev" aria-hidden="true">▸</span>
           <span class="p-name">${esc(p.name)}${p.autosaveNewer?'<span class="p-auto">autosave</span>':''}${lib.currentProject===p.dirName?' <span style="color:var(--accent);font-size:10px" title="last project opened on the device (.current)">●</span>':''}</span>
+          <span class="p-actions">
+            <button class="btn ghost sm proj-play" data-proj="${esc(p.dirName)}" title="Preview this project in the browser">▶ Play</button>
+            <button class="btn ghost sm proj-patterns" title="Open the full-screen workspace on the Patterns tab">▦ Patterns</button>
+            <button class="btn ghost sm proj-compare" title="Compare this project with another">⇌ Compare</button>
+          </span>
           <span class="p-meta">${p.tempo??'—'} BPM</span>
           <span class="p-meta">${p.instruments.length} inst</span>
           <span class="p-meta">${p.pool.length} smp</span>
           <span class="p-meta">${fmtBytes(p.poolBytes)}</span>
           <span class="p-meta">${fmtDate(p.lastModified)}</span>
           ${missBadge(p, 'p-miss')}
-          <span class="p-actions">
-            <button class="btn ghost sm proj-play" data-proj="${esc(p.dirName)}" title="Preview this project in the browser">▶ Play</button>
-            <button class="btn ghost sm proj-patterns" title="Open the full-screen workspace on the Patterns tab">▦ Patterns</button>
-            <button class="btn ghost sm proj-compare" title="Compare this project with another">⇌ Compare</button>
-          </span>
         </div>
         <div class="proj-detail"></div>
       </div>`, host2 => {
@@ -4354,20 +4387,32 @@ const UI = (() => {
     // Song grid table — column tracks follow the zoom var (a fixed 30px
     // here was why cells clipped their text at larger zoom levels). The
     // leading ▶ column plays that whole song row across all 8 channels.
-    let grid = `<div class="pv-grid" style="grid-template-columns:18px repeat(${CH+1},var(--pvw,44px))">`;
+    // Show spare rows past the end of the song so the arrangement can be
+    // extended in place — the device has room for far more than most songs
+    // use, and there was no way to reach it.
+    const maxRows = parsed.geometry?.songRows ?? PT.SONG_ROWS;
+    const shownRows = Math.min(maxRows, last + 1 + pvSpareRows);
+    let grid = `<div class="pv-grid" style="grid-template-columns:52px repeat(${CH+1},var(--pvw,44px))">`;
     grid += `<div class="pv-cell clbl"></div><div class="pv-cell clbl"></div>`;
     for (let t = 0; t < CH; t++) grid += `<div class="pv-cell clbl">C${t+1}</div>`;
-    for (let r = 0; r <= last; r++) {
-      grid += `<div class="pv-rowplay" data-row="${r}" title="Play song row ${PT.hx2(r)} (all channels)">▶</div>`;
-      grid += `<div class="pv-cell rlbl">${PT.hx2(r)}</div>`;
+    for (let r = 0; r < shownRows; r++) {
+      const spare = r > last;
+      grid += `<div class="pv-gutter${spare ? ' spare' : ''}">
+        <span class="pv-rowplay" data-row="${r}" title="Play song row ${PT.hx2(r)} (all channels)">▶</span>
+        <span class="pv-rowcopy" data-row="${r}" title="Copy row ${PT.hx2(r)}">⧉</span>
+        <span class="pv-rowpaste" data-row="${r}" title="Paste over row ${PT.hx2(r)}">⤓</span>
+      </div>`;
+      grid += `<div class="pv-cell rlbl${spare ? ' spare' : ''}">${PT.hx2(r)}</div>`;
       for (let t = 0; t < CH; t++) {
         const c = PT.gridCell(parsed, r, t);
         grid += c === PT.EMPTY
-          ? `<div class="pv-cell empty" data-row="${r}" data-ch="${t}" tabindex="0" title="Row ${PT.hx2(r)} · channel ${t+1} — click to place a chain">··</div>`
+          ? `<div class="pv-cell empty${spare ? ' spare' : ''}" data-row="${r}" data-ch="${t}" tabindex="0" title="Row ${PT.hx2(r)} · channel ${t+1} — click to place a chain">··</div>`
           : `<div class="pv-cell chain" data-chain="${c}" data-row="${r}" data-ch="${t}" tabindex="0" style="color:${chainColor.get(c)||'var(--accent)'}" title="Chain ${PT.hx2(c)} at row ${PT.hx2(r)} · channel ${t+1}. Click to open, double-click or type to change.">${PT.hx2(c)}</div>`;
       }
     }
     grid += '</div>';
+    if (shownRows < maxRows)
+      grid += `<button class="btn ghost sm" id="btn-pv-morerows" style="margin-top:8px">+ ${Math.min(8, maxRows - shownRows)} more rows</button>`;
 
     // Ordered chain list, ascending, grouped by high nibble
     const chainsAsc = [...chainColor.keys()].sort((a, b) => a - b);
@@ -4405,7 +4450,31 @@ const UI = (() => {
         </div>
       </div>`;
     host.querySelectorAll('.pv-rowplay').forEach(b =>
-      b.addEventListener('click', () => previewSongRow(p, parsed, parseInt(b.dataset.row, 10), b)));
+      b.addEventListener('click', e => { e.stopPropagation(); previewSongRow(p, parsed, parseInt(b.dataset.row, 10), b); }));
+    host.querySelector('#btn-pv-morerows')?.addEventListener('click', () => {
+      pvSpareRows += 8;
+      renderPatterns(host, p, parsed);
+    });
+    // whole-row copy/paste across all 8 channels
+    host.querySelectorAll('.pv-rowcopy').forEach(b =>
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        const r = parseInt(b.dataset.row, 10);
+        pvRowClip = [];
+        for (let t = 0; t < CH; t++) pvRowClip.push(PT.gridCell(parsed, r, t));
+        renderPatterns(host, p, parsed);
+      }));
+    host.querySelectorAll('.pv-rowpaste').forEach(b =>
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!pvRowClip) return;
+        const r = parseInt(b.dataset.row, 10);
+        for (let t = 0; t < CH; t++) parsed.grid[r * PT.CHANNELS + t] = pvRowClip[t];
+        dirtyGrid.add(p.dirName);
+        updateSaveBar(host);
+        renderPatterns(host, p, parsed);
+      }));
+    host.querySelectorAll('.pv-rowpaste').forEach(b => { if (!pvRowClip) b.style.display = 'none'; });
     host.querySelector('#btn-pv-recolour').addEventListener('click', async () => {
       for (const k of Object.keys(chainColors))
         if (k.startsWith(`${p.dirName}:`)) delete chainColors[k];
@@ -4417,10 +4486,27 @@ const UI = (() => {
     const gridEditable = (parsed.geometry?.cmdWidth ?? 1) === 1;
     const chainMax = PT.CHAIN_COUNT - 1;   // geometry carries no chain count
     const markGridDirty = () => { dirtyGrid.add(p.dirName); updateSaveBar(host); };
+    const setCell = (r, t, v) => {
+      parsed.grid[r * PT.CHANNELS + t] = v === null ? PT.EMPTY : v;
+      markGridDirty();
+      renderPatterns(host, p, parsed);
+    };
     const editGridCell = (cell, seed) => {
       if (!gridEditable || cell.querySelector('input')) return;
       const r = parseInt(cell.dataset.row, 10), t = parseInt(cell.dataset.ch, 10);
       const cur = PT.gridCell(parsed, r, t);
+      if (seed === undefined) {
+        openPicker(cell, {
+          items: chainItems(parsed, p, chainColor),
+          rawHint: 'or type hex',
+          onPick: v => setCell(r, t, v),
+          onRaw: raw => {
+            const v = parseInt(raw, 16);
+            if (!isNaN(v) && v >= 0 && v <= chainMax) setCell(r, t, v);
+          },
+        });
+        return;
+      }
       const inp = document.createElement('input');
       inp.className = 'pe-edit';
       inp.value = seed !== undefined ? seed : (cur === PT.EMPTY ? '' : PT.hx2(cur));
@@ -4582,6 +4668,20 @@ const UI = (() => {
         if (cell.querySelector('input')) return;
         const step = parseInt(cell.dataset.step, 10), f = cell.dataset.f;
         const cur = cell.textContent.trim();
+        // phrase column picks from the phrases this project actually has
+        if (f === 'phrase' && seed === undefined) {
+          openPicker(cell, {
+            items: phraseItems(parsed),
+            rawHint: 'or type hex',
+            onPick: v => {
+              parsed.chains[c * PT.STEPS + step] = v === null ? PT.EMPTY : v;
+              markDirty();
+              showChain(parsed, c, host);
+            },
+            onRaw: raw => { if (apply(step, f, raw)) markDirty(); showChain(parsed, c, host); },
+          });
+          return;
+        }
         const inp = document.createElement('input');
         inp.className = 'pe-edit';
         inp.value = seed !== undefined ? seed : (cur === '--' || cur === '·' ? '' : cur);
@@ -4613,6 +4713,160 @@ const UI = (() => {
         } else if (ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey) { ev.preventDefault(); begin(ev.key); }
       });
     });
+  }
+
+  // ── Pick-list popup ────────────────────────────────────
+  // Editing a tracker by typing hex from memory is miserable: you have to
+  // know that 0x1E is KIL and which of 255 chains is the one you meant.
+  // Every editable cell opens one of these instead — a filterable list of
+  // the things that actually exist in this project, with names, still
+  // accepting a raw typed value for anyone who does know the number.
+  let openPick = null;
+  function closePicker() {
+    if (!openPick) return;
+    openPick.el.remove();
+    document.removeEventListener('mousedown', openPick.outside, true);
+    document.removeEventListener('keydown', openPick.onKey, true);
+    const restore = openPick.anchor;
+    openPick = null;
+    restore?.focus?.();
+  }
+  // items: [{value, label, hint, color, group}]
+  function openPicker(anchor, opts) {
+    closePicker();
+    const el = document.createElement('div');
+    el.className = 'pick';
+    el.innerHTML = `
+      <input class="pick-filter" placeholder="${esc(opts.placeholder || 'filter or type a value…')}" spellcheck="false">
+      <div class="pick-list"></div>
+      <div class="pick-foot">↑↓ move · <b>Enter</b> choose · <b>Esc</b> cancel${opts.rawHint ? ' · ' + esc(opts.rawHint) : ''}</div>`;
+    document.body.appendChild(el);
+    const r = anchor.getBoundingClientRect();
+    el.style.left = Math.min(r.left, window.innerWidth - el.offsetWidth - 12) + 'px';
+    const below = r.bottom + 4;
+    el.style.top = (below + el.offsetHeight > window.innerHeight - 8
+      ? Math.max(8, r.top - el.offsetHeight - 4) : below) + 'px';
+
+    const filter = el.querySelector('.pick-filter');
+    const list = el.querySelector('.pick-list');
+    let shown = [], cursor = 0;
+
+    const draw = () => {
+      const q = filter.value.trim().toLowerCase();
+      shown = opts.items.filter(it =>
+        !q || String(it.label).toLowerCase().includes(q) || String(it.hint || '').toLowerCase().includes(q));
+      if (cursor >= shown.length) cursor = Math.max(0, shown.length - 1);
+      let html = '', lastGroup = null;
+      shown.forEach((it, i) => {
+        if (it.group !== lastGroup) { html += `<div class="pick-group">${esc(it.group || '')}</div>`; lastGroup = it.group; }
+        html += `<div class="pick-item${i === cursor ? ' on' : ''}" data-i="${i}">
+          ${it.color ? `<span class="pick-dot" style="background:${it.color}"></span>` : '<span class="pick-dot blank"></span>'}
+          <span class="pick-lbl">${esc(it.label)}</span>
+          ${it.hint ? `<span class="pick-hint">${esc(it.hint)}</span>` : ''}
+        </div>`;
+      });
+      list.innerHTML = html || '<div class="pick-none">nothing matches</div>';
+      list.querySelector('.pick-item.on')?.scrollIntoView({ block: 'nearest' });
+      list.querySelectorAll('.pick-item').forEach(n =>
+        n.addEventListener('mousedown', e => {
+          e.preventDefault();
+          choose(shown[parseInt(n.dataset.i, 10)]);
+        }));
+    };
+    const choose = it => {
+      if (!it) return;
+      closePicker();
+      opts.onPick(it.value);
+    };
+    const onKey = e => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePicker(); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); cursor = Math.min(shown.length - 1, cursor + 1); draw(); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); cursor = Math.max(0, cursor - 1); draw(); return; }
+      if (e.key === 'Enter') {
+        e.preventDefault(); e.stopPropagation();
+        const raw = filter.value.trim();
+        // a typed value that matches nothing but parses is still accepted
+        if (opts.onRaw && raw && !shown.length) { closePicker(); opts.onRaw(raw); return; }
+        choose(shown[cursor]);
+      }
+    };
+    const outside = e => { if (!el.contains(e.target)) closePicker(); };
+    filter.addEventListener('input', () => { cursor = 0; draw(); });
+    document.addEventListener('mousedown', outside, true);
+    document.addEventListener('keydown', onKey, true);
+    openPick = { el, outside, onKey, anchor };
+    draw();
+    filter.focus();
+  }
+
+  // ── Pick-list contents ─────────────────────────────────
+  function chainItems(parsed, p, chainColor) {
+    const used = new Map();
+    const last = PT.lastSongRow(parsed);
+    for (let r = 0; r <= last; r++)
+      for (let t = 0; t < PT.CHANNELS; t++) {
+        const c = PT.gridCell(parsed, r, t);
+        if (c !== PT.EMPTY) used.set(c, (used.get(c) || 0) + 1);
+      }
+    const hasSteps = c => {
+      for (let s = 0; s < PT.STEPS; s++) if (parsed.chains[c * PT.STEPS + s] !== PT.EMPTY) return true;
+      return false;
+    };
+    const items = [{ value: null, label: '— empty —', hint: 'clear this cell', group: '' }];
+    [...used.keys()].sort((a, b) => a - b).forEach(c =>
+      items.push({ value: c, label: PT.hx2(c), hint: `used ×${used.get(c)}`,
+        color: chainColor.get(c) || groupChainColor(c), group: 'In this song' }));
+    for (let c = 0; c < PT.CHAIN_COUNT; c++)
+      if (!used.has(c) && hasSteps(c))
+        items.push({ value: c, label: PT.hx2(c), hint: 'written, not placed', color: groupChainColor(c), group: 'Defined elsewhere' });
+    let free = 0;
+    for (let c = 0; c < PT.CHAIN_COUNT && free < 24; c++)
+      if (!used.has(c) && !hasSteps(c)) { items.push({ value: c, label: PT.hx2(c), hint: 'empty', color: groupChainColor(c), group: 'Empty chains' }); free++; }
+    return items;
+  }
+  function phraseItems(parsed) {
+    const usedInChains = new Set();
+    for (let i = 0; i < parsed.chains.length; i++)
+      if (parsed.chains[i] !== PT.EMPTY) usedInChains.add(parsed.chains[i]);
+    const count = parsed.geometry?.phraseCount ?? PT.PHRASE_COUNT;
+    const notesIn = ph => {
+      let n = 0;
+      for (let s = 0; s < PT.STEPS; s++) {
+        const v = parsed.phrases.notes[ph * PT.STEPS + s];
+        if (v !== PT.EMPTY && v !== PT.NOTE_OFF) n++;
+      }
+      return n;
+    };
+    const items = [{ value: null, label: '— empty —', hint: 'clear this step', group: '' }];
+    [...usedInChains].sort((a, b) => a - b).forEach(ph =>
+      items.push({ value: ph, label: PT.hx2(ph), hint: `${notesIn(ph)} notes`, group: 'In use' }));
+    let free = 0;
+    for (let ph = 0; ph < count && free < 24; ph++)
+      if (!usedInChains.has(ph)) { items.push({ value: ph, label: PT.hx2(ph), hint: notesIn(ph) ? `${notesIn(ph)} notes` : 'empty', group: 'Free' }); free++; }
+    return items;
+  }
+  function instrItems(parsed) {
+    const items = [{ value: null, label: '— none —', hint: 'clear', group: '' }];
+    for (const i of parsed.instruments)
+      items.push({ value: i.id, label: `${i.idHex}  ${i.name}`, hint: i.typeShort, group: 'Instruments' });
+    return items;
+  }
+  function fxItems() {
+    const items = [{ value: PT.CMD_NONE, label: '---', hint: 'no command', group: '' }];
+    for (const c of CMD_OPTIONS) {
+      if (c === PT.CMD_NONE) continue;
+      items.push({ value: c, label: PT.cmdName(c), hint: PT.hx2(c), group: 'Commands' });
+    }
+    return items;
+  }
+  function noteItems() {
+    const items = [
+      { value: PT.EMPTY, label: '---', hint: 'no note', group: '' },
+      { value: PT.NOTE_OFF, label: 'OFF', hint: 'note off', group: '' },
+    ];
+    for (let v = 0; v <= 119; v++)
+      items.push({ value: v, label: PT.noteStr(v), hint: String(v), group: 'Notes' });
+    return items;
   }
 
   // ── Phrase editor ──────────────────────────────────────
@@ -4753,11 +5007,35 @@ const UI = (() => {
     };
 
     // Turn a cell into a text input, commit on Enter/blur.
+    // Note, instrument and FX columns are chosen from a list rather than
+    // typed: nobody should have to remember that 0x1E is KIL or which hex
+    // id is the bass. Params stay free-text (they're arbitrary values).
+    const PICKABLE = { note: noteItems, instr: () => instrItems(parsed), cmd1: fxItems, cmd2: fxItems };
     const beginEdit = (cellEl, seed) => {
       if (cellEl.querySelector('input')) return;
       const step = parseInt(cellEl.closest('.pe-row').dataset.step, 10);
       const f = cellEl.dataset.f;
       const cur = cellEl.textContent.trim();
+      if (PICKABLE[f] && seed === undefined) {
+        const k = peKey(ph, step), pb = parsed.phrases;
+        openPicker(cellEl, {
+          items: PICKABLE[f](),
+          placeholder: f === 'note' ? 'note, e.g. C-4' : 'filter…',
+          rawHint: f === 'note' ? 'or type C-4 / OFF' : (f === 'instr' ? 'or type a hex id' : 'or type a name'),
+          onPick: v => {
+            pushUndo();
+            if (f === 'note') pb.notes[k] = v;
+            else if (f === 'instr') pb.instr[k] = v === null ? PT.EMPTY : v;
+            else {
+              pb[f][k] = v;
+              if (v === PT.CMD_NONE) pb[f === 'cmd1' ? 'param1' : 'param2'][k] = 0;
+            }
+            markDirty(); rerender(); focusCell();
+          },
+          onRaw: raw => { pushUndo(); if (apply(step, f, raw)) markDirty(); rerender(); focusCell(); },
+        });
+        return;
+      }
       const inp = document.createElement('input');
       inp.className = 'pe-edit';
       inp.value = seed !== undefined ? seed : (cur === '---' || cur === '--' ? '' : cur);

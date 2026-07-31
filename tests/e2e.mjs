@@ -168,13 +168,16 @@ check('editor: keyboard help shown', await page.evaluate(() =>
 // focus the note cell at step 0, type a new note, commit with Enter
 await page.click('.pe-row[data-step="0"] .pe-c[data-f="note"]');
 await page.waitForTimeout(100);
-await page.keyboard.press('Enter');       // begin editing the focused cell
-await page.waitForTimeout(100);
+await page.keyboard.press('Enter');       // opens the note pick-list
+await page.waitForTimeout(200);
+check('editor: note cell opens a pick list', await page.evaluate(() => !!document.querySelector('.pick')));
 await page.evaluate(() => {
-  const inp = document.querySelector('.pe-row[data-step="0"] .pe-edit');
-  inp.value = 'E-4';
+  const f = document.querySelector('.pick-filter');
+  f.value = 'E-4';
+  f.dispatchEvent(new Event('input', { bubbles: true }));
 });
-await page.keyboard.press('Enter');       // commit
+await page.waitForTimeout(150);
+await page.keyboard.press('Enter');       // choose the highlighted entry
 await page.waitForTimeout(250);
 check('editor: dirty bar appears', await page.evaluate(() => !!document.getElementById('pv-save-bar')));
 await page.click('#btn-save-edits');
@@ -211,11 +214,17 @@ await page.evaluate(() => {
   const c = document.querySelector('.pv-cell.empty[data-row]');
   c.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 });
-await page.waitForTimeout(200);
+await page.waitForTimeout(250);
+check('grid: clicking a cell opens the chain pick list', await page.evaluate(() =>
+  !!document.querySelector('.pick')));
+check('grid: pick list shows chains already in the song', await page.evaluate(() =>
+  [...document.querySelectorAll('.pick-group')].some(g => g.textContent === 'In this song')));
 await page.evaluate(() => {
-  const inp = document.querySelector('.pv-cell .pe-edit');
-  if (inp) inp.value = '02';
+  const f = document.querySelector('.pick-filter');
+  f.value = '02';
+  f.dispatchEvent(new Event('input', { bubbles: true }));
 });
+await page.waitForTimeout(150);
 await page.keyboard.press('Enter');
 await page.waitForTimeout(300);
 check('grid: placing a chain marks the song dirty', await page.evaluate(() =>
@@ -228,6 +237,15 @@ await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
 await page.waitForTimeout(250);
 check('chain: step list is editable', await page.evaluate(() =>
   document.querySelectorAll('.pv-cstep [data-f="phrase"][tabindex="0"]').length === 16));
+// the phrase column is a pick list; transpose stays free-text (it's a number)
+await page.evaluate(() => {
+  const c = document.querySelector('.pv-cstep [data-f="phrase"]');
+  c.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+});
+await page.waitForTimeout(250);
+check('chain: phrase column opens a pick list', await page.evaluate(() => !!document.querySelector('.pick')));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(150);
 await page.evaluate(() => {
   const c = document.querySelector('.pv-cstep [data-f="transpose"]');
   c.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -260,6 +278,37 @@ await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
 await page.waitForTimeout(250);
 check('arrangement: chain transpose persisted to the card', await page.evaluate(() =>
   document.querySelector('.pv-cstep [data-f="transpose"]')?.textContent.trim() === '-5'));
+
+// spare rows past the end of the song, and whole-row copy/paste
+check('grid: spare rows offered past the end of the song', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cell.rlbl.spare').length > 0));
+check('grid: spare rows are editable like any other', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cell.empty.spare[tabindex="0"]').length > 0));
+const rowsBefore = await page.evaluate(() => document.querySelectorAll('.pv-cell.rlbl').length);
+await page.evaluate(() => document.getElementById('btn-pv-morerows')?.click());
+await page.waitForTimeout(250);
+check('grid: "+ more rows" extends the grid', await page.evaluate(r =>
+  document.querySelectorAll('.pv-cell.rlbl').length > r, rowsBefore));
+// copy row 0 and paste it over a spare row
+check('grid: paste hidden until something is copied', await page.evaluate(() =>
+  [...document.querySelectorAll('.pv-rowpaste')].every(b => b.style.display === 'none')));
+await page.evaluate(() => document.querySelector('.pv-rowcopy[data-row="0"]')?.click());
+await page.waitForTimeout(250);
+check('grid: paste appears once a row is copied', await page.evaluate(() =>
+  [...document.querySelectorAll('.pv-rowpaste')].some(b => b.style.display !== 'none')));
+const row0 = await page.evaluate(() =>
+  [...document.querySelectorAll('.pv-cell[data-row="0"]')].map(c => c.textContent.trim()).join(','));
+const spareRow = await page.evaluate(() =>
+  document.querySelector('.pv-cell.rlbl.spare')?.textContent.trim());
+await page.evaluate(sr => {
+  const target = [...document.querySelectorAll('.pv-rowpaste')]
+    .find(b => parseInt(b.dataset.row, 10) === parseInt(sr, 16));
+  target?.click();
+}, spareRow);
+await page.waitForTimeout(300);
+const pasted = await page.evaluate(sr =>
+  [...document.querySelectorAll(`.pv-cell[data-row="${parseInt(sr, 16)}"]`)].map(c => c.textContent.trim()).join(','), spareRow);
+check('grid: pasted row matches the copied row', pasted === row0 && row0.length > 0);
 
 // ── 7b. sliced playback uses the wav's own sample rate ──
 // Must run BEFORE the slicer test below, which overwrites Night Bass's

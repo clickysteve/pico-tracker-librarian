@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.9.3 — pick lists instead of typing, room to arrange
+
+- **Nothing has to be typed from memory any more.** Every editable cell
+  opens a filterable pick-list of the things that actually exist:
+  - grid cells list the chains this song already uses, with their colours
+    and usage counts, then chains defined but not placed, then free slots;
+  - chain steps list the project's phrases with a note count each;
+  - the phrase editor picks **instruments by name** (`04 Night Bass`, not
+    `04`) and **FX by name** (`KIL`, `HOP`, `PSL` … with the hex as a
+    hint) — the FX column had regressed to free text when the editor was
+    rebuilt, which meant knowing the exact command names;
+  - notes pick from a list too.
+  Filter by typing, ↑↓ to move, Enter to choose, Esc to cancel. A raw hex
+  or literal value is still accepted for anyone who knows it.
+- **Spare rows past the end of the song**, so the arrangement can be
+  extended in place, with **+ more rows** for as far as the geometry
+  allows. There was previously no way to add to a song at all.
+- **Whole-row copy and paste** across all 8 channels, from the row gutter.
+- Row actions (**▶ Play**, **▦ Patterns**, **⇌ Compare**) now sit
+  immediately after the project name rather than stranded at the far right.
+- Expand chevrons enlarged throughout; the workspace's secondary stat line
+  (`master 100`, `23 song rows`) is larger and lighter.
+- More breathing room between the song grid and its scrollbar.
+
 ## v0.9.2 — arrangement editing, clearer affordances
 
 - **You can edit the arrangement.** Click any song-grid cell to place,
