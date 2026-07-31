@@ -310,6 +310,43 @@ const pasted = await page.evaluate(sr =>
   [...document.querySelectorAll(`.pv-cell[data-row="${parseInt(sr, 16)}"]`)].map(c => c.textContent.trim()).join(','), spareRow);
 check('grid: pasted row matches the copied row', pasted === row0 && row0.length > 0);
 
+// v0.9.4: insert/delete step, chain step layout, live marks, transport
+check('grid: cells navigate with the arrow keys', await page.evaluate(async () => {
+  const first = document.querySelector('.pv-cell[data-row="0"][data-ch="0"]');
+  first.focus();
+  first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  await new Promise(r => setTimeout(r, 60));
+  const a = document.activeElement;
+  return a?.dataset?.row === '0' && a?.dataset?.ch === '1';
+}));
+await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
+await page.waitForTimeout(300);
+check('chain steps: every fourth row is beat-marked', await page.evaluate(() => {
+  const beats = [...document.querySelectorAll('.pv-cstep.beat')].map(r => +r.dataset.step);
+  return beats.length === 4 && beats.every(b => b % 4 === 0);
+}));
+check('chain steps: columns line up regardless of transpose', await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.pv-cstep')];
+  const xs = rows.map(r => Math.round(r.querySelector('.cgo').getBoundingClientRect().left));
+  return new Set(xs).size === 1;   // the old flex rule made these drift
+}));
+check('chain steps: every row offers an edit affordance', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cstep .cgo').length === 16));
+// pick lists must reach values that are not in the list
+await page.evaluate(() => document.querySelector('.pv-cell.empty[data-row]')
+  ?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+await page.waitForTimeout(250);
+await page.evaluate(() => {
+  const f = document.querySelector('.pick-filter');
+  f.value = 'A4';
+  f.dispatchEvent(new Event('input', { bubbles: true }));
+});
+await page.waitForTimeout(150);
+check('picker: an unlisted value can still be chosen', await page.evaluate(() =>
+  [...document.querySelectorAll('.pick-item .pick-lbl')].some(n => n.textContent.trim() === 'A4')));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(150);
+
 // ── 7b. sliced playback uses the wav's own sample rate ──
 // Must run BEFORE the slicer test below, which overwrites Night Bass's
 // markers with 8 equal divisions.

@@ -566,8 +566,11 @@
     /* PATTERN VIEWER */
     .pv-section { margin-top:16px; border-top:1px solid var(--border); padding-top:14px; }
     .pv-hdr { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+    .pv-hint { font-size:10px; color:var(--muted); font-weight:400; letter-spacing:0; text-transform:none; }
+    .pv-hint b { color:var(--text); }
     .pv-hdr-title { font-size:10px; font-weight:700; letter-spacing:1.5px;
-      text-transform:uppercase; color:var(--muted); flex:1; }
+      text-transform:uppercase; color:var(--muted); }
+    .pv-hdr .pv-hint { flex:1; }
     /* room between the last channel column and the scrollbar */
     .pv-grid-wrap { overflow-x:auto; overflow-y:auto; padding:0 18px 6px 0; max-height:74vh; min-width:0; }
     .pv-grid-wrap::-webkit-scrollbar { width:4px; height:4px; }
@@ -629,27 +632,32 @@
       text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
     /* one step per line, top to bottom — a chain reads in play order */
     .pv-csteps { display:flex; flex-direction:column; }
-    .pv-cs-head, .pv-cstep { display:grid; grid-template-columns:26px 54px 46px 1fr; gap:6px; align-items:center; }
+    .pv-cs-head, .pv-cstep { display:grid; grid-template-columns:28px 56px 52px 34px;
+      gap:6px; align-items:center; font-size:11px; font-family:monospace;
+      padding:3px 0; border-bottom:1px solid var(--border); }
+    .pv-cstep:last-child { border-bottom:none; }
+    .pv-cstep .ci { color:var(--border2); }
+    .pv-cstep .cp { color:var(--accent); }
+    .pv-cstep .ct { color:var(--muted); text-align:right; }
+    /* beat highlight every 4 steps, same as the phrase grid */
+    .pv-cstep.beat { background:rgba(255,255,255,.03); }
+    .pv-cstep.playing { background:var(--accent-dim); box-shadow:inset 2px 0 0 var(--accent); }
     .pv-cs-head { font-size:9px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted);
       padding-bottom:4px; border-bottom:1px solid var(--border); margin-bottom:3px; }
     .pv-cstep .cp, .pv-cstep .ct { padding:2px 5px; border-radius:3px; cursor:text;
       border:1px solid transparent; outline:none; font-family:monospace; }
     .pv-cstep .cp:focus, .pv-cstep .ct:focus { border-color:var(--accent); background:var(--surface); }
     .pv-cstep .cp.empty { color:var(--border2); }
-    .pv-cstep .cgo { cursor:pointer; color:var(--muted); font-size:13px; }
-    .pv-cstep .cgo:hover { color:var(--accent); }
+    .pv-cstep .cgo { cursor:pointer; color:var(--accent); font-size:10px; text-align:right;
+      border:1px solid var(--accent-brd); border-radius:3px; padding:1px 4px; }
+    .pv-cstep .cgo:hover { background:var(--accent-dim); }
+    .pv-cstep .cgo.off { color:var(--border2); border-color:var(--border); cursor:default; }
+    .pv-cstep .cgo.off:hover { background:none; }
     .pv-cell.empty { cursor:pointer; }
     .pv-cell.empty:hover { background:var(--accent-dim); color:var(--accent); }
     .pv-cell:focus { outline:1px solid var(--accent); outline-offset:-1px; }
     .pv-cell .pe-edit { width:100%; text-align:center; background:var(--surface);
       border:none; outline:none; color:var(--text); font-family:monospace; font-size:inherit; padding:0; }
-    .pv-cstep { display:flex; gap:8px; padding:3px 0; font-size:11px; font-family:monospace;
-      border-bottom:1px solid var(--border); align-items:center; }
-    .pv-cstep:last-child { border-bottom:none; }
-    .pv-cstep .ci { color:var(--border2); width:18px; flex-shrink:0; }
-    .pv-cstep .cp { color:var(--accent); cursor:pointer; }
-    .pv-cstep .cp:hover { text-decoration:underline; }
-    .pv-cstep .ct { color:var(--muted); }
     .pv-pstep { display:grid;
       grid-template-columns:18px 36px 26px 1fr;
       gap:4px; padding:3px 0; font-size:10px; font-family:monospace;
@@ -660,6 +668,27 @@
     .pv-pstep .pn.empty { color:var(--border2); font-weight:400; }
     .pv-pstep .pv2 { color:var(--muted); }
     .pv-pstep .pfx { color:var(--c-mid); }
+    /* TRANSPORT */
+    #transport { position:fixed; left:0; right:0; bottom:0; z-index:320; display:none;
+      align-items:center; gap:14px; padding:9px 20px;
+      background:var(--surface); border-top:1px solid var(--accent-brd);
+      box-shadow:0 -6px 22px rgba(0,0,0,.45); }
+    #transport.on { display:flex; }
+    #tr-info { min-width:0; flex-shrink:0; max-width:34ch; }
+    #tr-title { font-size:12px; font-weight:700; color:var(--text);
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #tr-sub { font-size:10px; color:var(--muted); overflow:hidden;
+      text-overflow:ellipsis; white-space:nowrap; }
+    #tr-barwrap { flex:1; height:5px; background:var(--border); border-radius:3px; overflow:hidden; }
+    #tr-bar { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+    #tr-time { font-family:monospace; font-size:11px; color:var(--muted); flex-shrink:0; }
+    /* a row that is previewing must stay obvious under the hover colour */
+    .proj-item.playing .proj-row, .proj-item.playing:hover .proj-row { background:var(--accent-dim); }
+    .proj-item.playing .p-name { color:var(--accent); }
+    /* live position in the grid and chain list */
+    .pv-cell.chain.live { outline:2px solid var(--accent); outline-offset:-2px; }
+    .pv-gutter.live .pv-rowplay { color:var(--accent); opacity:1; }
+    .pv-chainrow.live { background:var(--accent-dim); }
     /* PICK LIST */
     .pick { position:fixed; z-index:400; width:270px; background:var(--surface);
       border:1px solid var(--accent-brd); border-radius:7px; box-shadow:0 10px 34px rgba(0,0,0,.6);
@@ -824,7 +853,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.3 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.4 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -1104,6 +1133,17 @@
 </div><!-- #app -->
 
 <!-- Project modal -->
+<!-- Transport: what is playing, where it is, and how to stop it -->
+<div id="transport" aria-live="polite">
+  <button class="btn sm" id="tr-stop" title="Stop playback">■</button>
+  <div id="tr-info">
+    <div id="tr-title"></div>
+    <div id="tr-sub"></div>
+  </div>
+  <div id="tr-barwrap"><div id="tr-bar"></div></div>
+  <span id="tr-time"></span>
+</div>
+
 <div id="proj-modal" class="proj-modal-overlay" style="display:none">
   <div class="proj-modal-box">
     <div class="proj-modal-hdr">
@@ -2083,6 +2123,7 @@ const PT = (() => {
       return steps.length ? steps : [6];
     };
     const events = [];
+    const marks = [];
     let endTick = 0;
     // opts.chain / opts.phrase: preview one chain or one phrase, played once
     // on channel 0. Everything downstream is the normal song path.
@@ -2099,6 +2140,9 @@ const PT = (() => {
             ? (cs === 0 ? { phrase: opts.phrase, transpose: 0 } : { phrase: EMPTY, transpose: 0 })
             : chainStep(proj, c, cs);
           if (phrase === EMPTY || phrase >= geom(proj).phraseCount) continue;
+          // Position marks let the UI show what is playing where: which
+          // grid cell, which chain step, which phrase, per channel.
+          marks.push({ time: tick * tickSec, ch: t, row, chain: c, step: cs, phrase });
           const enterAt = hopEntry; hopEntry = 0;
           for (let ps = enterAt; ps < STEPS; ps++) {
             const st = phraseStep(proj, phrase, ps);
@@ -2129,7 +2173,8 @@ const PT = (() => {
       endTick = Math.max(endTick, tick);
     }
     events.sort((a, b) => a.time - b.time);
-    return { events, duration: endTick * tickSec, bpm };
+    marks.sort((a, b) => a.time - b.time);
+    return { events, marks, duration: endTick * tickSec, bpm };
   }
 
   // ── Rewrite an instrument's slice points in project XML ──
@@ -3666,7 +3711,7 @@ const SongPlayer = (() => {
         }
       }
     }
-    state = { onEnd, duration: tl.duration, t0 };
+    state = { onEnd, duration: tl.duration, t0, tl, label: proj?.name || '' };
     onProgress?.(0, tl.duration);
     timer = setInterval(() => {
       if (!ctx) return;
@@ -3678,7 +3723,9 @@ const SongPlayer = (() => {
   }
 
   const isPlaying = () => !!state;
-  return { play, stop, isPlaying };
+  const timeline = () => state?.tl ?? null;
+  const label = () => state?.label ?? '';
+  return { play, stop, isPlaying, timeline, label };
 })();
 
 
@@ -3745,6 +3792,7 @@ const UI = (() => {
   const dirtyGrid = new Set();    // dirNames whose song grid was edited
   let pvSpareRows = 8;            // blank song rows shown past the end
   let pvRowClip = null;           // copied song row (8 chain values)
+  let pvCellClip = null;          // copied single grid cell
 
   const cacheKey = () => sd ? `card:${sd.name}` : null;
 
@@ -4025,12 +4073,19 @@ const UI = (() => {
       catch { btn.textContent = '▶ Play'; return; }
     }
     rowPlayBtn = btn;
-    const ok = await SongPlayer.play(sd, p, parsed, null, () => {
+    const item = btn.closest('.proj-item');
+    const ok = await SongPlayer.play(sd, p, parsed, transportProgress, () => {
       btn.textContent = '▶ Play'; btn.classList.remove('playing');
+      item?.classList.remove('playing');
+      hideTransport();
       if (rowPlayBtn === btn) rowPlayBtn = null;
     });
     btn.textContent = ok ? '■ Stop' : '▶ Play';
-    if (ok) btn.classList.add('playing');
+    if (ok) {
+      btn.classList.add('playing');
+      item?.classList.add('playing');
+      showTransport(p.name, `${p.tempo ?? '—'} BPM · preview`);
+    }
   }
 
   // ── Project modal (full detail + pattern viewer) ──────
@@ -4436,7 +4491,8 @@ const UI = (() => {
 
     host.innerHTML = `
       <div class="pv-hdr">
-        <span class="pv-hdr-title">Song grid — ${last+1} rows · ▶ plays a whole row · click a cell to set its chain</span>
+        <span class="pv-hdr-title">Song grid — ${last+1} rows</span>
+        <span class="pv-hint">arrows move · <b>Enter</b> pick a chain · <b>Del</b> clear · <b>⌘/Ctrl+C/V</b> copy a cell · ▶ plays a whole row</span>
         <button class="btn ghost sm" id="btn-pv-recolour" ${customColours ? '' : 'disabled'}
           title="${customColours ? `Discard your ${customColours} custom chain colour${customColours>1?'s':''} and go back to the by-group palette` : 'No custom chain colours to reset — pick one with a swatch first'}">↺ Colours</button>
       </div>
@@ -4453,7 +4509,11 @@ const UI = (() => {
       b.addEventListener('click', e => { e.stopPropagation(); previewSongRow(p, parsed, parseInt(b.dataset.row, 10), b); }));
     host.querySelector('#btn-pv-morerows')?.addEventListener('click', () => {
       pvSpareRows += 8;
+      const wrap = host.querySelector('.pv-grid-wrap');
+      const keep = wrap ? wrap.scrollTop : 0;
       renderPatterns(host, p, parsed);
+      const w2 = host.querySelector('.pv-grid-wrap');
+      if (w2) w2.scrollTop = keep;      // adding rows must not jump to the top
     });
     // whole-row copy/paste across all 8 channels
     host.querySelectorAll('.pv-rowcopy').forEach(b =>
@@ -4498,7 +4558,12 @@ const UI = (() => {
       if (seed === undefined) {
         openPicker(cell, {
           items: chainItems(parsed, p, chainColor),
-          rawHint: 'or type hex',
+          rawHint: `any chain 00–${PT.hx2(chainMax)}`,
+          synth: q => {
+            const v = parseInt(q, 16);
+            if (!/^[0-9a-fA-F]{1,2}$/.test(q) || isNaN(v) || v < 0 || v > chainMax) return null;
+            return { value: v, label: PT.hx2(v), hint: 'use this chain', color: groupChainColor(v), group: '' };
+          },
           onPick: v => setCell(r, t, v),
           onRaw: raw => {
             const v = parseInt(raw, 16);
@@ -4540,10 +4605,25 @@ const UI = (() => {
       cell.addEventListener('click', () => showChain(parsed, parseInt(cell.dataset.chain, 10), host)));
     host.querySelectorAll('.pv-cell.empty').forEach(cell =>
       cell.addEventListener('click', () => editGridCell(cell)));
+    const focusGrid = (r, t) => host.querySelector(`.pv-cell[data-row="${r}"][data-ch="${t}"]`)?.focus();
     host.querySelectorAll('.pv-cell[data-row]').forEach(cell => {
       cell.addEventListener('dblclick', e => { e.stopPropagation(); editGridCell(cell); });
       cell.addEventListener('keydown', ev => {
+        const r = parseInt(cell.dataset.row, 10), t = parseInt(cell.dataset.ch, 10);
+        // arrow keys walk the grid; ⌘/Ctrl+C/V copy and paste a single cell
+        if (ev.key === 'ArrowUp')    { ev.preventDefault(); focusGrid(Math.max(0, r - 1), t); return; }
+        if (ev.key === 'ArrowDown')  { ev.preventDefault(); focusGrid(Math.min(shownRows - 1, r + 1), t); return; }
+        if (ev.key === 'ArrowLeft')  { ev.preventDefault(); focusGrid(r, Math.max(0, t - 1)); return; }
+        if (ev.key === 'ArrowRight') { ev.preventDefault(); focusGrid(r, Math.min(CH - 1, t + 1)); return; }
         if (!gridEditable) return;
+        if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'c') {
+          ev.preventDefault(); pvCellClip = PT.gridCell(parsed, r, t); return;
+        }
+        if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'v') {
+          ev.preventDefault();
+          if (pvCellClip !== null) setCell(r, t, pvCellClip === PT.EMPTY ? null : pvCellClip);
+          return;
+        }
         if (ev.key === 'Enter') { ev.preventDefault(); editGridCell(cell); }
         else if (ev.key === 'Delete' || ev.key === 'Backspace') {
           ev.preventDefault();
@@ -4578,8 +4658,12 @@ const UI = (() => {
     if (SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
     const orig = el.textContent;
     el.textContent = '…';
-    SongPlayer.play(sd, p, parsed, null, () => { el.textContent = '▶'; }, { chain: c })
-      .then(ok => { el.textContent = ok ? '■' : orig; });
+    SongPlayer.play(sd, p, parsed, transportProgress,
+      () => { el.textContent = '▶'; hideTransport(); }, { chain: c })
+      .then(ok => {
+        el.textContent = ok ? '■' : orig;
+        if (ok) showTransport(`${p.name} — chain ${PT.hx2(c)}`, 'chain preview');
+      });
   }
   // Play one row of the song grid: every channel's chain at that row,
   // together, exactly as the song would sound there.
@@ -4589,15 +4673,20 @@ const UI = (() => {
     host?.querySelectorAll('.pv-rowplay.playing').forEach(x => x.classList.remove('playing'));
     el.textContent = '…';
     el.classList.add('playing');
-    SongPlayer.play(sd, p, parsed, null,
-      () => { el.textContent = '▶'; el.classList.remove('playing'); },
+    SongPlayer.play(sd, p, parsed, transportProgress,
+      () => { el.textContent = '▶'; el.classList.remove('playing'); hideTransport(); },
       { songRow: row })
-      .then(ok => { el.textContent = ok ? '■' : '▶'; if (!ok) el.classList.remove('playing'); });
+      .then(ok => {
+        el.textContent = ok ? '■' : '▶';
+        if (ok) showTransport(`${p.name} — row ${PT.hx2(row)}`, 'song row, all channels');
+        else el.classList.remove('playing');
+      });
   }
   function showChain(parsed, c, host) {
     host.querySelectorAll('.pv-cell.chain').forEach(x => x.classList.toggle('hi', parseInt(x.dataset.chain,10) === c));
     const det = host.querySelector('#pv-chain-detail');
     det.style.display = 'block';
+    det.dataset.chain = String(c);
     const hint = host.querySelector('#pv-side-hint');
     if (hint) hint.style.display = 'none';
     // usage: where in the song does this chain appear?
@@ -4610,14 +4699,16 @@ const UI = (() => {
     let rows = '';
     for (let st = 0; st < PT.STEPS; st++) {
       const {phrase, transpose} = PT.chainStep(parsed, c, st);
-      rows += `<div class="pv-cstep" data-step="${st}">
+      rows += `<div class="pv-cstep${st % 4 === 0 ? ' beat' : ''}" data-step="${st}">
         <span class="ci">${PT.hx2(st)}</span>
         <span class="cp ${phrase === PT.EMPTY ? 'empty' : ''}" data-f="phrase" data-step="${st}"
-          tabindex="${editable ? 0 : -1}" title="${editable ? 'Click to set the phrase (hex, or -- for none)' : ''}"
+          tabindex="${editable ? 0 : -1}" title="${editable ? 'Choose which phrase plays at this step' : ''}"
           ${phrase === PT.EMPTY ? '' : `data-p="${phrase}"`}>${phrase === PT.EMPTY ? '--' : PT.hx2(phrase)}</span>
         <span class="ct" data-f="transpose" data-step="${st}" tabindex="${editable ? 0 : -1}"
           title="${editable ? 'Transpose for this step, in semitones' : ''}">${transpose ? (transpose>0?'+':'')+transpose : '·'}</span>
-        ${phrase === PT.EMPTY ? '' : `<span class="cgo" data-p="${phrase}" title="open phrase ${PT.hx2(phrase)}">›</span>`}
+        ${phrase === PT.EMPTY
+          ? `<span class="cgo off" title="no phrase here yet — set one first">edit</span>`
+          : `<span class="cgo" data-p="${phrase}" title="Open phrase ${PT.hx2(phrase)} in the note editor">edit</span>`}
       </div>`;
     }
     const pRef = modalProj;
@@ -4626,7 +4717,7 @@ const UI = (() => {
         <span class="cp-play" style="cursor:pointer;font-size:13px" title="preview this chain">▶</span>
         <span style="font-weight:400;letter-spacing:0;text-transform:none">used at ${uses.length} spot${uses.length===1?'':'s'}: ${uses.slice(0,12).map(esc).join('  ')}${uses.length>12?' …':''}</span>
       </div>
-      <div class="pv-cs-head"><span>#</span><span>phrase</span><span>tsp</span><span></span></div>
+      <div class="pv-cs-head"><span>#</span><span>phrase</span><span>tsp</span><span>notes</span></div>
       <div class="pv-csteps">${rows}</div>
       ${editable ? `<div class="pe-help">Click a phrase or transpose cell and type. <b>Enter</b> commits · <b>Del</b> clears ·
         phrases are hex <code>00</code>–<code>${PT.hx2(phraseMax)}</code>, transpose is a signed number like <code>-12</code>.
@@ -4672,7 +4763,12 @@ const UI = (() => {
         if (f === 'phrase' && seed === undefined) {
           openPicker(cell, {
             items: phraseItems(parsed),
-            rawHint: 'or type hex',
+            rawHint: `any phrase 00–${PT.hx2(phraseMax)}`,
+            synth: q => {
+              const v = parseInt(q, 16);
+              if (!/^[0-9a-fA-F]{1,2}$/.test(q) || isNaN(v) || v < 0 || v > phraseMax) return null;
+              return { value: v, label: PT.hx2(v), hint: 'use this phrase', group: '' };
+            },
             onPick: v => {
               parsed.chains[c * PT.STEPS + step] = v === null ? PT.EMPTY : v;
               markDirty();
@@ -4715,6 +4811,59 @@ const UI = (() => {
     });
   }
 
+  // ── Transport bar ──────────────────────────────────────
+  // Row hover used to hide the fact that something was playing, and there
+  // was no way to tell what or to stop it without finding the row again.
+  const fmtClock = t => {
+    if (!isFinite(t) || t < 0) t = 0;
+    return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+  };
+  function showTransport(title, sub) {
+    $('tr-title').textContent = title;
+    $('tr-sub').textContent = sub || '';
+    $('tr-bar').style.width = '0%';
+    $('tr-time').textContent = '';
+    $('transport').classList.add('on');
+  }
+  function hideTransport() {
+    $('transport').classList.remove('on');
+    document.querySelectorAll('.proj-item.playing').forEach(el => el.classList.remove('playing'));
+    clearLiveMarks();
+  }
+  function transportProgress(t, dur) {
+    $('tr-bar').style.width = `${dur ? Math.min(100, t / dur * 100) : 0}%`;
+    $('tr-time').textContent = `${fmtClock(t)} / ${fmtClock(dur)}`;
+    paintLiveMarks(t);
+  }
+  function clearLiveMarks() {
+    document.querySelectorAll('.pv-cell.live, .pv-gutter.live, .pv-chainrow.live, .pv-cstep.playing')
+      .forEach(el => el.classList.remove('live', 'playing'));
+  }
+  // Highlight the grid cell, chain-list entry and chain step that each
+  // channel is currently inside.
+  function paintLiveMarks(t) {
+    const tl = SongPlayer.timeline();
+    const sec = $('modal-pattern-section');
+    if (!tl || !tl.marks || !sec || sec.style.display === 'none') return;
+    const cur = new Map();                        // ch → latest mark at or before t
+    for (const m of tl.marks) {
+      if (m.time > t) break;
+      cur.set(m.ch, m);
+    }
+    clearLiveMarks();
+    const chains = new Set();
+    for (const m of cur.values()) {
+      sec.querySelector(`.pv-cell[data-row="${m.row}"][data-ch="${m.ch}"]`)?.classList.add('live');
+      sec.querySelector(`.pv-gutter .pv-rowplay[data-row="${m.row}"]`)?.closest('.pv-gutter')?.classList.add('live');
+      chains.add(m.chain);
+      const openChain = sec.querySelector('#pv-chain-detail')?.dataset.chain;
+      if (openChain !== undefined && parseInt(openChain, 10) === m.chain)
+        sec.querySelector(`.pv-cstep[data-step="${m.step}"]`)?.classList.add('playing');
+    }
+    for (const c of chains)
+      sec.querySelector(`.pv-chainrow[data-chain="${c}"]`)?.classList.add('live');
+  }
+
   // ── Pick-list popup ────────────────────────────────────
   // Editing a tracker by typing hex from memory is miserable: you have to
   // know that 0x1E is KIL and which of 255 chains is the one you meant.
@@ -4753,8 +4902,17 @@ const UI = (() => {
 
     const draw = () => {
       const q = filter.value.trim().toLowerCase();
+      const norm = s2 => String(s2).toLowerCase().replace(/[-\s]/g, '');
       shown = opts.items.filter(it =>
-        !q || String(it.label).toLowerCase().includes(q) || String(it.hint || '').toLowerCase().includes(q));
+        !q || String(it.label).toLowerCase().includes(q) || String(it.hint || '').toLowerCase().includes(q)
+        // fuzzy: "c4" should find "C-4", "a4" should find chain A4
+        || norm(it.label).includes(norm(q)));
+      // A list can't hold every legal value (chains alone run 00–FE), so a
+      // typed value that isn't listed becomes a first-class entry.
+      if (q && opts.synth) {
+        const extra = opts.synth(filter.value.trim());
+        if (extra && !shown.some(it => it.value === extra.value)) shown = [extra, ...shown];
+      }
       if (cursor >= shown.length) cursor = Math.max(0, shown.length - 1);
       let html = '', lastGroup = null;
       shown.forEach((it, i) => {
@@ -4942,6 +5100,9 @@ const UI = (() => {
           <button class="btn ghost sm" data-tsp="-1">−1</button>
           <button class="btn ghost sm" data-tsp="1">+1</button>
           <button class="btn ghost sm" data-tsp="12" title="Transpose up an octave">+12</button>
+          <span class="pe-sep"></span>
+          <button class="btn ghost sm" id="btn-ph-ins" title="Insert a blank step at the cursor, pushing the rest down">⤒ Insert</button>
+          <button class="btn ghost sm" id="btn-ph-del" title="Delete the step at the cursor, pulling the rest up">⤓ Delete</button>
           <span class="pe-sep"></span>
           <button class="btn ghost sm" id="btn-ph-copy" title="Copy the whole phrase">⧉ Copy</button>
           <button class="btn ghost sm" id="btn-ph-paste" title="Paste over this phrase"${peClipPhrase ? '' : ' disabled'}>Paste</button>
@@ -5134,6 +5295,33 @@ const UI = (() => {
         markDirty();
         rerender();
       }));
+    // Insert/delete a step, shifting the rest of the phrase. Insert drops
+    // whatever falls off the end; delete leaves a blank last step.
+    const PF = ['notes', 'instr', 'cmd1', 'param1', 'cmd2', 'param2'];
+    const blankStep = (pb, at) => {
+      const k = peKey(ph, at);
+      pb.notes[k] = PT.EMPTY; pb.instr[k] = PT.EMPTY;
+      pb.cmd1[k] = PT.CMD_NONE; pb.cmd2[k] = PT.CMD_NONE;
+      pb.param1[k] = 0; pb.param2[k] = 0;
+    };
+    det.querySelector('#btn-ph-ins').addEventListener('click', () => {
+      pushUndo();
+      const pb = parsed.phrases, at = peCursor.step;
+      for (const f of PF)
+        for (let sIdx = PT.STEPS - 1; sIdx > at; sIdx--)
+          pb[f][peKey(ph, sIdx)] = pb[f][peKey(ph, sIdx - 1)];
+      blankStep(pb, at);
+      markDirty(); rerender(); focusCell();
+    });
+    det.querySelector('#btn-ph-del').addEventListener('click', () => {
+      pushUndo();
+      const pb = parsed.phrases, at = peCursor.step;
+      for (const f of PF)
+        for (let sIdx = at; sIdx < PT.STEPS - 1; sIdx++)
+          pb[f][peKey(ph, sIdx)] = pb[f][peKey(ph, sIdx + 1)];
+      blankStep(pb, PT.STEPS - 1);
+      markDirty(); rerender(); focusCell();
+    });
     det.querySelector('#btn-ph-copy').addEventListener('click', () => {
       peClipPhrase = phraseSnapshot(parsed, ph);
       rerender();
@@ -5169,8 +5357,12 @@ const UI = (() => {
   function previewPhrase(parsed, ph, el) {
     if (SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
     el.textContent = '…';
-    SongPlayer.play(sd, modalProj, parsed, null, () => { el.textContent = '▶'; }, { phrase: ph })
-      .then(ok => { el.textContent = ok ? '■' : '▶'; });
+    SongPlayer.play(sd, modalProj, parsed, transportProgress,
+      () => { el.textContent = '▶'; hideTransport(); }, { phrase: ph })
+      .then(ok => {
+        el.textContent = ok ? '■' : '▶';
+        if (ok) showTransport(`${modalProj.name} — phrase ${PT.hx2(ph)}`, 'phrase preview');
+      });
   }
 
   function updateSaveBar(host) {
@@ -7202,6 +7394,7 @@ const UI = (() => {
     $('proj-modal').addEventListener('click', e => { if (e.target === $('proj-modal')) closeProjModal(); });
     $('btn-modal-prev').addEventListener('click', () => modalNav(-1));
     $('btn-modal-next').addEventListener('click', () => modalNav(1));
+    $('tr-stop').addEventListener('click', () => SongPlayer.stop());
     $('btn-modal-play').addEventListener('click', async () => {
       if (SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
       if (!modalProj) return;
@@ -7212,11 +7405,12 @@ const UI = (() => {
       btn.textContent = '… loading';
       const baseMeta = $('modal-meta').textContent;
       const ok = await SongPlayer.play(sd, modalProj, parsed,
-        (t, d) => { $('modal-meta').textContent = `▶ ${fmtDur(t)} / ${fmtDur(d)}`; },
-        () => { btn.textContent = '▶ Play'; $('modal-meta').textContent = baseMeta; });
+        (t, d) => { $('modal-meta').textContent = `▶ ${fmtDur(t)} / ${fmtDur(d)}`; transportProgress(t, d); },
+        () => { btn.textContent = '▶ Play'; $('modal-meta').textContent = baseMeta; hideTransport(); });
       btn.disabled = false;
       btn.textContent = ok ? '■ Stop' : '▶ Play';
-      if (!ok) $('modal-meta').textContent = baseMeta;
+      if (ok) showTransport(modalProj.name, `${modalProj.tempo ?? '—'} BPM · full song`);
+      else $('modal-meta').textContent = baseMeta;
     });
     $('btn-modal-patterns').addEventListener('click', togglePatternView);
     $('btn-modal-overview').addEventListener('click', () => setModalTab('overview'));
@@ -7336,6 +7530,11 @@ const UI = (() => {
       if ($('slice-modal').style.display !== 'none' || $('fix-modal').classList.contains('open') ||
           $('diff-modal').classList.contains('open') || $('samp-modal').classList.contains('open')) return;
       if ($('proj-modal').style.display !== 'none') {
+        // Don't steal the arrows from an editor: the phrase grid, chain
+        // steps and song grid all navigate with them. Project-to-project
+        // nav only applies when nothing editable has focus.
+        const a = document.activeElement;
+        if (a && a.closest && a.closest('.pe-c, .pv-cell, .pv-cstep, .pick')) return;
         if (e.key === 'ArrowLeft') modalNav(-1);
         if (e.key === 'ArrowRight') modalNav(1);
         return;

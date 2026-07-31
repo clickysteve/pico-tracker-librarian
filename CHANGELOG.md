@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.9.4 — transport, live position, phrase insert/delete
+
+- **Transport bar.** A bar along the bottom shows what's playing (song,
+  chain, row or phrase), a progress bar, elapsed/total, and a stop button
+  that works from anywhere. The playing project's row is tinted and its
+  name accented, so row hover no longer hides the fact that it's playing.
+- **Live position in the grid.** While anything plays, the cell each
+  channel is currently inside is outlined, its row gutter lights up, the
+  chains in play are highlighted in the chain list, and the open chain's
+  current step is marked. Driven by new position marks on the event
+  timeline.
+- **Insert / delete a phrase step**, shifting the rest of the phrase.
+- **Chain step rows line up again.** A stale `display:flex` rule was
+  overriding the grid layout, so any row with a transpose pushed its
+  neighbours out of alignment — that's the broken look in the screenshot.
+  Rows are also beat-marked every four now, matching the phrase grid.
+- **Every chain step has a labelled `edit` button**, including empty ones
+  (disabled, so the column doesn't jump). The bare `›` was easy to miss.
+- **Pick lists reach every value.** Chains run 00–FE and phrases beyond
+  what a list can usefully hold, so typing a value that isn't listed now
+  offers it as a first-class entry rather than relying on an invisible
+  fallback.
+- **Fuzzy matching in pick lists**: `c4` finds `C-4`, `a4` finds chain
+  `A4`.
+- **Arrow keys work in the editors.** They were being swallowed by
+  project-to-project navigation. They now walk the song grid too, with
+  ⌘/Ctrl+C/V to copy and paste a single cell.
+- **"+ more rows" keeps your scroll position** instead of jumping to the
+  top of the grid.
+
 ## v0.9.3 — pick lists instead of typing, room to arrange
 
 - **Nothing has to be typed from memory any more.** Every editable cell
