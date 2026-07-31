@@ -653,6 +653,9 @@
     .pv-cstep .cgo:hover { background:var(--accent-dim); }
     .pv-cstep .cgo.off { color:var(--border2); border-color:var(--border); cursor:default; }
     .pv-cstep .cgo.off:hover { background:none; }
+    .pv-cell.sel { background:var(--accent-dim); box-shadow:inset 0 0 0 1px var(--accent-brd); }
+    .pv-cell.sel.empty { color:var(--accent); }
+    #pv-selinfo { color:var(--accent); margin-left:8px; font-weight:600; }
     .pv-cell.empty { cursor:pointer; }
     .pv-cell.empty:hover { background:var(--accent-dim); color:var(--accent); }
     .pv-cell:focus { outline:1px solid var(--accent); outline-offset:-1px; }
@@ -668,6 +671,9 @@
     .pv-pstep .pn.empty { color:var(--border2); font-weight:400; }
     .pv-pstep .pv2 { color:var(--muted); }
     .pv-pstep .pfx { color:var(--c-mid); }
+    .exp-badge { font-size:9px; font-weight:700; letter-spacing:.8px; color:var(--warn);
+      background:#1f1200; border:1px solid #4a2e00; border-radius:3px; padding:2px 7px;
+      margin-left:10px; vertical-align:middle; cursor:help; white-space:nowrap; }
     /* TRANSPORT */
     #transport { position:fixed; left:0; right:0; bottom:0; z-index:320; display:none;
       align-items:center; gap:14px; padding:9px 20px;
@@ -853,7 +859,8 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.5 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.6 Alpha</span>
+      <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -1008,6 +1015,7 @@
         <button class="prob-btn" data-psec="autosaves">Autosaves<span class="prob-count" id="pc-autosaves"></span></button>
         <button class="prob-btn" data-psec="skipped">Unreadable<span class="prob-count" id="pc-skipped"></span></button>
         <button class="prob-btn" data-psec="backbone">Backbone</button>
+        <button class="prob-btn" data-psec="trash">Trash<span class="prob-count" id="pc-trash"></span></button>
         <button class="prob-btn" data-psec="repairlog">Repair Log<span class="prob-count" id="pc-repairlog"></span></button>
         <button class="btn sm dim" id="btn-dupescan" title="Byte-level scan for content-identical samples">Scan dupes</button>
         <button class="btn sm dim" id="btn-export-report" style="margin-left:auto">⬇ Export Report</button>
@@ -3792,7 +3800,11 @@ const UI = (() => {
   const dirtyGrid = new Set();    // dirNames whose song grid was edited
   let pvSpareRows = 8;            // blank song rows shown past the end
   let pvRowClip = null;           // copied song row (8 chain values)
-  let pvCellClip = null;          // copied single grid cell
+  // Block selection in the song grid. A single cell is just a 1x1 block, so
+  // copy/paste/clear have one code path rather than two.
+  let pvSel = null;               // {r0,t0,r1,t1} normalised selection
+  let pvFocus = null;             // {r,t} last focused cell, survives re-render
+  let pvBlockClip = null;         // {w,h,cells:[[chain,…],…]}
 
   const cacheKey = () => sd ? `card:${sd.name}` : null;
 
@@ -4492,7 +4504,9 @@ const UI = (() => {
     host.innerHTML = `
       <div class="pv-hdr">
         <span class="pv-hdr-title">Song grid — ${last+1} rows</span>
-        <span class="pv-hint">arrows move · <b>Enter</b> pick a chain · <b>Del</b> clear · <b>⌘/Ctrl+C/V</b> copy a cell · ▶ plays a whole row</span>
+        <span class="pv-hint">arrows move · <b>shift+arrows</b> or shift+click select a block · <b>Enter</b> pick a chain ·
+          <b>Del</b> clear · <b>⌘/Ctrl+C/V</b> copy &amp; paste · <b>⌘/Ctrl+A</b> all · ▶ plays a whole row
+          <span id="pv-selinfo"></span></span>
         <button class="btn ghost sm" id="btn-pv-recolour" ${customColours ? '' : 'disabled'}
           title="${customColours ? `Discard your ${customColours} custom chain colour${customColours>1?'s':''} and go back to the by-group palette` : 'No custom chain colours to reset — pick one with a swatch first'}">↺ Colours</button>
       </div>
@@ -4574,34 +4588,106 @@ const UI = (() => {
       cell.addEventListener('click', () => showChain(parsed, parseInt(cell.dataset.chain, 10), host)));
     host.querySelectorAll('.pv-cell.empty').forEach(cell =>
       cell.addEventListener('click', () => editGridCell(cell)));
-    const focusGrid = (r, t) => host.querySelector(`.pv-cell[data-row="${r}"][data-ch="${t}"]`)?.focus();
+    const focusGrid = (r, t) => {
+      pvFocus = { r, t };
+      host.querySelector(`.pv-cell[data-row="${r}"][data-ch="${t}"]`)?.focus();
+    };
+    // ── Block selection ──────────────────────────────────
+    const selBox = () => {
+      if (!pvSel) return pvFocus ? { r0: pvFocus.r, t0: pvFocus.t, r1: pvFocus.r, t1: pvFocus.t } : null;
+      return { r0: Math.min(pvSel.r0, pvSel.r1), r1: Math.max(pvSel.r0, pvSel.r1),
+               t0: Math.min(pvSel.t0, pvSel.t1), t1: Math.max(pvSel.t0, pvSel.t1) };
+    };
+    const paintSel = () => {
+      host.querySelectorAll('.pv-cell.sel').forEach(c => c.classList.remove('sel'));
+      if (!pvSel) return;
+      const b = selBox();
+      for (let r = b.r0; r <= b.r1; r++)
+        for (let t = b.t0; t <= b.t1; t++)
+          host.querySelector(`.pv-cell[data-row="${r}"][data-ch="${t}"]`)?.classList.add('sel');
+      const n = (b.r1 - b.r0 + 1) * (b.t1 - b.t0 + 1);
+      const lbl = host.querySelector('#pv-selinfo');
+      if (lbl) lbl.textContent = n > 1 ? `${b.r1-b.r0+1}×${b.t1-b.t0+1} selected` : '';
+    };
+    const extendSel = (r, t) => {
+      if (!pvSel) pvSel = { r0: pvFocus.r, t0: pvFocus.t, r1: r, t1: t };
+      else { pvSel.r1 = r; pvSel.t1 = t; }
+      focusGrid(r, t);
+      paintSel();
+    };
+    const clearSel = () => { pvSel = null; paintSel(); };
+    const copyBlock = () => {
+      const b = selBox();
+      if (!b) return;
+      pvBlockClip = { w: b.t1 - b.t0 + 1, h: b.r1 - b.r0 + 1, cells: [] };
+      for (let r = b.r0; r <= b.r1; r++) {
+        const row = [];
+        for (let t = b.t0; t <= b.t1; t++) row.push(PT.gridCell(parsed, r, t));
+        pvBlockClip.cells.push(row);
+      }
+    };
+    const pasteBlock = (r0, t0) => {
+      if (!pvBlockClip) return;
+      for (let dr = 0; dr < pvBlockClip.h; dr++)
+        for (let dt = 0; dt < pvBlockClip.w; dt++) {
+          const r = r0 + dr, t = t0 + dt;
+          if (r >= maxRows || t >= CH) continue;      // clip at the edges
+          parsed.grid[r * PT.CHANNELS + t] = pvBlockClip.cells[dr][dt];
+        }
+      markGridDirty();
+      renderPatterns(host, p, parsed);
+    };
+    const clearBlock = () => {
+      const b = selBox();
+      if (!b) return;
+      for (let r = b.r0; r <= b.r1; r++)
+        for (let t = b.t0; t <= b.t1; t++) parsed.grid[r * PT.CHANNELS + t] = PT.EMPTY;
+      markGridDirty();
+      renderPatterns(host, p, parsed);
+    };
+    // shift+click extends a selection from the focused cell
     host.querySelectorAll('.pv-cell[data-row]').forEach(cell => {
+      cell.addEventListener('mousedown', ev => {
+        const r = parseInt(cell.dataset.row, 10), t = parseInt(cell.dataset.ch, 10);
+        if (ev.shiftKey && pvFocus) { ev.preventDefault(); extendSel(r, t); }
+        else { pvFocus = { r, t }; clearSel(); }
+      });
       cell.addEventListener('dblclick', e => { e.stopPropagation(); editGridCell(cell); });
       cell.addEventListener('keydown', ev => {
         const r = parseInt(cell.dataset.row, 10), t = parseInt(cell.dataset.ch, 10);
-        // arrow keys walk the grid; ⌘/Ctrl+C/V copy and paste a single cell
-        if (ev.key === 'ArrowUp')    { ev.preventDefault(); focusGrid(Math.max(0, r - 1), t); return; }
-        if (ev.key === 'ArrowDown')  { ev.preventDefault(); focusGrid(Math.min(shownRows - 1, r + 1), t); return; }
-        if (ev.key === 'ArrowLeft')  { ev.preventDefault(); focusGrid(r, Math.max(0, t - 1)); return; }
-        if (ev.key === 'ArrowRight') { ev.preventDefault(); focusGrid(r, Math.min(CH - 1, t + 1)); return; }
-        if (!gridEditable) return;
-        if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'c') {
-          ev.preventDefault(); pvCellClip = PT.gridCell(parsed, r, t); return;
+        pvFocus = { r, t };
+        const move = (nr, nt) => {
+          ev.preventDefault();
+          if (ev.shiftKey) extendSel(nr, nt);
+          else { clearSel(); focusGrid(nr, nt); }
+        };
+        if (ev.key === 'ArrowUp')    return move(Math.max(0, r - 1), t);
+        if (ev.key === 'ArrowDown')  return move(Math.min(shownRows - 1, r + 1), t);
+        if (ev.key === 'ArrowLeft')  return move(r, Math.max(0, t - 1));
+        if (ev.key === 'ArrowRight') return move(r, Math.min(CH - 1, t + 1));
+        if (ev.key === 'Escape') { ev.preventDefault(); clearSel(); return; }
+        if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'a') {
+          ev.preventDefault();
+          pvSel = { r0: 0, t0: 0, r1: shownRows - 1, t1: CH - 1 };
+          paintSel();
+          return;
         }
+        if (!gridEditable) return;
+        if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'c') { ev.preventDefault(); copyBlock(); return; }
         if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'v') {
           ev.preventDefault();
-          if (pvCellClip !== null) setCell(r, t, pvCellClip === PT.EMPTY ? null : pvCellClip);
+          const b = selBox();
+          pasteBlock(b.r0, b.t0);
           return;
         }
         if (ev.key === 'Enter') { ev.preventDefault(); editGridCell(cell); }
-        else if (ev.key === 'Delete' || ev.key === 'Backspace') {
-          ev.preventDefault();
-          parsed.grid[parseInt(cell.dataset.row,10) * PT.CHANNELS + parseInt(cell.dataset.ch,10)] = PT.EMPTY;
-          markGridDirty();
-          renderPatterns(host, p, parsed);
-        } else if (/^[0-9a-fA-F]$/.test(ev.key)) { ev.preventDefault(); editGridCell(cell, ev.key); }
+        else if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); clearBlock(); }
+        else if (/^[0-9a-fA-F]$/.test(ev.key)) { ev.preventDefault(); editGridCell(cell, ev.key); }
       });
     });
+    // restore selection and focus across the wholesale re-render
+    paintSel();
+    if (pvFocus) host.querySelector(`.pv-cell[data-row="${pvFocus.r}"][data-ch="${pvFocus.t}"]`)?.focus();
     host.querySelectorAll('.pv-chainrow input[type=color]').forEach(inp =>
       inp.addEventListener('change', async () => {
         chainColors[`${p.dirName}:${inp.dataset.chain}`] = inp.value;
@@ -6152,6 +6238,9 @@ const UI = (() => {
           <div class="prob-main"><div class="prob-name">${esc(nm)}</div></div>
           <span class="prob-right">${n} projects</span></div>`).join('')
         || '<div class="center-note">No sample is used in more than one project yet.</div>');
+    } else if (probSec === 'trash') {
+      host.innerHTML = '<div class="center-note">Reading PTLibrarian_Trash/…</div>';
+      renderTrash(host);
     } else if (probSec === 'repairlog') {
       host.innerHTML = repairLog.slice().reverse().map(r => `<div class="prob-row">
         <span class="prob-icon">${r.ok?'✓':'✕'}</span>
@@ -6159,6 +6248,101 @@ const UI = (() => {
         <div class="prob-sub">${esc(r.detail)}</div></div>
         <span class="prob-right">${new Date(r.ts).toLocaleString()}</span></div>`).join('')
         || '<div class="center-note">No repairs have been made in this browser yet.<br>Repairs are also logged to PTLibrarian_Backups/audit-log.txt on the card.</div>';
+    }
+  }
+
+  // ── Trash browser ──────────────────────────────────────
+  // Cleanup moves pool samples to PTLibrarian_Trash/ rather than deleting
+  // them. This is where they can be put back, or actually removed.
+  async function listTrash() {
+    const out = [];
+    let root;
+    try { root = await sd.getDirectoryHandle('PTLibrarian_Trash'); } catch { return out; }
+    for await (const [projName, dir] of root) {
+      if (dir.kind !== 'directory') continue;
+      for await (const [name, fh] of dir) {
+        if (fh.kind !== 'file' || !/\.wav$/i.test(name)) continue;
+        try {
+          const f = await fh.getFile();
+          out.push({ proj: projName, name, size: f.size, lastModified: f.lastModified });
+        } catch {}
+      }
+    }
+    out.sort((a, b) => b.lastModified - a.lastModified);
+    return out;
+  }
+  async function renderTrash(host) {
+    let items = [];
+    try { items = await listTrash(); } catch {}
+    const total = items.reduce((n, i) => n + i.size, 0);
+    $('pc-trash').textContent = items.length || '';
+    if (!items.length) {
+      host.innerHTML = '<div class="center-note">Trash is empty.<br>Cleaning up unused pool samples moves them here first, so nothing is lost by accident.</div>';
+      return;
+    }
+    host.innerHTML = `<div class="prob-group-hdr" style="display:flex;align-items:center;gap:10px">
+        <span style="flex:1">${items.length} file${items.length>1?'s':''} in PTLibrarian_Trash/ · ${fmtBytes(total)} reclaimable</span>
+        <button class="btn ghost sm" id="btn-trash-empty">🗑 Empty trash permanently</button>
+      </div>` +
+      items.map((i, idx) => `<div class="prob-row" data-i="${idx}">
+        <span class="prob-icon">🗑</span>
+        <div class="prob-main"><div class="prob-name">${esc(i.name)}</div>
+          <div class="prob-sub">from ${esc(i.proj)} · ${fmtDate(i.lastModified)}</div></div>
+        <span class="prob-right" style="display:flex;gap:6px;align-items:center">
+          ${fmtBytes(i.size)}
+          <button class="btn ghost sm btn-trash-restore" data-i="${idx}" title="Put this file back in its project's sample pool">↩ Restore</button>
+          <button class="btn ghost sm btn-trash-del" data-i="${idx}" title="Delete permanently — this cannot be undone">✕ Delete</button>
+        </span></div>`).join('');
+    host.querySelectorAll('.btn-trash-restore').forEach(b =>
+      b.addEventListener('click', () => restoreFromTrash(items[+b.dataset.i], host)));
+    host.querySelectorAll('.btn-trash-del').forEach(b =>
+      b.addEventListener('click', () => deleteFromTrash(items[+b.dataset.i], host)));
+    $('btn-trash-empty').addEventListener('click', async () => {
+      if (!confirm(`Permanently delete all ${items.length} file(s) in PTLibrarian_Trash/?\n\nThis cannot be undone.`)) return;
+      let ok = 0;
+      for (const i of items) if (await deleteFromTrash(i, null)) ok++;
+      setCacheBar(`Deleted ${ok}/${items.length} file(s) permanently.`, ok === items.length);
+      renderTrash(host);
+    });
+  }
+  async function restoreFromTrash(item, host) {
+    if (!await ensureWrite()) return false;
+    try {
+      const bytes = await (await readCardFile(`PTLibrarian_Trash/${item.proj}`, item.name)).arrayBuffer();
+      const poolPath = `projects/${item.proj}/samples`;
+      // don't clobber a file that has reappeared in the pool since
+      let exists = false;
+      try { await (await getPathDir(poolPath, false)).getFileHandle(item.name); exists = true; } catch {}
+      if (exists) throw new Error(`${item.name} is already in that pool — remove it there first`);
+      await writeCardFile(poolPath, item.name, bytes);
+      const back = await readCardFile(poolPath, item.name);
+      if (back.size !== bytes.byteLength) throw new Error('restore verification failed');
+      await (await getPathDir(`PTLibrarian_Trash/${item.proj}`, false)).removeEntry(item.name);
+      logRepair(true, 'restore-sample', `${item.proj}: ${item.name} restored from trash (${fmtBytes(item.size)})`);
+      await persist();
+      setCacheBar(`Restored ${item.name} — rescanning…`, true);
+      await rescan(lib);
+      if (host) renderTrash(host);
+      return true;
+    } catch (e) {
+      logRepair(false, 'restore-sample', `${item.proj}: ${item.name}: ${e.message || e}`);
+      setCacheBar(`Restore failed: ${e.message || e}`, false);
+      return false;
+    }
+  }
+  async function deleteFromTrash(item, host) {
+    if (!await ensureWrite()) return false;
+    if (host && !confirm(`Permanently delete ${item.name}?\n\nIt is already out of your project. This cannot be undone.`)) return false;
+    try {
+      await (await getPathDir(`PTLibrarian_Trash/${item.proj}`, false)).removeEntry(item.name);
+      logRepair(true, 'delete-sample', `${item.proj}: ${item.name} deleted permanently (${fmtBytes(item.size)})`);
+      await persist();
+      if (host) { setCacheBar(`Deleted ${item.name} permanently.`, true); renderTrash(host); }
+      return true;
+    } catch (e) {
+      logRepair(false, 'delete-sample', `${item.proj}: ${item.name}: ${e.message || e}`);
+      setCacheBar(`Delete failed: ${e.message || e}`, false);
+      return false;
     }
   }
 

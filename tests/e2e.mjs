@@ -347,6 +347,55 @@ check('picker: an unlisted value can still be chosen', await page.evaluate(() =>
 await page.keyboard.press('Escape');
 await page.waitForTimeout(150);
 
+// block selection: shift+arrows mark a range, which copies/pastes/clears
+check('select: shift+arrow marks a block', await page.evaluate(async () => {
+  const c = document.querySelector('.pv-cell[data-row="0"][data-ch="0"]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 60));
+  const a = document.activeElement;
+  a.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 60));
+  return document.querySelectorAll('.pv-cell.sel').length === 4;   // 2x2
+}));
+check('select: the block size is reported', await page.evaluate(() =>
+  /2×2/.test(document.getElementById('pv-selinfo')?.textContent || '')));
+// copy the 2x2 block, move away, paste it, and confirm the values landed
+const blockVals = await page.evaluate(() =>
+  [[0,0],[0,1],[1,0],[1,1]].map(([r,t]) =>
+    document.querySelector(`.pv-cell[data-row="${r}"][data-ch="${t}"]`).textContent.trim()));
+// note the target row BEFORE pasting: filling spare rows extends the song,
+// so they stop being spare and the selector would find a different row
+const targetRow = await page.evaluate(async () => {
+  document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', metaKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 60));
+  const target = document.querySelector('.pv-cell.empty.spare[data-ch="0"]');
+  if (!target) return null;
+  const r0 = parseInt(target.dataset.row, 10);
+  target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  target.focus();
+  target.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', metaKey: true, bubbles: true }));
+  return r0;
+});
+await page.waitForTimeout(350);
+const pastedBlock = targetRow === null ? null : await page.evaluate(r0 =>
+  [[0,0],[0,1],[1,0],[1,1]].map(([dr,dt]) =>
+    document.querySelector(`.pv-cell[data-row="${r0+dr}"][data-ch="${dt}"]`)?.textContent.trim()), targetRow);
+check('select: a copied block pastes as a block',
+  !!pastedBlock && pastedBlock.join(',') === blockVals.join(','));
+// Esc deselects
+await page.evaluate(() => {
+  const c = document.querySelector('.pv-cell[data-row="0"][data-ch="0"]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }));
+});
+await page.waitForTimeout(80);
+await page.evaluate(() =>
+  document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+await page.waitForTimeout(80);
+check('select: Esc clears the selection', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cell.sel').length === 0));
+
 // ── 7b. sliced playback uses the wav's own sample rate ──
 // Must run BEFORE the slicer test below, which overwrites Night Bass's
 // markers with 8 equal divisions.
@@ -525,6 +574,34 @@ await page.click('.btn-trash-one');
 await page.waitForTimeout(2000);
 const unusedAfter = await page.evaluate(() => document.querySelectorAll('.btn-trash-one').length);
 check('cleanup: sample moved to card trash', unusedAfter === unusedBefore - 1);
+
+// ── 8c. trash browser: restore, then delete permanently ─
+await page.evaluate(() => document.querySelector('[data-psec="trash"]').click());
+await page.waitForTimeout(600);
+check('trash: the trashed file is listed', await page.evaluate(() =>
+  document.querySelectorAll('.btn-trash-restore').length === 1));
+const trashedName = await page.evaluate(() =>
+  document.querySelector('.prob-row .prob-name')?.textContent.trim());
+await page.click('.btn-trash-restore');
+await page.waitForTimeout(2500);
+await page.evaluate(() => document.querySelector('[data-psec="trash"]').click());
+await page.waitForTimeout(600);
+check('trash: restoring empties the trash', await page.evaluate(() =>
+  document.querySelectorAll('.btn-trash-restore').length === 0));
+await page.evaluate(() => document.querySelector('[data-psec="unusedpool"]').click());
+await page.waitForTimeout(400);
+check('trash: the restored sample is back in the pool', await page.evaluate(nm =>
+  document.getElementById('prob-content').textContent.includes(nm), trashedName));
+// trash it again and delete it for real
+await page.click('.btn-trash-one');
+await page.waitForTimeout(2200);
+await page.evaluate(() => document.querySelector('[data-psec="trash"]').click());
+await page.waitForTimeout(600);
+page.once('dialog', d => d.accept());
+await page.click('.btn-trash-del');
+await page.waitForTimeout(1200);
+check('trash: permanent delete removes the file', await page.evaluate(() =>
+  document.querySelectorAll('.btn-trash-restore').length === 0));
 
 // ── 9. warm reopen of a (mock) real card reads no wav content ──
 await page.evaluate(() => {

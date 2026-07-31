@@ -7,11 +7,9 @@ until then, however substantial a round turns out to be.
 
 ## Next
 
-- **Block selection in the pattern editor** — shift+arrows to mark a range
-  of grid cells, then copy, paste, transpose or clear it as a unit. Single
-  cells and whole rows already copy and paste; a selection model is what
-  turns the grid from cell-at-a-time into actual arranging, and it's the
-  biggest remaining gap in the feature people like most.
+- **Transpose a selected block** — selection, copy, paste and clear landed
+  in 0.9.6; nudging every chain number in a selection up or down is the
+  obvious next operation on it.
 - **Card access over USB** — blocked on firmware (issues #1430 mass
   storage / #1432 data protocol); the librarian will work while the device
   is connected the day either lands.
@@ -19,9 +17,10 @@ until then, however substantial a round turns out to be.
   C/C#/D) for the phrase editor, so melodies can be typed rather than
   picked note by note. Worth it only if people actually write in the
   browser rather than on the device.
-- **True sample delete** — cleanup moves unused pool samples to
-  `PTLibrarian_Trash/`; add explicit delete (with confirm) from the sample
-  browser and preview flows, plus a trash browser with restore/empty.
+- **Delete from the sample browser** — the Trash tab (0.9.6) handles
+  restore and permanent delete for files already trashed; trashing
+  directly from the sample browser and preview flows would save a trip
+  through Problems.
 
 ## Playback fidelity
 
@@ -61,7 +60,8 @@ actually audible rather than theoretical:
 ## Done
 
 Kept short, as a record of what feedback rounds resolved: arrangement
-editing (song grid + chains), phrase step insert/delete, pick-lists in
+editing (song grid + chains), block selection, the trash browser with
+restore and permanent delete, phrase step insert/delete, pick-lists in
 place of typing hex, the transport bar and live playback position, the
 slicer's waveform zoom, setlist ordering, the macOS junk-file filter, and
 the playback fixes in 0.9.1 (slice/loop sample-rate units, output

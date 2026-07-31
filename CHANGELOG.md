@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.9.6 — block selection, real delete, experimental warning
+
+- **Block selection in the pattern editor.** Shift+arrows or shift+click
+  mark a rectangle of grid cells; `⌘/Ctrl+C` and `⌘/Ctrl+V` copy and paste
+  it as a block, `Del` clears it, `⌘/Ctrl+A` selects everything and `Esc`
+  deselects. A single cell is just a 1×1 block, so copy, paste and clear
+  have one code path rather than two. Pasting clips at the grid edges
+  rather than wrapping.
+- **True sample delete, with a way back.** Cleanup still moves unused pool
+  samples to `PTLibrarian_Trash/` rather than deleting them; a new
+  **Trash** tab lists what's in there with its size and origin, and offers
+  **Restore** (back to the project's pool, verified, and refused if a file
+  of that name has reappeared there) or **Delete** permanently, per file or
+  all at once. Both are confirmed and audit-logged.
+- **Experimental warning** in the app header and at the top of the README:
+  this writes to your SD card, the editing features are new, back your
+  projects up first.
+
 ## v0.9.5 — docs rewritten, consistent cell editing
 
 - **README rewritten and audited against the code**, not against memory.

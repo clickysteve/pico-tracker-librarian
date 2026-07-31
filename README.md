@@ -6,6 +6,12 @@ Sibling project to [M8 Librarian](https://m8librarian.allmyfriendsaresynths.com)
 
 Requires Chrome or Edge (it uses the File System Access API to read your card; Firefox and Safari don't support it).
 
+> ## ⚠ Experimental — back up your projects first
+>
+> This is alpha software that **writes to your SD card**. Reading and browsing are safe and well exercised; the editing features (arrangement, phrases, slice points, instrument parameters, themes) are newer and have had far less real-world use.
+>
+> Every write backs the original up to `PTLibrarian_Backups/` on the card, verifies the result byte-for-byte and rolls back on failure, and deletions go to a trash folder rather than vanishing. That is not a substitute for your own backup. **Copy your card, or at least the projects you care about, before editing anything.** Use at your own risk.
+
 ## Getting started
 
 1. Open `index.html` in Chrome or Edge (or the hosted page).
@@ -39,7 +45,7 @@ Cards that have been near a Mac collect AppleDouble junk (`._kick.wav`, `.DS_Sto
 ### Arrange and edit
 
 - **Pattern editor** — the song grid at full size, with an ordered chain list down the left bucketed by number group (usage counts, colours, per-chain preview, hover-to-highlight), and chain and phrase panels beside the grid rather than under it.
-  Click any cell to choose the chain that sits there from a filterable list of the chains this song already uses, the ones defined but unplaced, and free slots; type a value that isn't listed and it's offered too, so all of `00`–`FE` is reachable. Arrow keys walk the grid, `Enter` opens the picker, `Del` clears, `⌘/Ctrl+C/V` copies and pastes a cell, and whole rows copy and paste from the gutter. Spare rows sit past the end of the song so an arrangement can be extended, with **+ more rows** for as far as the geometry allows.
+  Click any cell to choose the chain that sits there from a filterable list of the chains this song already uses, the ones defined but unplaced, and free slots; type a value that isn't listed and it's offered too, so all of `00`–`FE` is reachable. Arrow keys walk the grid and **shift+arrows or shift+click select a block**, which then copies, pastes or clears as a unit (`⌘/Ctrl+C/V`, `Del`, `⌘/Ctrl+A` for everything, `Esc` to deselect). Whole rows also copy and paste from the gutter. Spare rows sit past the end of the song so an arrangement can be extended, with **+ more rows** for as far as the geometry allows.
   Chain colours come from the chain number: the high nibble picks a hue family so the `00`s, `10`s and `20`s each read as a group, while lightness strides within a group to keep neighbours apart. Pick your own per chain, or reset.
 - **Chain editor** — open any chain and edit its 16 steps in place: which phrase plays at each step, chosen from the project's phrases with a note count each, and a per-step transpose. Beat-marked every four.
 - **Phrase editor** — a tracker-style grid you edit in place. Arrows and Tab move the cursor, `Enter` or typing opens a pick-list, `Del` clears a cell. Notes, instruments and FX are chosen by name — `04 Night Bass` rather than `04`, `KIL`/`HOP`/`PSL` rather than raw hex — with fuzzy matching, so `c4` finds `C-4`. Insert or delete a step (shifting the rest of the phrase), per-step copy/paste, whole-phrase copy/paste/clear, one-click transpose (±1/±12), 50-level undo, and a ▶ that auditions just that phrase.
@@ -65,7 +71,7 @@ All edits are held in memory until you explicitly save, and every save goes thro
 - **Problems tab** — missing sample references, unused pool samples with reclaimable sizes, unused instruments, content-identical samples (byte-level dupe scan), duplicate `.pti` names, stale autosaves, unreadable files, backbone sounds, and the repair log. Most problems can be fixed from the tab itself.
 - **Fix all exact matches** — one-click batch repair: every missing reference with an exact-name copy elsewhere on the card is restored by file copy, verified and audit-logged.
 - **Repair mode** — two fixes for a broken reference: *copy* a matching WAV from the library or another project's pool into this project's pool (no project-file edit), or *re-point* the reference to an existing pool sample by rewriting only that attribute inside the project file.
-- **Cleanup** — unused pool samples move to `PTLibrarian_Trash/` on the card rather than being deleted.
+- **Cleanup and trash** — unused pool samples move to `PTLibrarian_Trash/` on the card rather than being deleted. The **Trash** tab lists what's in there and lets you restore a file to its pool (refusing if something of that name has reappeared) or delete it permanently, individually or all at once.
 - **Extract as .pti** — pull any instrument out of a project bank into `instruments/` as a `.pti` (or download it if the card is read-only).
 - **Backup** — copy the card to a folder or download it as a ZIP, with per-directory selection (`.config.xml` and `.current` always included).
 - **Setlists** — click projects to add them to an ordered setlist, drag or ▲▼ to reorder, then export a lean, card-ready `projects/` layout as a folder or ZIP. Folders can be numbered (`01_`, `02_` …) so the device lists them in playing order. Setlists save with their order.
@@ -103,7 +109,7 @@ Tests are zero-dependency Node scripts that extract modules straight out of `ind
 node tests/parser.test.mjs   # 92 unit tests: formats, MIDI timing, slice/loop units, theme writing, round-trips
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
 node tests/audio.test.mjs    # renders the mix offline: no clipping, correct slice offsets
-node tests/e2e.mjs           # 85 browser checks (needs: npm i -D playwright)
+node tests/e2e.mjs           # 93 browser checks (needs: npm i -D playwright)
 ```
 
 The parser tests run round-trip checks against real Advance project files when they're present locally; those files are not in this repository.
@@ -112,6 +118,6 @@ The USB mirror's font is the 8x8 Wide face and special-glyph page by nILS (publi
 
 ## Status
 
-Alpha, and versioned accordingly. It reads cards safely and has done from the start; the editing features are newer and have had less real-world use. Try them on a backed-up copy of a project before anything you'd be sad to lose. `CHANGELOG.md` records what changed and why; `ROADMAP.md` lists what's known to be missing.
+Alpha, and versioned accordingly — see the warning at the top before you edit anything. `CHANGELOG.md` records what changed and why, including the bugs found and how they were caught; `ROADMAP.md` lists what's known to be missing, including where playback still differs from the device.
 
 Not affiliated with xiphonics. Use at your own risk — the read-only default, backup-first writes and automatic rollback exist precisely so that risk stays near zero.
