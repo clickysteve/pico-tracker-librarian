@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.9.5 — docs rewritten, consistent cell editing
+
+- **README rewritten and audited against the code**, not against memory.
+  Corrections found while checking: the instrument type filter list was
+  missing `SAMPLESOURCE`; MIDI export writes a tempo track plus one track
+  per channel *that plays anything*, not simply one per channel; the
+  module list omitted `Demo`, `USB` and `SongPlayer`; the remote-input
+  section described an opt-in mode that is in fact hidden and never sends
+  anything; and several sections still described the zoom slider and
+  timeline removed in 0.9.2. Editing, playback, the transport, setlists,
+  cleanup-to-trash and the theme creator were absent entirely.
+- **Typing on a cell now opens its pick-list, pre-filtered**, instead of
+  falling back to a raw text box. Clicking and typing on the same cell
+  behaved differently, which also made the docs hard to write honestly.
+  Removed the dead text-input path this left behind.
+- **ROADMAP rewritten** with the real remaining gaps, including an honest
+  section on where playback still differs from the device.
+
 ## v0.9.4 — transport, live position, phrase insert/delete
 
 - **Transport bar.** A bar along the bottom shows what's playing (song,

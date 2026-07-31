@@ -853,7 +853,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.4 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.5 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -4554,51 +4554,20 @@ const UI = (() => {
     const editGridCell = (cell, seed) => {
       if (!gridEditable || cell.querySelector('input')) return;
       const r = parseInt(cell.dataset.row, 10), t = parseInt(cell.dataset.ch, 10);
-      const cur = PT.gridCell(parsed, r, t);
-      if (seed === undefined) {
-        openPicker(cell, {
-          items: chainItems(parsed, p, chainColor),
-          rawHint: `any chain 00–${PT.hx2(chainMax)}`,
-          synth: q => {
-            const v = parseInt(q, 16);
-            if (!/^[0-9a-fA-F]{1,2}$/.test(q) || isNaN(v) || v < 0 || v > chainMax) return null;
-            return { value: v, label: PT.hx2(v), hint: 'use this chain', color: groupChainColor(v), group: '' };
-          },
-          onPick: v => setCell(r, t, v),
-          onRaw: raw => {
-            const v = parseInt(raw, 16);
-            if (!isNaN(v) && v >= 0 && v <= chainMax) setCell(r, t, v);
-          },
-        });
-        return;
-      }
-      const inp = document.createElement('input');
-      inp.className = 'pe-edit';
-      inp.value = seed !== undefined ? seed : (cur === PT.EMPTY ? '' : PT.hx2(cur));
-      cell.textContent = '';
-      cell.appendChild(inp);
-      inp.focus();
-      if (seed === undefined) inp.select();
-      let done = false;
-      const commit = () => {
-        if (done) return;
-        done = true;
-        const s = inp.value.trim();
-        let ok = true;
-        if (s === '' || s === '--' || s === '··') parsed.grid[r * PT.CHANNELS + t] = PT.EMPTY;
-        else {
-          const v = parseInt(s, 16);
-          if (isNaN(v) || v < 0 || v > chainMax) ok = false;
-          else parsed.grid[r * PT.CHANNELS + t] = v;
-        }
-        if (ok) markGridDirty();
-        renderPatterns(host, p, parsed);
-      };
-      inp.addEventListener('blur', commit);
-      inp.addEventListener('keydown', ev => {
-        ev.stopPropagation();
-        if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
-        else if (ev.key === 'Escape') { ev.preventDefault(); done = true; renderPatterns(host, p, parsed); }
+      openPicker(cell, {
+        items: chainItems(parsed, p, chainColor),
+        seed,
+        rawHint: `any chain 00–${PT.hx2(chainMax)}`,
+        synth: q => {
+          const v = parseInt(q, 16);
+          if (!/^[0-9a-fA-F]{1,2}$/.test(q) || isNaN(v) || v < 0 || v > chainMax) return null;
+          return { value: v, label: PT.hx2(v), hint: 'use this chain', color: groupChainColor(v), group: '' };
+        },
+        onPick: v => setCell(r, t, v),
+        onRaw: raw => {
+          const v = parseInt(raw, 16);
+          if (!isNaN(v) && v >= 0 && v <= chainMax) setCell(r, t, v);
+        },
       });
     };
     host.querySelectorAll('.pv-cell.chain').forEach(cell =>
@@ -4760,9 +4729,10 @@ const UI = (() => {
         const step = parseInt(cell.dataset.step, 10), f = cell.dataset.f;
         const cur = cell.textContent.trim();
         // phrase column picks from the phrases this project actually has
-        if (f === 'phrase' && seed === undefined) {
+        if (f === 'phrase') {
           openPicker(cell, {
             items: phraseItems(parsed),
+            seed,
             rawHint: `any phrase 00–${PT.hx2(phraseMax)}`,
             synth: q => {
               const v = parseInt(q, 16);
@@ -4953,8 +4923,10 @@ const UI = (() => {
     document.addEventListener('mousedown', outside, true);
     document.addEventListener('keydown', onKey, true);
     openPick = { el, outside, onKey, anchor };
+    if (opts.seed !== undefined && opts.seed !== null) filter.value = String(opts.seed);
     draw();
     filter.focus();
+    filter.setSelectionRange(filter.value.length, filter.value.length);
   }
 
   // ── Pick-list contents ─────────────────────────────────
@@ -5177,10 +5149,11 @@ const UI = (() => {
       const step = parseInt(cellEl.closest('.pe-row').dataset.step, 10);
       const f = cellEl.dataset.f;
       const cur = cellEl.textContent.trim();
-      if (PICKABLE[f] && seed === undefined) {
+      if (PICKABLE[f]) {
         const k = peKey(ph, step), pb = parsed.phrases;
         openPicker(cellEl, {
           items: PICKABLE[f](),
+          seed,
           placeholder: f === 'note' ? 'note, e.g. C-4' : 'filter…',
           rawHint: f === 'note' ? 'or type C-4 / OFF' : (f === 'instr' ? 'or type a hex id' : 'or type a name'),
           onPick: v => {
