@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.9.0 — sliced playback fix
+
+- **Sliced samples played at the wrong offsets, and it was audible.**
+  `SLnn` values on the card are frames at the WAV's *own* sample rate, but
+  the player divided them by the decoded `AudioBuffer`'s rate — which is
+  the AudioContext rate, since `decodeAudioData` resamples. Every slice
+  was therefore out by `srcRate / contextRate`: a 22050 Hz sample on a
+  48 kHz machine started 2.18× into the wrong place and ran 2.18× short,
+  which is why sliced parts sounded out of time. Loop points had the same
+  unit mix. Both now convert through the native rate read from the WAV
+  header before decoding. (Same class of bug as the v0.6 slicer-editor
+  fix; the player was simply never corrected.)
+  The conversion is now a pure `PT.sliceWindow` / `PT.loopWindow` pair
+  with unit tests, plus an end-to-end check that inspects the offsets the
+  player actually schedules.
+- **The demo card now demonstrates slicing.** Its bass phrase asked for
+  slice 0 on an instrument that only defines SL01/SL02, so it rendered
+  silence; it now triggers slice pads 1 and 2.
+- **Chain colours are vivid again.** The by-group palette was correct but
+  desaturated. Saturation is back up (average chroma now above the old
+  hand-picked palette's) while keeping the group-hue and
+  neighbour-contrast guarantees, both of which are pinned by tests.
+- **↺ Colours is disabled** until you actually have custom chain colours,
+  and its tooltip says how many it would discard.
+- **Chain steps read vertically**, one step per line in play order,
+  instead of flowing across columns.
+
 ## v0.8.0 — fourth feedback round
 
 - **Song grid row triggers.** Every row in the song grid has a ▶ that

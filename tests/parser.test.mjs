@@ -851,13 +851,75 @@ t('groupChainColor gives each nibble group its own hue family', () => {
   eq(swatches.size, 16, 'all 16 chains in a group get distinct colours');
   // and consecutive chains must be *visibly* apart, not a 1% lightness step:
   // songs use 00,01,02,03 side by side and they have to be tellable apart
-  const lumOf = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const rgbOf = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   for (let g = 0; g < 16; g++)
     for (let s = 0; s < 15; s++) {
-      const d = Math.abs(lumOf(fn((g << 4) | s)) - lumOf(fn((g << 4) | (s + 1))));
-      ok(d > 18, `chains ${((g<<4)|s).toString(16)} and ${((g<<4)|s+1).toString(16)} are too close (Δlum ${d.toFixed(1)})`);
+      const [a1, a2, a3] = rgbOf(fn((g << 4) | s)), [b1, b2, b3] = rgbOf(fn((g << 4) | (s + 1)));
+      const d = Math.hypot(a1 - b1, a2 - b2, a3 - b3);
+      ok(d > 55, `chains ${((g<<4)|s).toString(16)} and ${((g<<4)|s+1).toString(16)} are too close (Δrgb ${d.toFixed(0)})`);
     }
+  // Vibrancy: the by-group palette replaced a hand-picked vivid one, and
+  // muted pastels were the first thing anyone noticed. Hold the line at
+  // the old palette's average chroma.
+  const chromaOf = h => { const [r, g2, b] = rgbOf(h); return Math.max(r, g2, b) - Math.min(r, g2, b); };
+  let total = 0, count = 0;
+  for (let c = 0; c <= 0xFF; c++) { total += chromaOf(fn(c)); count++; }
+  const avgChroma = total / count;
+  ok(avgChroma >= 150, `palette is washed out: average chroma ${avgChroma.toFixed(0)}, want >= 150`);
+});
+
+// ── v0.9: slice/loop windows are computed in SECONDS ───
+// Regression guard for the unit bug that detuned every sliced sample in
+// the player: SLnn offsets are frames at the WAV's own rate, but they were
+// divided by the decoded AudioBuffer's rate (the AudioContext rate).
+const SLICES = [{index: 0, offset: 0}, {index: 1, offset: 22050}, {index: 2, offset: 44100}];
+t('sliceWindow converts native frames to seconds using the source rate', () => {
+  // 22050 Hz sample, 4s long. Slice 1 starts at frame 22050 = 1.0s.
+  const w = PT.sliceWindow(SLICES, 1, 22050, 4);
+  eq(w.offset, 1, 'slice 1 starts at 1.0s');
+  eq(w.dur, 1, 'and runs to slice 2 at 2.0s');
+});
+t('sliceWindow is independent of the AudioContext rate', () => {
+  // The decoded buffer rate must not enter the maths at all: the same card
+  // must sound identical on a 44.1k and a 48k machine.
+  const a = PT.sliceWindow(SLICES, 1, 22050, 4);
+  const b = PT.sliceWindow(SLICES, 1, 22050, 4);
+  eq(a.offset, b.offset);
+  // and a differently-rated source gives a correspondingly different time
+  eq(PT.sliceWindow(SLICES, 1, 44100, 4).offset, 0.5, '44.1k source halves the time');
+});
+t('sliceWindow last slice runs to the end of the buffer', () => {
+  const w = PT.sliceWindow(SLICES, 2, 22050, 4);
+  eq(w.offset, 2);
+  eq(w.dur, 2, 'last slice runs to the 4s end');
+});
+t('sliceWindow rejects missing, past-the-end and degenerate slices', () => {
+  eq(PT.sliceWindow(SLICES, 7, 22050, 4), null, 'no such slice');
+  eq(PT.sliceWindow(SLICES, 2, 22050, 1), null, 'marker past the end of a short buffer');
+  eq(PT.sliceWindow([{index: 0, offset: 100}, {index: 1, offset: 100}], 0, 22050, 4), null,
+    'zero-length slice');
+  eq(PT.sliceWindow(SLICES, 1, 0, 4), null, 'no source rate');
+  eq(PT.sliceWindow(SLICES, 1, 22050, 0), null, 'empty buffer');
+});
+t('sliceWindow clamps a slice that overruns the buffer', () => {
+  const w = PT.sliceWindow(SLICES, 1, 22050, 1.5);
+  eq(w.offset, 1);
+  eq(w.dur, 0.5, 'truncated at the buffer end rather than running past it');
+});
+t('loopWindow converts loop points from native frames too', () => {
+  const w = PT.loopWindow(11025, 33075, 22050, 4);
+  eq(w.start, 0.5);
+  eq(w.end, 1.5);
+});
+t('loopWindow rejects inverted, empty and unrated loops', () => {
+  eq(PT.loopWindow(1000, 1000, 22050, 4), null, 'zero length');
+  eq(PT.loopWindow(2000, 1000, 22050, 4), null, 'inverted');
+  eq(PT.loopWindow(0, 1000, 0, 4), null, 'no source rate');
+});
+t('loopWindow clamps loop points to the decoded buffer', () => {
+  const w = PT.loopWindow(0, 22050 * 99, 22050, 2);
+  eq(w.start, 0);
+  eq(w.end, 2, 'loop end clamped to the 2s buffer');
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

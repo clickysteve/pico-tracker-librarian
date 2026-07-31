@@ -29,7 +29,7 @@ Cards that have been near a Mac collect AppleDouble junk (`._kick.wav`, `.DS_Sto
 - **Stats** — collection KPIs, instrument types, FX command usage, tempo/scale/firmware distributions, backbone samples, recently modified, and the device's `.config.xml`.
 
 ### Play & edit
-- **In-browser playback** — press Play on any project and hear it: a Web Audio engine walks the song exactly like the firmware player (grooves, GRV switches, HOPs, chain + project transpose) triggering the project's own pool samples, with slices, loop modes, and VOL/PAN/KIL honoured. An honest sketch of the song, not a device emulator: synth voices (SID/OPAL) and most FX are out of scope by design.
+- **In-browser playback** — press Play on any project and hear it: a Web Audio engine walks the song exactly like the firmware player (grooves, GRV switches, HOPs, chain + project transpose) triggering the project's own pool samples, with slices, loop modes, and VOL/PAN/KIL honoured. Slice and loop points are converted through each WAV's own sample rate, so playback is in time regardless of your machine's audio rate. An honest sketch of the song, not a device emulator: synth voices (SID/OPAL) and most FX are out of scope by design.
 - **Phrase editor** — a tracker-style grid you edit in place: arrows and Tab move the cursor, typing starts an edit, Enter commits and drops to the next step, Delete clears a cell. Per-step copy/paste (⌘/Ctrl+C/V), whole-phrase copy/paste/clear, one-click transpose (±1/±12), 50-level undo (⌘/Ctrl+Z), and a ▶ that auditions just that phrase. Edits are held in memory until you explicitly save; saving uses the same paranoid path as repairs (mtime guard, on-card backup, byte-level verification of every phrase buffer after the write, automatic rollback). Legacy 2-byte-command beta files are read-only.
 
 - **Slice editor** — open any sample instrument's wav on a big waveform: zoom in with the scroll wheel or the −/+/Fit buttons (a full-file strip underneath shows where you are and drags to scroll), drag slice markers, double-click to add, audition slices by clicking regions or with number-key pads, auto-chop breakbeats with transient detection (adjustable sensitivity), equal-divide clean loops, and snap everything to zero-crossings. Saving rewrites just that instrument's SLnn points with the usual backup + verify + rollback.
@@ -75,9 +75,9 @@ The entire app is a single `index.html` — deliberately, so it can be hosted an
 Tests are zero-dependency Node scripts that extract the `PT` module straight out of `index.html`:
 
 ```bash
-node tests/parser.test.mjs   # format unit tests (74: formats, MIDI timing, theme writing)
+node tests/parser.test.mjs   # format unit tests (82: formats, MIDI timing, slice/loop units, theme writing)
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
-node tests/e2e.mjs           # browser end-to-end, 50 checks (needs: npm i -D playwright)
+node tests/e2e.mjs           # browser end-to-end, 58 checks (needs: npm i -D playwright)
 ```
 
 The USB mirror's font is the 8x8 Wide face and special-glyph page by nILS (public domain), as shipped in the picoTracker firmware; the firmware's other two fonts are not redistributable and are intentionally not embedded.

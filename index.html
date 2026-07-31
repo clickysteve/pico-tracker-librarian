@@ -604,7 +604,8 @@
     .pv-detail::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
     .pv-detail-title { font-size:10px; font-weight:700; letter-spacing:1px;
       text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
-    .pv-csteps { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:0 18px; }
+    /* one step per line, top to bottom — a chain reads in play order */
+    .pv-csteps { display:flex; flex-direction:column; }
     .pv-cstep { display:flex; gap:8px; padding:3px 0; font-size:11px; font-family:monospace;
       border-bottom:1px solid var(--border); align-items:center; }
     .pv-cstep:last-child { border-bottom:none; }
@@ -762,7 +763,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.8.0 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.0 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -2124,6 +2125,36 @@ const PT = (() => {
     return o;
   }
 
+  // ── Slice playback window, in SECONDS ──────────────────
+  // SLnn offsets on the card are frames at the wav's OWN sample rate.
+  // decodeAudioData resamples to the AudioContext rate, so dividing an
+  // SLnn value by the decoded buffer's rate mixes units and detunes every
+  // slice by srcRate/ctxRate (a 22kHz sample on a 48kHz context lands
+  // 2.18x out). Seconds are rate-independent, so convert here, once.
+  // Returns null when the slice is absent or degenerate.
+  function sliceWindow(slices, idx, srcRate, bufferDuration) {
+    if (!srcRate || srcRate <= 0 || !(bufferDuration > 0)) return null;
+    const sl = (slices || []).find(x => x.index === idx);
+    if (!sl) return null;
+    const next = (slices || []).find(x => x.index > idx);
+    const offset = sl.offset / srcRate;
+    if (offset >= bufferDuration) return null;             // marker past the end
+    const end = next ? Math.min(next.offset / srcRate, bufferDuration) : bufferDuration;
+    const dur = end - offset;
+    if (!(dur > 0)) return null;
+    return { offset, dur };
+  }
+
+  // Same unit trap for loop points, which are native frames too.
+  function loopWindow(loopStart, loopEnd, srcRate, bufferDuration) {
+    if (!srcRate || srcRate <= 0 || !(bufferDuration > 0)) return null;
+    if (!(loopEnd > loopStart)) return null;
+    const start = Math.max(0, Math.min(loopStart / srcRate, bufferDuration));
+    const end = Math.min(loopEnd / srcRate, bufferDuration);
+    if (!(end > start)) return null;
+    return { start, end };
+  }
+
   // ── Rewrite existing instrument PARAM values in project XML ──
   // Only updates PARAMs that already exist in the block (the firmware
   // writes every non-default parameter, and inventing new elements risks
@@ -2151,6 +2182,7 @@ const PT = (() => {
   return {
     parseXml, decodeHexBuffer, u16leFrom, buildPti, buildPtt, rewriteConfigTheme, defaultConfigXml,
     noteFromStr, encodeHexBuffer, rewriteSongSections, buildEventTimeline,
+    sliceWindow, loopWindow,
     rewriteInstrumentSlices, rewriteInstrumentParams, detectOnsets, snapZeroCross,
     parseProject, parsePti, parseTheme, parseConfig, parseInstrumentEl,
     parseWavHeader, rewriteSampleRef,
@@ -3088,7 +3120,10 @@ const Demo = (() => {
         [0,4,null,null,VOL,0x60],[0,12,null,null,VOL,0x60],
         [1,2,42,KIT.hatC],[1,6,42,KIT.hatC],[1,10,42,KIT.hatO],[1,14,42,KIT.hatC],
         [1,4,38,KIT.snare],[1,12,38,KIT.snare],[1,14,null,null,PAN,0x40],
-        [2,0,45,KIT.bass],[2,3,45,KIT.bass],[2,6,48,KIT.bass],[2,10,43,KIT.bass],[2,14,45,KIT.bass],
+        // notes 49/50 are slice pads 1 and 2 on Night Bass (SL01/SL02), so the
+        // demo actually demonstrates slice playback; 48 would be slice 0,
+        // which this instrument doesn't define, and would render silence
+        [2,0,45,KIT.bass],[2,3,45,KIT.bass],[2,6,49,KIT.bass],[2,10,43,KIT.bass],[2,14,50,KIT.bass],
         [2,6,null,null,PSL,0x20],
         [3,0,57,KIT.pad],[3,8,60,KIT.pad],[3,15,null,null,KIL,0],
       ],
@@ -3413,7 +3448,13 @@ const SongPlayer = (() => {
       try {
         const dir = await (await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(projDirName)).getDirectoryHandle('samples');
         const f = await (await dir.getFileHandle(name)).getFile();
-        buffers.set(name, await actx.decodeAudioData(await f.arrayBuffer()));
+        const bytes = await f.arrayBuffer();
+        // Read the native rate BEFORE decoding: decodeAudioData detaches the
+        // buffer, and slice/loop offsets are frames at this rate, not at the
+        // AudioContext rate the decoded buffer ends up in.
+        const hdr = PT.parseWavHeader(new Uint8Array(bytes.slice(0, 4096)), bytes.byteLength);
+        const buf = await actx.decodeAudioData(bytes);
+        buffers.set(name, { buf, srcRate: (hdr && hdr.sampleRate) || buf.sampleRate });
       } catch { /* missing or undecodable — channel stays silent */ }
     }
     return { actx, buffers };
@@ -3477,8 +3518,9 @@ const SongPlayer = (() => {
         else if (e.type === 'on') {
           const m = instr.get(e.instr);
           if (!m || !m.sample) continue;
-          const buf = buffers.get(m.sample);
-          if (!buf) continue;
+          const ent = buffers.get(m.sample);
+          if (!ent) continue;
+          const buf = ent.buf, srcRate = ent.srcRate;
           let stopAt = t0 + tl.duration;
           for (let j = i + 1; j < evs.length; j++)
             if (evs[j].type === 'on' || evs[j].type === 'off') { stopAt = t0 + evs[j].time; break; }
@@ -3490,19 +3532,16 @@ const SongPlayer = (() => {
           const sliceCount = m.slices.length;
           let offset = 0, dur = null, rate = 1;
           if (sliceCount && e.note >= PT.SLICE_NOTE_BASE && e.note < PT.SLICE_NOTE_BASE + 32) {
-            const idx = e.note - PT.SLICE_NOTE_BASE;
-            const sl = m.slices.find(x => x.index === idx);
-            if (!sl) continue;                       // inactive slice = silence
-            const next = m.slices.find(x => x.index > idx);
-            offset = sl.offset / buf.sampleRate;
-            dur = ((next ? next.offset : buf.length) - sl.offset) / buf.sampleRate;
+            const w = PT.sliceWindow(m.slices, e.note - PT.SLICE_NOTE_BASE, srcRate, buf.duration);
+            if (!w) continue;                        // inactive slice = silence
+            offset = w.offset;
+            dur = w.dur;
             rate = 1;                                // slices ignore transpose (firmware)
           } else {
             rate = Math.pow(2, (e.note + e.transpose - m.rootNote) / 12);
-            if (m.loopMode !== 'none' && m.loopEnd > m.loopStart) {
-              src.loop = true;
-              src.loopStart = m.loopStart / buf.sampleRate;
-              src.loopEnd = m.loopEnd / buf.sampleRate;
+            if (m.loopMode !== 'none') {
+              const lw = PT.loopWindow(m.loopStart, m.loopEnd, srcRate, buf.duration);
+              if (lw) { src.loop = true; src.loopStart = lw.start; src.loopEnd = lw.end; }
             }
           }
           src.playbackRate.value = rate;
@@ -4164,8 +4203,9 @@ const UI = (() => {
     // 16 slots throws consecutive chains to opposite ends of the lightness
     // band (min ~21 luma apart) while the group keeps one hue.
     const slot = (step * 9) % 16;
-    const light = 36 + slot / 15 * 46;        // 36% … 82%
-    const sat = 58 + (step % 3) * 9;
+    const light = 38 + slot / 15 * 42;        // 38% … 80%
+    const sat = 88 - (step % 3) * 4;          // stay saturated: washed-out
+                                              // pastels were the complaint
     return hslHex(hue, sat, light);
   }
   function hslHex(h, s, l) {
@@ -4268,12 +4308,14 @@ const UI = (() => {
     }
     const chainList = `<div class="pv-chainlist">
       <div class="pv-chainlist-hdr">Chains · ${chainsAsc.length}</div>${chainRows}</div>`;
+    const customColours = Object.keys(chainColors).filter(k => k.startsWith(`${p.dirName}:`)).length;
 
     host.innerHTML = `
       <div class="pv-hdr">
         <span class="pv-hdr-title">Timeline — ${last+1} rows</span>
         <input id="pv-zoom" type="range" min="22" max="52" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--pvw')) || 30}" style="width:100px;accent-color:var(--accent)" title="cell size">
-        <button class="btn ghost sm" id="btn-pv-recolour" title="Discard custom colours and go back to the by-group palette">↺ Colours</button>
+        <button class="btn ghost sm" id="btn-pv-recolour" ${customColours ? '' : 'disabled'}
+          title="${customColours ? `Discard your ${customColours} custom chain colour${customColours>1?'s':''} and go back to the by-group palette` : 'No custom chain colours to reset — pick one with a swatch first'}">↺ Colours</button>
         <button class="btn ghost sm" id="btn-pv-expand" title="Grow the window to nearly full screen">⛶ Expand</button>
       </div>
       <div class="tl-svg-wrap">${svg}</div>

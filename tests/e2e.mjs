@@ -24,6 +24,18 @@ const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
 await page.goto('file://' + join(root, 'index.html'));
+// Record every buffer-source start so the slice-offset assertions below can
+// inspect what the player actually scheduled.
+await page.addInitScript(() => {
+  window.__sliceStarts = [];
+  const orig = AudioBufferSourceNode.prototype.start;
+  AudioBufferSourceNode.prototype.start = function (when, offset, dur) {
+    if (dur !== undefined && this.buffer)
+      window.__sliceStarts.push({ offset, dur, bufRate: this.buffer.sampleRate, bufDur: this.buffer.duration });
+    return orig.call(this, when, offset, dur);
+  };
+});
+await page.reload();
 
 // ── 1. demo card loads ─────────────────────────────────
 await page.click('#btn-demo');
@@ -185,6 +197,48 @@ const savedNote = await page.evaluate(() =>
 check('editor: saved edit persisted to card (E-4 at step 0)', savedNote === 'E-4');
 check('editor: phrase audition button present', await page.evaluate(() => !!document.getElementById('btn-ph-play')));
 
+// ── 7b. sliced playback uses the wav's own sample rate ──
+// Must run BEFORE the slicer test below, which overwrites Night Bass's
+// markers with 8 equal divisions.
+await page.keyboard.press('Escape');
+await page.click('.tab-btn[data-tab="projects"]');
+await page.waitForTimeout(300);
+// scope to NIGHTDRIVE's own row: other rows may still be expanded from
+// earlier sections, and a bare .btn-det-open would hit the wrong one
+await page.evaluate(() => {
+  document.querySelectorAll('.proj-item.open .proj-row').forEach(r => r.click());  // collapse any open rows
+  [...document.querySelectorAll('.proj-item')].find(r => r.textContent.includes('NIGHTDRIVE'))?.querySelector('.proj-row')?.click();
+});
+await page.waitForTimeout(300);
+await page.evaluate(() =>
+  [...document.querySelectorAll('.proj-item')].find(r => r.textContent.includes('NIGHTDRIVE'))
+    ?.querySelector('.btn-det-open')?.click());
+await page.waitForTimeout(900);
+check('player: opened NIGHTDRIVE (the sliced project)', await page.evaluate(() =>
+  document.getElementById('modal-title').textContent === 'NIGHTDRIVE'));
+await page.evaluate(() => { window.__sliceStarts = []; });
+await page.click('#btn-modal-play');
+await page.waitForTimeout(1500);
+const sliceStarts = await page.evaluate(() => (window.__sliceStarts || []));
+// Night Bass: SL01=2205, SL02=5512 frames at the wav's own 22050Hz, in a
+// 0.5s sample that decodes to the context rate (44.1k here, 48k on many
+// machines). Dividing SLnn by the DECODED rate was the bug.
+const SRC = 22050;
+check('player: sliced notes actually triggered', sliceStarts.length > 0);
+check('player: slice offsets use the source rate, not the context rate',
+  sliceStarts.some(s => Math.abs(s.offset - 2205 / SRC) < 1e-3) &&
+  !sliceStarts.some(s => s.bufRate !== SRC && Math.abs(s.offset - 2205 / s.bufRate) < 1e-3));
+check('player: slice durations run to the next marker',
+  sliceStarts.some(s => Math.abs(s.dur - (5512 - 2205) / SRC) < 1e-3));
+check('player: last slice runs to the end of the buffer',
+  sliceStarts.some(s => Math.abs((s.offset + s.dur) - s.bufDur) < 1e-3));
+check('player: no slice starts past the end of its buffer',
+  sliceStarts.every(s => s.offset < s.bufDur));
+await page.click('#btn-modal-play');
+await page.waitForTimeout(200);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+
 // ── 8. slice editor on the demo card ───────────────────
 await page.keyboard.press('Escape');
 await page.click('.tab-btn[data-tab="instruments"]');
@@ -276,6 +330,19 @@ check('patterns: timeline spans the pane width', await page.evaluate(() => {
 }));
 check('patterns: chain list is grouped by high nibble', await page.evaluate(() =>
   document.querySelectorAll('.pv-chaingroup').length >= 1));
+// ↺ Colours is disabled until you actually pick a custom colour
+check('patterns: reset-colours disabled with no custom colours', await page.evaluate(() =>
+  document.getElementById('btn-pv-recolour').disabled === true));
+// chain steps read vertically, one per line, in play order
+await page.evaluate(() => document.querySelector('.pv-chainrow .cp-open')?.click());
+await page.waitForTimeout(250);
+check('patterns: chain steps are laid out vertically', await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.pv-csteps .pv-cstep')];
+  if (rows.length < 4) return false;
+  const tops = rows.map(r => Math.round(r.getBoundingClientRect().top));
+  // strictly increasing top offsets == one per line, none side by side
+  return tops.every((t, i) => i === 0 || t > tops[i - 1]);
+}));
 // row triggers: one per song row, and pressing one starts playback
 const rowBtns = await page.evaluate(() => document.querySelectorAll('.pv-rowplay').length);
 const gridRows = await page.evaluate(() => document.querySelectorAll('.pv-cell.rlbl').length);
