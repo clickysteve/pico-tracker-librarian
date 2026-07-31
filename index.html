@@ -763,7 +763,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.0 Alpha</span></div>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.1 Alpha</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
       <span class="ro-badge" id="ro-badge">🔒 READ ONLY</span>
@@ -2132,17 +2132,36 @@ const PT = (() => {
   // slice by srcRate/ctxRate (a 22kHz sample on a 48kHz context lands
   // 2.18x out). Seconds are rate-independent, so convert here, once.
   // Returns null when the slice is absent or degenerate.
-  function sliceWindow(slices, idx, srcRate, bufferDuration) {
+  // Mirrors SampleInstrument::computeSliceStart / computeSliceEnd /
+  // isSliceIndexActive. Three details matter and are easy to get wrong:
+  //   * slice 0 is active whenever ANY slice point is set, and starts at
+  //     frame 0 when SL00 itself is unset (so note 48 is the head of the
+  //     sample, not silence);
+  //   * the end is the SMALLEST later point above start, not the next by
+  //     index — slice points are not required to ascend;
+  //   * pad count is per instrument type (Advance SAMPLESOURCE has 32,
+  //     the pico's SampleInstrument::MaxSlices is 16).
+  function slicePadCount(inst) {
+    return (inst && inst.type === 'SAMPLESOURCE') ? 32 : MAX_SLICES;
+  }
+  function sliceWindow(slices, idx, srcRate, bufferDuration, maxSlices = MAX_SLICES) {
     if (!srcRate || srcRate <= 0 || !(bufferDuration > 0)) return null;
-    const sl = (slices || []).find(x => x.index === idx);
-    if (!sl) return null;
-    const next = (slices || []).find(x => x.index > idx);
-    const offset = sl.offset / srcRate;
-    if (offset >= bufferDuration) return null;             // marker past the end
-    const end = next ? Math.min(next.offset / srcRate, bufferDuration) : bufferDuration;
-    const dur = end - offset;
-    if (!(dur > 0)) return null;
-    return { offset, dur };
+    if (!(idx >= 0) || idx >= maxSlices) return null;
+    const sampleSize = Math.round(bufferDuration * srcRate);
+    if (!sampleSize) return null;
+    const pts = new Array(maxSlices).fill(0);
+    for (const s of slices || [])
+      if (s.index >= 0 && s.index < maxSlices && s.offset > 0)
+        pts[s.index] = Math.min(s.offset, sampleSize);      // firmware clamps on load
+    if (!pts.some(v => v > 0)) return null;                 // no slices at all
+    if (idx !== 0 && pts[idx] <= 0) return null;            // inactive pad = silence
+    const start = pts[idx];                                 // 0 for an unset slice 0
+    let end = sampleSize;
+    for (let i = idx + 1; i < maxSlices; i++)
+      if (pts[i] > start && pts[i] < end) end = pts[i];
+    if (end <= start) end = Math.min(start + 1, sampleSize);
+    if (start >= end) return null;
+    return { offset: start / srcRate, dur: (end - start) / srcRate };
   }
 
   // Same unit trap for loop points, which are native frames too.
@@ -2182,7 +2201,7 @@ const PT = (() => {
   return {
     parseXml, decodeHexBuffer, u16leFrom, buildPti, buildPtt, rewriteConfigTheme, defaultConfigXml,
     noteFromStr, encodeHexBuffer, rewriteSongSections, buildEventTimeline,
-    sliceWindow, loopWindow,
+    sliceWindow, loopWindow, slicePadCount,
     rewriteInstrumentSlices, rewriteInstrumentParams, detectOnsets, snapZeroCross,
     parseProject, parsePti, parseTheme, parseConfig, parseInstrumentEl,
     parseWavHeader, rewriteSampleRef,
@@ -3469,9 +3488,11 @@ const SongPlayer = (() => {
       gain: Math.min(2, num('volume', num('level', 128)) / 128),
       pan: (num('pan', 0x7F) - 0x7F) / 127,
       loopMode: p.loopmode || 'none',
+      start: num('start', 0),          // native frames; firmware: rendFirst_
       loopStart: num('loopstart', 0),
       loopEnd: num('end', 0),
       slices: (inst.slices || []).slice().sort((a, b) => a.index - b.index),
+      pads: PT.slicePadCount(inst),   // 32 on Advance SAMPLESOURCE, else 16
     };
   }
 
@@ -3493,9 +3514,21 @@ const SongPlayer = (() => {
     const { actx, buffers } = await loadBuffers(sd, proj.dirName, parsed);
     if (token !== playToken) { try { actx.close(); } catch {} return false; }  // stopped/replaced during load
     ctx = actx;
+    // Gain staging. Eight channels each ran up to 2.0 (volume 255) times a
+    // 1.4 channel boost into a destination that clamps at ±1 — worst case
+    // ~20x, i.e. hard clipping, which is what "distorted" sounded like. Sum
+    // at a sane level and put a brickwall limiter in front of the output so
+    // dense parts compress instead of shattering.
     const master = ctx.createGain();
-    master.gain.value = 0.9;
-    master.connect(ctx.destination);
+    master.gain.value = 0.32;
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -1.5;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.002;
+    limiter.release.value = 0.12;
+    master.connect(limiter);
+    limiter.connect(ctx.destination);
     const instr = new Map(parsed.instruments.map(i => [i.id, instrMeta(i)]));
     const chans = [];
     for (let c = 0; c < 8; c++) {
@@ -3513,7 +3546,9 @@ const SongPlayer = (() => {
       const evs = byCh[c];
       for (let i = 0; i < evs.length; i++) {
         const e = evs[i];
-        if (e.type === 'vol') chans[c].g.gain.setValueAtTime(e.value * 1.4, t0 + e.time);
+        // VOL param is 0..255 → 0..1. The old 1.4x boost had no basis and
+        // pushed full-volume channels straight into clipping.
+        if (e.type === 'vol') chans[c].g.gain.setValueAtTime(e.value, t0 + e.time);
         else if (e.type === 'pan' && chans[c].pan) chans[c].pan.pan.setValueAtTime(e.value, t0 + e.time);
         else if (e.type === 'on') {
           const m = instr.get(e.instr);
@@ -3531,14 +3566,19 @@ const SongPlayer = (() => {
           src.connect(vg); vg.connect(chans[c].g);
           const sliceCount = m.slices.length;
           let offset = 0, dur = null, rate = 1;
-          if (sliceCount && e.note >= PT.SLICE_NOTE_BASE && e.note < PT.SLICE_NOTE_BASE + 32) {
-            const w = PT.sliceWindow(m.slices, e.note - PT.SLICE_NOTE_BASE, srcRate, buf.duration);
+          if (sliceCount && e.note >= PT.SLICE_NOTE_BASE && e.note < PT.SLICE_NOTE_BASE + m.pads) {
+            const w = PT.sliceWindow(m.slices, e.note - PT.SLICE_NOTE_BASE, srcRate, buf.duration, m.pads);
             if (!w) continue;                        // inactive slice = silence
             offset = w.offset;
             dur = w.dur;
             rate = 1;                                // slices ignore transpose (firmware)
           } else {
             rate = Math.pow(2, (e.note + e.transpose - m.rootNote) / 12);
+            // non-sliced notes begin at the instrument's `start` frame
+            if (m.start > 0) {
+              const s = m.start / srcRate;
+              if (s < buf.duration) offset = s;
+            }
             if (m.loopMode !== 'none') {
               const lw = PT.loopWindow(m.loopStart, m.loopEnd, srcRate, buf.duration);
               if (lw) { src.loop = true; src.loopStart = lw.start; src.loopEnd = lw.end; }

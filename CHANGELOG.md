@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.9.1 — playback: distortion and dropped notes
+
+Chased with the open firmware's `SampleInstrument.cpp` as ground truth and
+an offline render of the mix as the measurement.
+
+- **The distortion was clipping, and it had been there all along.** Eight
+  channels each ran at up to 2.0 voice gain times an unjustified 1.4x
+  channel boost into an output that clamps at ±1. Rendering the demo song
+  offline peaked at **1.257 with 56 samples pinned at full scale** — and
+  measured identically back in v0.6.0, so this predates the recent work;
+  correcting slice lengths in v0.9.0 simply kept more voices sounding at
+  once and pushed it further over. The mix is now staged sanely with a
+  brickwall limiter in front of the output: **peak 0.46, zero clipped
+  samples**. `tests/audio.test.mjs` renders and measures this, and fails
+  if the old gain staging is restored.
+- **Slice 0 was silently dropped.** `isSliceIndexActive` treats slice 0 as
+  live whenever *any* slice point is set, starting at frame 0 when `SL00`
+  itself is unset. The player required an explicit `SL00` and silenced the
+  note otherwise — 12 real notes in `SECOND` on the reference card.
+- **Slice pad range is now per instrument type.** Advance `SAMPLESOURCE`
+  instruments carry 32 pads (notes 48–79; the reference card has one with
+  31 active slice points), the pico's `SampleInstrument` has 16. It was
+  hardcoded to 32 for everything, so notes 64–79 on a 16-pad instrument
+  were swallowed as dead pads instead of playing pitched.
+- **Slice end now takes the nearest later marker**, matching
+  `computeSliceEnd`, rather than the next marker by index — slice points
+  are not required to ascend.
+- **The `start` parameter is honoured** for non-sliced notes
+  (firmware: `rendFirst_ = start_.GetInt()`); it was ignored, so any
+  instrument with a trimmed start played from the wrong point.
+
+Still an honest sketch, not an emulation: `pingpong` loops play forward,
+and Advance `SAMPLESOURCE` amp envelopes aren't applied — that firmware is
+closed, and guessing at its parameter ranges is what causes bugs like the
+ones above.
+
 ## v0.9.0 — sliced playback fix
 
 - **Sliced samples played at the wrong offsets, and it was audible.**

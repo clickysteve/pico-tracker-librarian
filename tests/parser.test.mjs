@@ -893,18 +893,48 @@ t('sliceWindow last slice runs to the end of the buffer', () => {
   eq(w.offset, 2);
   eq(w.dur, 2, 'last slice runs to the 4s end');
 });
-t('sliceWindow rejects missing, past-the-end and degenerate slices', () => {
-  eq(PT.sliceWindow(SLICES, 7, 22050, 4), null, 'no such slice');
-  eq(PT.sliceWindow(SLICES, 2, 22050, 1), null, 'marker past the end of a short buffer');
-  eq(PT.sliceWindow([{index: 0, offset: 100}, {index: 1, offset: 100}], 0, 22050, 4), null,
-    'zero-length slice');
+t('sliceWindow rejects missing and degenerate slices', () => {
+  eq(PT.sliceWindow(SLICES, 7, 22050, 4), null, 'inactive pad is silence');
   eq(PT.sliceWindow(SLICES, 1, 0, 4), null, 'no source rate');
   eq(PT.sliceWindow(SLICES, 1, 22050, 0), null, 'empty buffer');
+  eq(PT.sliceWindow([], 1, 22050, 4), null, 'no slices at all');
+  eq(PT.sliceWindow(SLICES, 99, 22050, 4), null, 'index beyond the pad count');
 });
 t('sliceWindow clamps a slice that overruns the buffer', () => {
   const w = PT.sliceWindow(SLICES, 1, 22050, 1.5);
   eq(w.offset, 1);
   eq(w.dur, 0.5, 'truncated at the buffer end rather than running past it');
+});
+// SampleInstrument::isSliceIndexActive — slice 0 is live whenever ANY point
+// is set, and computeSliceStart returns 0 when SL00 itself is unset. Dropping
+// it silenced real notes (12 of them in SECOND on the reference card).
+t('sliceWindow plays slice 0 from the head when SL00 is unset', () => {
+  const w = PT.sliceWindow([{index: 1, offset: 22050}], 0, 22050, 4);
+  ok(w, 'note 48 must sound, not be silenced');
+  eq(w.offset, 0, 'starts at the head of the sample');
+  eq(w.dur, 1, 'runs to the first marker');
+});
+t('sliceWindow honours an explicit SL00', () => {
+  const w = PT.sliceWindow([{index: 0, offset: 11025}, {index: 1, offset: 22050}], 0, 22050, 4);
+  eq(w.offset, 0.5);
+  eq(w.dur, 0.5);
+});
+t('sliceWindow with no points at all is silent even for slice 0', () => {
+  eq(PT.sliceWindow([], 0, 22050, 4), null);
+});
+// computeSliceEnd takes the SMALLEST later point above start, not the next
+// by index — slice points are not required to ascend.
+t('sliceWindow ends at the nearest later marker, not the next index', () => {
+  const jumbled = [{index: 1, offset: 22050}, {index: 2, offset: 88200}, {index: 3, offset: 44100}];
+  const w = PT.sliceWindow(jumbled, 1, 22050, 8);
+  eq(w.offset, 1);
+  eq(w.dur, 1, 'ends at frame 44100 (index 3), the nearest marker above start');
+});
+t('slicePadCount is 32 on Advance SAMPLESOURCE and 16 on pico SAMPLE', () => {
+  eq(PT.slicePadCount({ type: 'SAMPLESOURCE' }), 32);
+  eq(PT.slicePadCount({ type: 'SAMPLE' }), 16);
+  // a 16-pad instrument must not swallow note 64+ as a pad
+  eq(PT.sliceWindow([{index: 1, offset: 22050}], 16, 22050, 4, 16), null);
 });
 t('loopWindow converts loop points from native frames too', () => {
   const w = PT.loopWindow(11025, 33075, 22050, 4);

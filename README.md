@@ -75,8 +75,9 @@ The entire app is a single `index.html` — deliberately, so it can be hosted an
 Tests are zero-dependency Node scripts that extract the `PT` module straight out of `index.html`:
 
 ```bash
-node tests/parser.test.mjs   # format unit tests (82: formats, MIDI timing, slice/loop units, theme writing)
+node tests/parser.test.mjs   # format unit tests (87: formats, MIDI timing, slice/loop units, theme writing)
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
+node tests/audio.test.mjs    # renders the mix offline: no clipping, correct slice offsets
 node tests/e2e.mjs           # browser end-to-end, 58 checks (needs: npm i -D playwright)
 ```
 
