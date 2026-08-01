@@ -17,3 +17,9 @@ function extractModule(name) {
 const src = extractModule('PT');
 const factory = new Function(`${src}; return PT;`);
 export const PT = factory();
+
+// FX is pure data plus one function that only touches the DOM when it is
+// called, so the definitions, presets and clamping can be unit tested in
+// node exactly like the parser.
+const fxSrc = extractModule('FX');
+export const FX = new Function(`${fxSrc}; return FX;`)();

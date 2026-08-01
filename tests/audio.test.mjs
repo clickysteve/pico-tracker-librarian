@@ -80,6 +80,85 @@ check('audio: mix is not inaudibly quiet', mix && mix.rms > 0.005,
 check('audio: no page errors', errors.length === 0, errors.join('; '));
 if (mix) console.log(`     peak ${mix.peak.toFixed(3)} · rms ${mix.rms.toFixed(4)} · clipped ${mix.clipped}`);
 
+// ── offline render to WAV, and stems ───────────────────
+// Assert the render actually produces audio and a valid WAV container,
+// rather than only that the buttons exist.
+const rendered = await page.evaluate(async () => {
+  const dl = [];
+  // capture downloads instead of writing files
+  const realCreate = URL.createObjectURL;
+  URL.createObjectURL = b => { dl.push(b); return 'blob:stub'; };
+  const origClick = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function () {};
+  document.getElementById('btn-modal-wav').click();
+  // wait for the render to finish and the blob to be handed over
+  for (let i = 0; i < 120 && !dl.length; i++) await new Promise(r => setTimeout(r, 250));
+  URL.createObjectURL = realCreate;
+  HTMLAnchorElement.prototype.click = origClick;
+  if (!dl.length) return null;
+  const buf = new Uint8Array(await dl[0].arrayBuffer());
+  const txt = o => String.fromCharCode(...buf.slice(o, o + 4));
+  const dv = new DataView(buf.buffer);
+  // is there any non-silence?
+  let peak = 0;
+  for (let o = 44; o + 1 < buf.length; o += 2) {
+    const v = Math.abs(dv.getInt16(o, true));
+    if (v > peak) peak = v;
+  }
+  return { size: buf.length, riff: txt(0), wave: txt(8), fmt: txt(12), data: txt(36),
+    channels: dv.getUint16(22, true), rate: dv.getUint32(24, true),
+    bits: dv.getUint16(34, true), peak };
+});
+check('render: produced a file', !!rendered, 'no blob was created');
+if (rendered) {
+  check('render: valid WAV container',
+    rendered.riff === 'RIFF' && rendered.wave === 'WAVE' && rendered.fmt === 'fmt ' && rendered.data === 'data',
+    JSON.stringify(rendered));
+  check('render: stereo 16-bit 44.1k',
+    rendered.channels === 2 && rendered.bits === 16 && rendered.rate === 44100,
+    `${rendered.channels}ch ${rendered.bits}bit ${rendered.rate}Hz`);
+  check('render: contains audio, not silence', rendered.peak > 500, `peak ${rendered.peak}`);
+  check('render: does not clip', rendered.peak < 32767, `peak ${rendered.peak}`);
+  console.log(`     wav ${(rendered.size/1024).toFixed(0)}KB · peak ${rendered.peak}/32767`);
+}
+
+// stems: one file per channel that plays, and they must not be identical
+const stems = await page.evaluate(async () => {
+  const dl = [];
+  const realCreate = URL.createObjectURL;
+  URL.createObjectURL = b => { dl.push(b); return 'blob:stub'; };
+  const origClick = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function () {};
+  document.getElementById('btn-modal-stems').click();
+  for (let i = 0; i < 240; i++) {
+    await new Promise(r => setTimeout(r, 250));
+    const msg = document.getElementById('cache-msg')?.textContent || '';
+    if (/Rendered \d+ stem/.test(msg)) break;
+  }
+  URL.createObjectURL = realCreate;
+  HTMLAnchorElement.prototype.click = origClick;
+  const peaks = [];
+  for (const b of dl) {
+    const buf = new Uint8Array(await b.arrayBuffer());
+    const dv = new DataView(buf.buffer);
+    let peak = 0, sum = 0;
+    for (let o = 44; o + 1 < buf.length; o += 2) {
+      const v = Math.abs(dv.getInt16(o, true));
+      if (v > peak) peak = v;
+      sum += v;
+    }
+    peaks.push({ peak, sum });
+  }
+  return peaks;
+});
+check('stems: one file per playing channel', stems.length >= 2, `got ${stems.length}`);
+check('stems: every stem has audio', stems.every(s2 => s2.peak > 100),
+  stems.map(s2 => s2.peak).join(','));
+check('stems: stems differ from each other',
+  new Set(stems.map(s2 => s2.sum)).size === stems.length,
+  'two stems are byte-identical, so the channel filter is not working');
+if (stems.length) console.log(`     ${stems.length} stems · peaks ${stems.map(s2 => s2.peak).join(' ')}`);
+
 await browser.close();
 console.log(`\naudio: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -1,6 +1,6 @@
 // Unit tests for the PT picoTracker XML parser.
 // Run: node tests/parser.test.mjs
-import { PT } from './extract.mjs';
+import { PT, FX } from './extract.mjs';
 
 let pass = 0, fail = 0;
 function t(name, fn) {
@@ -142,6 +142,20 @@ t('u16le pairs little-endian', () => {
 });
 
 // ── Project parse ──────────────────────────────────────
+function buildTableXml() {
+  const run = (v, n) => `<DATA VALUE="${v}" LENGTH="${n}"/>`;
+  const tbl = id => `<TABLE ID="${id}">` +
+    `<CMD1>${run(45, 16)}</CMD1><PARAM1>${run(0, 32)}</PARAM1>` +
+    `<CMD2>${run(45, 16)}</CMD2><PARAM2>${run(0, 32)}</PARAM2>` +
+    `<CMD3>${run(45, 16)}</CMD3><PARAM3>${run(0, 32)}</PARAM3></TABLE>`;
+  // the base fixture already carries a <TABLES> block (with a self-closing
+  // TABLE 01), so swap the whole section for two fully-populated tables
+  const src = buildProjectXml();
+  const a = src.indexOf('<TABLES>'), b = src.indexOf('</TABLES>') + '</TABLES>'.length;
+  if (a < 0 || b < a) throw new Error('fixture TABLES block not found');
+  return src.slice(0, a) + `<TABLES>${tbl('00')}${tbl('01')}</TABLES>` + src.slice(b);
+}
+
 const proj = PT.parseProject(buildProjectXml());
 t('project parses', () => ok(proj, 'null'));
 t('project header fields', () => {
@@ -1010,6 +1024,203 @@ t('rewriteSongSections still refuses legacy 2-byte command files', () => {
   p.geometry = { ...(p.geometry || {}), cmdWidth: 2 };
   const res = PT.rewriteSongSections(buildProjectXml(), p);
   ok(!res.ok, 'must refuse');
+});
+
+// ── v0.9.8: new-project template, groove and table writers ──
+t('buildEmptyProject chunks buffers the way the firmware does', () => {
+  // A single giant <DATA LENGTH="4096"/> parses here but is not a shape the
+  // firmware is known to emit; every other writer chunks at 64 bytes.
+  const xml = PT.buildEmptyProject({});
+  const lens = [...xml.matchAll(/LENGTH="(\d+)"/g)].map(m => +m[1]);
+  ok(lens.length, 'expected run-length chunks');
+  eq(Math.max(...lens), 64, 'no chunk may exceed the 64-byte convention');
+});
+t('buildEmptyProject round-trips through the parser', () => {
+  const xml = PT.buildEmptyProject({ tempo: 132, version: '3.0' });
+  const p = PT.parseProject(xml);
+  ok(p, 'template must parse');
+  eq(p.tempo, 132);
+  eq(PT.lastSongRow(p), -1, 'song grid starts empty');
+  eq(p.instruments.length, 1, 'one instrument slot');
+  eq(p.tables.length, PT.TABLE_COUNT, 'full table bank');
+  ok(p.grooveRaw, 'groove buffer present');
+  eq(p.grooves[0].join(','), '6,6', 'groove 0 defaults to 6/6');
+  eq(p.geometry.cmdWidth, 1, 'modern command encoding');
+});
+t('an empty project is immediately editable and re-serialises', () => {
+  const xml = PT.buildEmptyProject({});
+  const p = PT.parseProject(xml);
+  p.grid[0] = 0x00;
+  p.chains[0] = 0x00;
+  p.phrases.notes[0] = 60;
+  const res = PT.rewriteSongSections(xml, p);
+  ok(res.ok, res.error);
+  const back = PT.parseProject(res.text);
+  eq(PT.gridCell(back, 0, 0), 0x00);
+  eq(PT.chainStep(back, 0, 0).phrase, 0x00);
+  eq(back.phrases.notes[0], 60);
+});
+t('rebuildGrooveDigest makes an edited groove reach playback', () => {
+  // The timeline reads proj.grooves, not proj.grooveRaw. Without the rebuild
+  // the edit shows in the UI and on the card but never in a preview or render.
+  const p = PT.parseProject(buildProjectXml());
+  const before = PT.buildEventTimeline(p).duration;
+  ok(before > 0, 'baseline duration');
+  for (let st = 0; st < PT.STEPS; st++) p.grooveRaw[st] = st < 2 ? 24 : 255;
+  eq(PT.buildEventTimeline(p).duration, before, 'raw edit alone changes nothing');
+  PT.rebuildGrooveDigest(p);
+  eq(p.grooves[0].join(','), '24,24');
+  ok(PT.buildEventTimeline(p).duration > before * 2,
+    'after the rebuild the slower groove lengthens the song');
+});
+t('rebuildGrooveDigest tolerates a project with no groove buffer', () => {
+  const p = PT.parseProject(buildProjectXml());
+  delete p.grooveRaw;
+  PT.rebuildGrooveDigest(p);      // must not throw
+  ok(true);
+});
+t('rewriteGrooves round-trips an edited groove', () => {
+  const xml = buildProjectXml();
+  const p = PT.parseProject(xml);
+  ok(p.grooveRaw, 'fixture exposes a groove buffer');
+  p.grooveRaw[0] = 8; p.grooveRaw[1] = 4; p.grooveRaw[2] = 255;
+  const res = PT.rewriteGrooves(xml, p);
+  ok(res.ok, res.error);
+  const back = PT.parseProject(res.text);
+  eq(back.grooves[0].join(','), '8,4');
+  eq([...back.grooveRaw.slice(0, 3)].join(','), '8,4,255');
+});
+t('rewriteGrooves leaves the rest of the file alone', () => {
+  const xml = buildProjectXml();
+  const p = PT.parseProject(xml);
+  p.grooveRaw[0] = 9;
+  const back = PT.parseProject(PT.rewriteGrooves(xml, p).text);
+  eq(back.tempo, p.tempo);
+  eq(back.instruments.length, p.instruments.length);
+  eq([...back.phrases.notes].join(), [...p.phrases.notes].join());
+  eq([...back.grid].join(), [...p.grid].join());
+});
+t('rewriteTable edits only the target table', () => {
+  const xml = buildTableXml();
+  const p = PT.parseProject(xml);
+  ok(p.tables.length >= 2, 'fixture has two tables');
+  p.tables[0].cmd[0][0] = 0x45;      // VOL
+  p.tables[0].param[0][0] = 0x1234;
+  const res = PT.rewriteTable(xml, PT.hx2(p.tables[0].id), p.tables[0]);
+  ok(res.ok, res.error);
+  const back = PT.parseProject(res.text);
+  eq(back.tables[0].cmd[0][0], 0x45);
+  eq(back.tables[0].param[0][0], 0x1234);
+  eq(back.tables[1].cmd[0][0], PT.CMD_NONE, 'the other table is untouched');
+  eq(back.tables[1].param[0][0], 0, 'and its params too');
+});
+t('rewriteTable refuses an unknown table id', () => {
+  const p = PT.parseProject(buildTableXml());
+  const res = PT.rewriteTable(buildTableXml(), 'ZZ', p.tables[0]);
+  ok(!res.ok, 'must refuse');
+});
+
+// ── Output effects (FX) ────────────────────────────────
+t('FX: every definition has an id, a label, a hint and params', () => {
+  const seen = new Set();
+  for (const d of FX.DEFS) {
+    ok(d.id && !seen.has(d.id), `duplicate or missing id: ${d.id}`);
+    seen.add(d.id);
+    ok(d.label && d.hint, `${d.id} needs a label and a hint`);
+    ok(d.params.length > 0, `${d.id} has no params`);
+  }
+  eq(FX.ORDER, FX.DEFS.map(d => d.id), 'ORDER matches DEFS');
+});
+t('FX: every range param has a default inside its own bounds', () => {
+  for (const d of FX.DEFS) for (const p of d.params) {
+    if (p.type === 'seg') {
+      ok(p.opts.some(o => o[0] === p.def), `${d.id}.${p.key} default is not one of its options`);
+    } else {
+      ok(typeof p.def === 'number', `${d.id}.${p.key} default is not a number`);
+      ok(p.def >= p.min && p.def <= p.max, `${d.id}.${p.key} default ${p.def} outside ${p.min}..${p.max}`);
+      ok(p.step > 0, `${d.id}.${p.key} step must be positive`);
+      ok(typeof p.fmt === 'function', `${d.id}.${p.key} needs a formatter`);
+    }
+  }
+});
+t('FX: defaults() covers every effect and every key', () => {
+  const d = FX.defaults();
+  eq(Object.keys(d).sort(), FX.DEFS.map(x => x.id).sort());
+  for (const def of FX.DEFS)
+    eq(Object.keys(d[def.id]).sort(), def.params.map(p => p.key).sort(), def.id);
+});
+t('FX: presets only name real effects and real parameters', () => {
+  const byId = new Map(FX.DEFS.map(d => [d.id, d]));
+  for (const pre of FX.PRESETS) {
+    ok(pre.id && pre.label, 'preset needs an id and a label');
+    for (const id of pre.on) ok(byId.has(id), `${pre.id} enables unknown effect ${id}`);
+    for (const id in pre.p) {
+      const def = byId.get(id);
+      ok(def, `${pre.id} overrides unknown effect ${id}`);
+      for (const key in pre.p[id]) {
+        const par = def.params.find(x => x.key === key);
+        ok(par, `${pre.id}.${id} overrides unknown param ${key}`);
+        if (par.type === 'seg')
+          ok(par.opts.some(o => o[0] === pre.p[id][key]), `${pre.id}.${id}.${key} is not a valid option`);
+        else
+          ok(pre.p[id][key] >= par.min && pre.p[id][key] <= par.max,
+             `${pre.id}.${id}.${key} = ${pre.p[id][key]} outside ${par.min}..${par.max}`);
+      }
+    }
+  }
+});
+t('FX: presetState turns on exactly what the preset lists', () => {
+  for (const pre of FX.PRESETS) {
+    const st = FX.presetState(pre.id);
+    for (const d of FX.DEFS)
+      eq(st.enabled[d.id], pre.on.includes(d.id), `${pre.id}: ${d.id}`);
+    eq(st.preset, pre.id);
+  }
+});
+t('FX: presetState overrides land and the rest stay at defaults', () => {
+  const st = FX.presetState('crt');
+  eq(st.params.scanlines.variant, 'medium');
+  eq(st.params.rgbshift.shiftH, 25);
+  eq(st.params.rgbshift.shiftV, FX.DEFS.find(d => d.id === 'rgbshift').params.find(p => p.key === 'shiftV').def);
+  // an unlisted effect keeps a full, valid parameter set even when off
+  eq(st.params.noise, FX.defaults().noise);
+});
+t('FX: presetState hands back a fresh object each time', () => {
+  const a = FX.presetState('crt'), b = FX.presetState('crt');
+  a.params.scanlines.mix = 3;
+  eq(b.params.scanlines.mix, 65, 'presets must not share mutable state');
+  a.enabled.noise = true;
+  eq(b.enabled.noise, false);
+});
+t('FX: unknown preset id falls back to Off rather than throwing', () => {
+  const st = FX.presetState('nope');
+  eq(st.preset, 'off');
+  ok(!Object.values(st.enabled).some(Boolean), 'nothing enabled');
+});
+t('FX: the Off preset really is off', () => {
+  const st = FX.presetState('off');
+  ok(!Object.values(st.enabled).some(Boolean));
+});
+t('FX: output sizes are sane and unique', () => {
+  const seen = new Set();
+  for (const o of FX.OUTPUTS) {
+    ok(!seen.has(o.id), `duplicate output ${o.id}`);
+    seen.add(o.id);
+    eq(o.id, `${o.w}x${o.h}`, 'id encodes the size');
+    ok(o.w >= FX.SRC_W && o.h >= FX.SRC_H, `${o.id} is smaller than the source`);
+  }
+});
+t('FX: source canvas is a whole multiple of the device screen', () => {
+  eq(FX.SRC_W % FX.DEV_W, 0);
+  eq(FX.SRC_H % FX.DEV_H, 0);
+  eq(FX.SRC_W / FX.DEV_W, FX.SRC_H / FX.DEV_H, 'square pixels');
+});
+t('FX: hexToRgb normalises and survives junk', () => {
+  eq(FX.hexToRgb('#000000'), [0, 0, 0]);
+  eq(FX.hexToRgb('#ffffff'), [1, 1, 1]);
+  eq(FX.hexToRgb('#f00'), [1, 0, 0], 'short form');
+  eq(FX.hexToRgb(''), [0, 0, 0], 'empty falls back to black');
+  eq(FX.hexToRgb('not a colour'), [0, 0, 0]);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

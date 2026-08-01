@@ -40,17 +40,20 @@ Cards that have been near a Mac collect AppleDouble junk (`._kick.wav`, `.DS_Sto
 - **In-browser playback** — press Play on any project and hear it. A Web Audio engine walks the song the way the firmware player does: grooves, per-channel `GRV` switches, `HOP` flow, chain and project transpose, slices, loop modes, and `VOL`/`PAN`/`KIL`. Slice and loop points are converted through each WAV's own sample rate, so playback is in time whatever your machine's audio rate is, and the mix runs through a limiter so dense passages don't clip.
   An honest sketch of the song, not an emulation: synth voices (SID/OPAL) and most FX are out of scope by design, `pingpong` loops play forward, and Advance `SAMPLESOURCE` amp envelopes aren't applied.
 - **Play anything, at any level** — the whole song, a single song row across all 8 channels, one chain, or one phrase.
-- **Transport** — a bar along the bottom shows what's playing, a progress bar, elapsed/total, and a stop that works from anywhere; the playing project's row stays lit. While anything plays, the song grid outlines the cell each channel is currently inside, lights its row, highlights the chains in play, and marks the current step of the open chain.
+- **Transport** — a bar along the bottom shows what's playing, a scrub bar you can drag to jump around, a loop toggle, elapsed/total, and a stop that works from anywhere; the playing project's row stays lit. **Space** plays whatever you're looking at: the open phrase, else the open chain, else the song. While anything plays, the song grid outlines the cell each channel is currently inside, lights its row, highlights the chains in play, and marks the current step of the open chain.
 
 ### Arrange and edit
 
 - **Pattern editor** — the song grid at full size, with an ordered chain list down the left bucketed by number group (usage counts, colours, per-chain preview, hover-to-highlight), and chain and phrase panels beside the grid rather than under it.
   Click any cell to choose the chain that sits there from a filterable list of the chains this song already uses, the ones defined but unplaced, and free slots; type a value that isn't listed and it's offered too, so all of `00`–`FE` is reachable. Arrow keys walk the grid and **shift+arrows or shift+click select a block**, which then copies, pastes or clears as a unit (`⌘/Ctrl+C/V`, `Del`, `⌘/Ctrl+A` for everything, `Esc` to deselect). Whole rows also copy and paste from the gutter, and `⌘/Ctrl+Z` undoes arrangement changes. Spare rows sit past the end of the song so an arrangement can be extended, with **+ more rows** for as far as the geometry allows.
   Chain colours come from the chain number: the high nibble picks a hue family so the `00`s, `10`s and `20`s each read as a group, while lightness strides within a group to keep neighbours apart. Pick your own per chain, or reset.
-- **Chain editor** — open any chain and edit its 16 steps in place: which phrase plays at each step, chosen from the project's phrases with a note count each, and a per-step transpose. Beat-marked every four.
-- **Phrase editor** — a tracker-style grid you edit in place. Arrows and Tab move the cursor, `Enter` or typing opens a pick-list, `Del` clears a cell. Notes, instruments and FX are chosen by name — `04 Night Bass` rather than `04`, `KIL`/`HOP`/`PSL` rather than raw hex — with fuzzy matching, so `c4` finds `C-4`. An optional QWERTY piano mode types notes straight down the column (`z s x d c v g b h n j m` for C–B, `q 2 w 3 e r 5 t 6 y 7 u` an octave up, `a` for note-off, `[`/`]` for octave), carrying the instrument down and advancing by a configurable step. Insert or delete a step (shifting the rest of the phrase), per-step copy/paste, whole-phrase copy/paste/clear, one-click transpose (±1/±12), 50-level undo, and a ▶ that auditions just that phrase.
+- **Chain editor** — open any chain and edit its 16 steps in place: which phrase plays at each step, chosen from the project's phrases with a note count each, and a per-step transpose. Beat-marked every four. **Clone** copies a chain to an empty slot and repoints the grid cells that used it.
+- **Reach anything** — **⤳ Go to…** opens any chain or phrase, whether or not it appears in the song, so ideas can be sketched without editing the arrangement first.
+- **Phrase editor** — a tracker-style grid you edit in place. Arrows and Tab move the cursor, `Enter` or typing opens a pick-list, `Del` clears a cell. Notes, instruments and FX are chosen by name — `04 Night Bass` rather than `04`, `KIL`/`HOP`/`PSL` rather than raw hex — with fuzzy matching, so `c4` finds `C-4`. Shift+arrows select a block over steps and columns, which copies, pastes, clears and transposes as a unit. The header says where the phrase is used and warns when editing it will change several chains at once, with **Clone** to vary it in one place only. An optional QWERTY piano mode types notes straight down the column (`z s x d c v g b h n j m` for C–B, `q 2 w 3 e r 5 t 6 y 7 u` an octave up, `a` for note-off, `[`/`]` for octave), carrying the instrument down and advancing by a configurable step. Insert or delete a step (shifting the rest of the phrase), per-step copy/paste, whole-phrase copy/paste/clear, one-click transpose (±1/±12), 50-level undo, and a ▶ that auditions just that phrase.
 - **Slice editor** — any sample instrument's WAV on a big waveform. Zoom with the scroll wheel or −/+/Fit, with a full-file strip underneath showing where you are that drags to scroll. Drag markers, double-click to add, audition slices by clicking regions or with the `1`–`9`,`0` keys, auto-chop breakbeats with transient detection, equal-divide clean loops, and snap everything to zero-crossings. Advance `SAMPLESOURCE` instruments carry 32 slice pads, pico `SAMPLE` instruments 16.
 - **Instrument parameters** — edit any existing parameter of a project-bank instrument in place, with sliders alongside the values for 0–255 knobs.
+- **Tables and grooves** — a tab in the project workspace for both: three columns of command and value over 16 steps per table, and groove step lengths in ticks.
+- **New projects** — create an empty project on the card and start writing.
 
 All edits are held in memory until you explicitly save, and every save goes through the write path described under [the safety model](#the-safety-model). Files using the legacy 2-byte command encoding are read-only.
 
@@ -58,11 +61,15 @@ All edits are held in memory until you explicitly save, and every save goes thro
 
 - **Project overview** — four headline cards (BPM, playback length, scale, samples) over grouped Song / Instruments / File panels, a clickable full-width song map, FX-usage and groove summaries, collapsible instrument and sample sections, and auditionable sample rows with one-click access to the slice editor.
 - **Compare** — diff two projects: shared and unique instruments and samples, metadata side by side.
+- **Render to WAV** — bounce a project to a stereo 16-bit WAV, or to **stems**, one file per channel that plays. Rendered offline through the same scheduling as the preview, so it sounds like what you heard.
 - **MIDI export** — download any project as a Standard MIDI File (type 1, 24 PPQ, a tempo track plus one track per channel that plays anything, chain and project transpose applied, per-channel `GRV` groove switches and `HOP` flow honoured).
 
 ### Device (USB)
 
 - **Live screen mirror** — connect the picoTracker over USB (WebSerial) and watch the device screen in the browser, rendered pixel-for-pixel with the device's own bitmap font, with full-refresh requests, a pop-out window for capture, full-screen mode and PNG snapshots. Reachable straight from the landing page, no SD card needed. Requires the `https://` page, since WebSerial only exists in secure contexts.
+- **Output effects** — nineteen GPU effects over the mirror, for streaming, recording and projection: screen curve, wave warp, scanline jitter, block glitch, RGB offset, RGB planes, VHS ghosting, channel swap, colour grade, phosphor tint, phosphor glow, CRT scanlines, LCD panel, pixel grid, dot matrix, interlace, noise, vignette and posterise/dither. Ten presets, per-parameter control, and settings that persist. The effect list and its tuned parameter ranges come from [DMG Darkroom](https://github.com/clickysteve/dmg-darkroom); they are reimplemented here as a single WebGL shader pass so they hold 60fps on live video rather than being applied to a still image.
+- **Built for capture** — pick an output size (960×720, 1440×1080, 1280×720 or 1920×1080; the 16:9 sizes pillarbox rather than stretch, with a **Fill** control if you would rather overscan and a **Bars** colour you can key out), **Record** the output straight to a `.webm`, or pop the mirror into its own window and capture that in OBS — the popped-out window drives its own frames, so it keeps running when you switch away from the Librarian tab. A stand-in screen is drawn before anything is connected, so a look can be set up without the hardware to hand. All of it is display-side; nothing is ever sent to the device.
+  Effects need WebGL. Without it the mirror still works, still honours the output size, fill, bars, pop-out and recording, and tells you why the effects are off.
 - **Remote input — written, and deliberately disabled.** The client half of a proposed `FE 03` key-state opcode exists in the code, but the button is hidden and nothing is ever sent: on a real Advance the proposed opcode makes the screen flicker, which means the closed firmware already assigns inbound opcodes beyond the published protocol. Sending it blind risks provoking undefined behaviour on the device. This needs agreement on the firmware side before it's switched on — see `ROADMAP.md`.
 - **Card access while connected** is a firmware matter (issues #1430 / #1432), not something a client can work around.
 
@@ -74,6 +81,7 @@ All edits are held in memory until you explicitly save, and every save goes thro
 - **Cleanup and trash** — unused pool samples move to `PTLibrarian_Trash/` on the card rather than being deleted. The **Trash** tab lists what's in there and lets you restore a file to its pool (refusing if something of that name has reappeared) or delete it permanently, individually or all at once.
 - **Extract as .pti** — pull any instrument out of a project bank into `instruments/` as a `.pti` (or download it if the card is read-only).
 - **Backup** — copy the card to a folder or download it as a ZIP, with per-directory selection (`.config.xml` and `.current` always included).
+- **Chain colours travel with the card** — write them to `PTLibrarian_colours.json` at the card root, and they're picked up on any machine.
 - **Setlists** — click projects to add them to an ordered setlist, drag or ▲▼ to reorder, then export a lean, card-ready `projects/` layout as a folder or ZIP. Folders can be numbered (`01_`, `02_` …) so the device lists them in playing order. Setlists save with their order.
 
 ## The safety model
@@ -83,7 +91,8 @@ The card is opened **read-only**. Nothing is written unless you explicitly confi
 - Write permission is requested only at the moment you confirm.
 - The file's modification time and size are checked against the scan first; if it changed since (say, you saved on the device), the write refuses and asks for a rescan rather than clobbering it.
 - The original is copied to `PTLibrarian_Backups/<timestamp>/` on the card before anything is overwritten.
-- After writing, the file is re-read, re-parsed and compared byte-for-byte against what you intended — phrase buffers, song grid, chains and transposes, slice points, parameters, whichever applied.
+- Before writing, a **preview** lists exactly which grid cells, chains, phrases, tables and grooves will change.
+- After writing, the file is re-read, re-parsed and compared byte-for-byte against what you intended — phrase buffers, song grid, chains and transposes, tables, grooves, slice points, parameters, whichever applied.
 - If verification fails, the write is rolled back automatically from the backup.
 - Every operation is recorded in the browser and appended to `PTLibrarian_Backups/audit-log.txt` on the card, so the history travels with the card.
 
@@ -101,20 +110,22 @@ Validated against real Advance card files spanning firmware 2.0-RC3, 2.1-BETA1, 
 
 ## Development
 
-The entire app is a single `index.html` — deliberately, so it can be hosted anywhere and audited in one read. Internal modules: `PT` (format knowledge: parsers, encoders, rewriters, playback timeline, MIDI), `Cache` (IndexedDB), `Scanner`, `Zip` (store-method ZIP writer), `AudioPlayer`, `Demo` (synthetic card), `USB` (Remote UI protocol), `SongPlayer` (Web Audio) and one UI module.
+The entire app is a single `index.html` — deliberately, so it can be hosted anywhere and audited in one read. Internal modules: `PT` (format knowledge: parsers, encoders, rewriters, playback timeline, MIDI), `Cache` (IndexedDB), `Scanner`, `Zip` (store-method ZIP writer), `AudioPlayer`, `Demo` (synthetic card), `USB` (Remote UI protocol, painting to an offscreen canvas), `FX` (effect definitions, presets and the WebGL renderer), `Mirror` (the visible output canvas, render loop, recording and pop-out), `SongPlayer` (Web Audio) and one UI module.
 
 Tests are zero-dependency Node scripts that extract modules straight out of `index.html`, so they always run against the shipped code:
 
 ```bash
-node tests/parser.test.mjs   # 92 unit tests: formats, MIDI timing, slice/loop units, theme writing, round-trips
+node tests/parser.test.mjs   # 113 unit tests: formats, MIDI timing, slice/loop units, theme writing, round-trips, effect definitions
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
-node tests/audio.test.mjs    # renders the mix offline: no clipping, correct slice offsets
-node tests/e2e.mjs           # 109 browser checks (needs: npm i -D playwright)
+node tests/audio.test.mjs    # renders the mix and a WAV export offline: no clipping, correct slice offsets, valid stems
+node tests/e2e.mjs           # 163 browser checks (needs: npm i -D playwright)
 ```
 
 The parser tests run round-trip checks against real Advance project files when they're present locally; those files are not in this repository.
 
 The USB mirror's font is the 8x8 Wide face and special-glyph page by nILS (public domain), as shipped in the picoTracker firmware. The firmware's other two fonts are not redistributable and are intentionally not embedded.
+
+The mirror's output effects are a reimplementation of the filter set from [DMG Darkroom](https://github.com/clickysteve/dmg-darkroom) (MIT, same author): the effect list, parameter ranges and many of the tuned constants are carried over, but the filters themselves are rewritten from 2D-canvas passes over a still image into one WebGL shader pass that runs at video rate.
 
 ## Status
 

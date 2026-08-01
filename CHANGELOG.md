@@ -1,5 +1,159 @@
 # Changelog
 
+## v0.9.9 — output effects for the screen mirror
+
+The USB mirror can now be run through a chain of GPU effects and captured,
+which turns it from a debugging view into something you can put on a stream,
+a projector or a video. The effect list, parameter ranges and most of the
+tuned constants are lifted from [DMG Darkroom](https://github.com/clickysteve/dmg-darkroom),
+whose filters do the same job to a still Game Boy Camera photo. There they
+are 2D-canvas passes over one image; here they are reworked as a single
+WebGL shader pass because this has to hold 60fps on live video.
+
+**Nineteen effects**, applied in a fixed order regardless of the order you
+switch them on: screen curve, wave warp, scanline jitter, block glitch, RGB
+offset, RGB planes, VHS ghosting, channel swap, colour grade, phosphor tint,
+phosphor glow, CRT scanlines, LCD panel, pixel grid, dot matrix, interlace,
+noise, vignette and posterise/dither. Ten presets to start from — CRT
+monitor, arcade tube, VHS tape, handheld LCD, dot matrix, green and amber
+phosphor, glitch and projector — and a Custom slot the moment you touch
+anything. Settings persist across sessions.
+
+**Built for capture, not just for looking at**
+- **Output size** of 960×720, 1440×1080, 1280×720 or 1920×1080. The 16:9
+  sizes pillarbox the 4:3 screen rather than stretching it, so an OBS scene
+  needs no cropping; **Fill** overscans instead if you would rather crop the
+  sides than live with bars, and **Bars** sets their colour so they can be
+  keyed out.
+- **Record** straight to a `.webm` from the output canvas.
+- **Pop out** now drives its own frames, so the popped-out mirror keeps
+  running when you switch away from this tab — which is exactly when it is
+  being captured on the other screen.
+- **Full screen** letterboxes properly at the 16:9 sizes.
+- A **stand-in screen** is drawn before anything is connected, so a look can
+  be dialled in without the hardware to hand.
+- Nothing is ever sent to the device: this is all display-side.
+
+Effects need WebGL. Without it the mirror still works, still honours the
+output size, fill, bars, pop-out and recording, and says so.
+
+**Found by review of the above, before shipping**
+- Two mask effects "compensated" for the light they removed by brightening
+  the whole fragment, including the parts they had never darkened. At the
+  shipped Dot matrix preset every colour on the screen clipped to white.
+  The gain is now rescaled by the peak channel, which preserves hue.
+- The glow was blurred from the flat, un-letterboxed source, so it painted a
+  ghost of the screen across the bars and the bezel, and stayed still while
+  the picture curved, rippled or tore.
+- The glow had no bright-pass at all, so the screen blend lifted the black
+  background as much as the text and the picture went milky rather than the
+  highlights glowing. There is now a Threshold control.
+- Scanlines and the LCD grille were measured in output pixels while every
+  other mask was measured in device pixels, so they beat against each other
+  and against the curve, and drifted between output sizes.
+- Corner radius did nothing unless Curvature was above zero.
+- Recording a still screen with the effects off produced a one-frame file,
+  because the canvas was only redrawn when something changed and
+  `captureStream` only emits on a draw.
+- Capture tracks were never stopped, so every recording left a live track
+  attached to the output canvas for the rest of the session.
+- Changing the output size or hitting Reset mid-recording resized the canvas
+  under the capture track. Those controls are now held while recording.
+- Reset also threw away the output size, fill and bar colour; it now clears
+  the look and leaves the plumbing alone.
+- A failed `MediaRecorder.stop()` stranded the captured chunks with no file
+  and no message, and a recorder that errored on its own left the button
+  saying "Stop recording" forever.
+- Re-opening the pop-out after reloading this page stacked a second canvas
+  into the old window instead of replacing it.
+- With no WebGL the preset dropdown still ticked the master switch and lit
+  up the effect cards while the picture never changed.
+- Jitter used one random number for both "is this row affected" and "how
+  far", so every affected row moved almost the full distance, always the
+  same way.
+- Posterise produced N+1 tones rather than N, so "2" was not 1-bit.
+- The bottom fifth of the Bloom radius slider was clamped away and did
+  nothing.
+- Animated grain, jitter and glitch froze after about an hour of streaming,
+  once page-uptime-in-seconds outgrew a float32 mantissa inside the hash.
+  Every time-dependent term is now quantised and wrapped on the CPU.
+- Clicking a segmented option in the effects panel left it focused, so the
+  next keystroke fired the app-wide tab shortcuts.
+- WebGL context loss left the mirror black for the rest of the session with
+  no explanation; a failed shader compile leaked the context it had opened.
+- Noise, vignette, glare and backlight bleed painted over the letterbox
+  bars, which defeats keying them out.
+- Effect sliders had no accessible name and the segmented buttons exposed
+  no selected state.
+
+## v0.9.8 — the big editing round
+
+Eighteen requested items, then an adversarial review of the result which
+found eleven more defects in the new code; those are listed after.
+
+**Editing**
+- **One undo history per project** covering the song grid, chains, phrases,
+  tables and grooves, with redo (`⌘/Ctrl+Z`, `⇧⌘Z`). It no longer resets
+  when you move between phrases, and the two separate stacks are gone.
+- **Consistent cell interaction everywhere.** Click selects, `Enter` or
+  typing opens the pick-list, `Delete` clears. Chain cells opened the
+  picker on a plain click, so `Delete` could never reach them.
+- **Auto-advance is one setting** shared by typing, picking and the piano,
+  with a switchable toggle and an edit step of 1–8.
+- **Reach any chain or phrase** without touching the arrangement, via
+  **⤳ Go to…** — including slots that aren't placed in the song.
+- **Clone** on chains and phrases. A chain clone repoints the grid cells
+  that used it; a phrase clone repoints only the chain step you came from,
+  so a shared phrase can be varied in one place.
+- **Shared-phrase warning.** The phrase header now states where it's used
+  and flags when editing it will change several chains at once.
+- **Breadcrumb** from a phrase back to the chain and step you opened it from.
+- **Block selection in the phrase editor** over steps *and* columns, with
+  copy, paste and clear, matching the song grid. Transpose applies to the
+  selection when one is active.
+
+**Playback**
+- **Space plays what you're looking at** — the open phrase, else the open
+  chain, else the whole song.
+- **Scrub** the transport bar to jump around, and a **loop** toggle.
+- **Playheads everywhere**: the grid cell, row, chain list entry, chain step
+  and now the phrase step.
+
+**New**
+- **Render to WAV**, and **render stems** (one file per channel that plays),
+  using the same scheduling as the player so a render matches the preview.
+- **Create a project** on the card from scratch.
+- **Table and groove editing**, in a new tab in the project workspace.
+- **Chain colours as a sidecar** (`PTLibrarian_colours.json`) so they travel
+  with the card instead of living in one browser.
+- **Save preview**: see exactly which grid cells, chains, phrases, tables and
+  grooves are about to change before anything is written.
+
+**Found by review of the above, before shipping**
+- Undo didn't snapshot tables, so `⌘Z` after a table edit reverted an
+  unrelated earlier edit instead.
+- Groove edits never rebuilt the digest the player, MIDI export, renders and
+  the length readout all read — so the app and the device disagreed.
+- A self-closing `<TABLE/>` in the file couldn't be rewritten, and saving
+  rewrote *every* table, so one empty table aborted the whole save and rolled
+  back unrelated work. Only changed, writable tables are rewritten now, and
+  the editor says when a table can't be edited.
+- Seeking and looping fired the caller's `onEnd`, tearing down the transport
+  while audio carried on, and re-decoded the entire sample pool on every
+  pointermove while dragging.
+- The save preview's baseline was never refreshed after a save, so a second
+  save listed changes already written.
+- The preview ignored tables and grooves entirely, telling you nothing had
+  changed and then writing it anyway.
+- `beforeunload` didn't count table or groove edits.
+- Phrase block paste ignored the source columns, so a 16-bit param could land
+  in the note column and truncate to an invalid note.
+- Undo snapshots were pushed before validation, so a rejected keystroke wiped
+  the redo stack.
+- The new-project template used single 4096-byte run chunks where the firmware
+  writes 64-byte ones; now it uses the same encoder as every other write.
+- Escape left the save preview orphaned over a closed project.
+
 ## v0.9.7 — data-loss fixes, arrangement undo, optional piano entry
 
 Two independent reviews of the editor found the same cluster of data-loss

@@ -674,6 +674,27 @@
     .exp-badge { font-size:9px; font-weight:700; letter-spacing:.8px; color:var(--warn);
       background:#1f1200; border:1px solid #4a2e00; border-radius:3px; padding:2px 7px;
       margin-left:10px; vertical-align:middle; cursor:help; white-space:nowrap; }
+    /* SAVE PREVIEW */
+    #save-preview { position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:360;
+      display:none; align-items:center; justify-content:center; padding:20px; }
+    #save-preview.open { display:flex; }
+    .savep-box { background:var(--surface); border:1px solid var(--border2); border-radius:10px;
+      width:min(720px,100%); max-height:86vh; display:flex; flex-direction:column; overflow:hidden; }
+    .savep-hdr { padding:12px 16px; border-bottom:1px solid var(--border); font-size:14px; font-weight:700; }
+    .savep-body { padding:12px 16px; overflow-y:auto; }
+    .savep-sec { margin-bottom:14px; }
+    .savep-sec h4 { font-size:10px; letter-spacing:1px; text-transform:uppercase;
+      color:var(--accent); margin:0 0 6px; }
+    .savep-row { display:flex; gap:10px; align-items:center; font-family:monospace;
+      font-size:11px; padding:2px 0; }
+    .savep-at { color:var(--muted); min-width:110px; }
+    .savep-from { color:var(--c-miss); }
+    .savep-arrow { color:var(--border2); }
+    .savep-to { color:var(--c-found); }
+    .savep-more, .savep-list { font-family:monospace; font-size:11px; color:var(--muted); }
+    .savep-foot { display:flex; align-items:center; gap:10px; padding:12px 16px;
+      border-top:1px solid var(--border); }
+    .savep-note { flex:1; font-size:10px; color:var(--muted); }
     /* TRANSPORT */
     #transport { position:fixed; left:0; right:0; bottom:0; z-index:320; display:none;
       align-items:center; gap:14px; padding:9px 20px;
@@ -685,8 +706,14 @@
       overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     #tr-sub { font-size:10px; color:var(--muted); overflow:hidden;
       text-overflow:ellipsis; white-space:nowrap; }
-    #tr-barwrap { flex:1; height:5px; background:var(--border); border-radius:3px; overflow:hidden; }
-    #tr-bar { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+    #tr-barwrap { flex:1; height:14px; background:transparent; border-radius:3px;
+      position:relative; cursor:pointer; display:flex; align-items:center; }
+    #tr-barwrap::before { content:''; position:absolute; left:0; right:0; height:5px;
+      background:var(--border); border-radius:3px; }
+    #tr-head { position:absolute; width:3px; height:14px; background:var(--accent);
+      border-radius:2px; left:0; pointer-events:none; }
+    #tr-bar { position:absolute; left:0; height:5px; width:0; background:var(--accent);
+      border-radius:3px; transition:width .1s linear; }
     #tr-time { font-family:monospace; font-size:11px; color:var(--muted); flex-shrink:0; }
     /* a row that is previewing must stay obvious under the hover colour */
     .proj-item.playing .proj-row, .proj-item.playing:hover .proj-row { background:var(--accent-dim); }
@@ -701,6 +728,46 @@
     .pe-piano-cfg b { color:var(--accent); font-family:monospace; min-width:1ch; text-align:center; }
     .pe-help-piano { background:var(--accent-dim); border:1px solid var(--accent-brd);
       border-radius:5px; padding:7px 9px; margin-top:8px; }
+    .usage-note { font-size:10px; font-weight:400; letter-spacing:0; text-transform:none; color:var(--muted); }
+    .usage-note.shared { color:var(--warn); }
+    .pe-crumb { font-size:10px; font-weight:400; letter-spacing:0; text-transform:none; color:var(--muted); }
+    .pe-crumb a { color:var(--accent); cursor:pointer; }
+    .pe-crumb a:hover { text-decoration:underline; }
+    .pe-c.sel { background:var(--accent-dim); box-shadow:inset 0 0 0 1px var(--accent-brd); }
+    .pe-selinfo { font-size:10px; color:var(--accent); font-weight:600; letter-spacing:0; text-transform:none; }
+    .pe-row.playing { background:var(--accent-dim); box-shadow:inset 2px 0 0 var(--accent); }
+    #tr-loop.on { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+    /* TABLES & GROOVES */
+    .tg-tabs { display:flex; flex-wrap:wrap; gap:3px; margin-bottom:10px; }
+    .tg-tab { background:var(--surface2); border:1px solid var(--border); color:var(--text);
+      border-radius:4px; padding:3px 7px; font-family:monospace; font-size:11px; cursor:pointer; }
+    .tg-tab.empty { color:var(--border2); }
+    .tg-tab.on { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+    .tg-head, .tg-row { display:grid; grid-template-columns:26px repeat(3, 62px 52px);
+      gap:5px; align-items:center; font-family:monospace; font-size:11px; }
+    .tg-head { font-size:9px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted);
+      padding-bottom:4px; border-bottom:1px solid var(--border); margin-bottom:3px; }
+    .tg-grid { display:flex; flex-direction:column; gap:1px; }
+    .tg-row { padding:1px 0; border-radius:3px; }
+    .tg-row.beat { background:rgba(255,255,255,.028); }
+    .tg-i { color:var(--border2); font-size:10px; text-align:center; }
+    .tg-c { padding:2px 5px; border-radius:3px; cursor:text; outline:none;
+      border:1px solid transparent; white-space:nowrap; overflow:hidden; }
+    .tg-c:focus { border-color:var(--accent); background:var(--surface); }
+    .tg-cmd { color:var(--c-mid); }
+    .tg-par { color:var(--muted); }
+    .tg-c.dim { color:var(--border2); }
+    .tg-grooves { display:flex; flex-direction:column; gap:3px; }
+    .tg-groove { display:flex; align-items:center; gap:10px; background:var(--surface2);
+      border:1px solid var(--border); border-radius:5px; padding:5px 9px; }
+    .tg-gname { font-family:monospace; font-size:11px; color:var(--accent); font-weight:700; }
+    .tg-gsteps { display:flex; gap:2px; flex:1; flex-wrap:wrap; }
+    .tg-gs { min-width:22px; text-align:center; font-family:monospace; font-size:11px;
+      padding:2px 3px; border-radius:3px; background:var(--surface); cursor:text;
+      border:1px solid transparent; outline:none; }
+    .tg-gs.off { color:var(--border2); }
+    .tg-gs:focus { border-color:var(--accent); }
+    .tg-gmeta { font-size:10px; color:var(--muted); flex-shrink:0; }
     /* PICK LIST */
     .pick { position:fixed; z-index:400; width:270px; background:var(--surface);
       border:1px solid var(--accent-brd); border-radius:7px; box-shadow:0 10px 34px rgba(0,0,0,.6);
@@ -857,7 +924,49 @@
       border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
     @keyframes spin { to { transform:rotate(360deg); } }
     #usb-stage:fullscreen { border:none; border-radius:0; }
-    #usb-stage:fullscreen canvas { max-height:100vh; height:100vh; width:auto; }
+    /* object-fit does the letterboxing: clamping both width and height
+       would drop the aspect ratio and stretch the 16:9 output sizes. */
+    #usb-stage:fullscreen canvas { width:100vw; height:100vh; max-width:none;
+      max-height:none; object-fit:contain; }
+
+    /* OUTPUT EFFECTS (USB mirror) */
+    .fx-panel { width:100%; max-width:1100px; display:flex; flex-direction:column; gap:10px; }
+    .fx-top { display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+      background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:9px 12px; }
+    .fx-master { display:flex; align-items:center; gap:7px; font-weight:700; font-size:12px;
+      letter-spacing:.4px; cursor:pointer; }
+    .fx-master input, .fx-mini input[type=checkbox], .fx-head input {
+      width:14px; height:14px; accent-color:var(--accent); cursor:pointer; }
+    .fx-mini { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); cursor:pointer; }
+    .fx-top select { background:var(--surface2); border:1px solid var(--border2); color:var(--text);
+      padding:4px 7px; font-size:11px; border-radius:5px; outline:none; }
+    .fx-top select:focus { border-color:var(--accent); }
+    .fx-top input[type=color] { width:26px; height:22px; padding:0; border:1px solid var(--border2);
+      border-radius:4px; background:var(--surface2); cursor:pointer; }
+    .fx-sep { width:1px; height:20px; background:var(--border2); }
+    .fx-panel input[type=range] { accent-color:var(--accent); height:16px; cursor:pointer; }
+    #fx-zoom { width:74px; }
+    #fx-record.on { color:#fff; background:var(--c-miss); border-color:var(--c-miss); }
+    .fx-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(258px,1fr)); gap:8px; }
+    .fx-card { background:var(--surface); border:1px solid var(--border); border-radius:8px;
+      padding:8px 10px; display:flex; flex-direction:column; gap:5px; }
+    .fx-card.on { border-color:var(--accent-brd); background:var(--accent-dim); }
+    .fx-head { display:flex; align-items:center; gap:7px; cursor:pointer; }
+    .fx-name { font-size:12px; font-weight:600; }
+    .fx-hint { font-size:10px; color:var(--muted); line-height:1.45; }
+    .fx-params { display:none; flex-direction:column; gap:3px; margin-top:2px; }
+    .fx-card.on .fx-params { display:flex; }
+    .fx-p { display:flex; align-items:center; gap:7px; font-size:10px; }
+    .fx-plab { color:var(--muted); width:82px; flex-shrink:0; }
+    .fx-p input[type=range] { flex:1; min-width:0; }
+    .fx-pval { width:52px; text-align:right; font-family:monospace; color:var(--text); flex-shrink:0; }
+    .fx-seg { display:flex; flex-wrap:wrap; gap:3px; flex:1; }
+    .fx-segb { background:var(--surface2); border:1px solid var(--border2); color:var(--muted);
+      font-size:10px; padding:2px 6px; border-radius:4px; cursor:pointer; font-family:inherit; }
+    .fx-segb.on { background:var(--accent); border-color:var(--accent); color:#08121a; font-weight:700; }
+    .fx-panel.fx-dim .fx-grid { opacity:.45; }
+    .fx-note { font-size:11px; color:var(--warn); min-height:0; }
+    .fx-panel input:disabled, .fx-panel button:disabled { opacity:.5; cursor:not-allowed; }
     .no-results { color:var(--muted); padding:36px; text-align:center; }
   </style>
 </head>
@@ -865,7 +974,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.7 Alpha</span>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.9 Alpha</span>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -939,6 +1048,7 @@
           <option value="size-desc">Largest first</option>
         </select>
         <button class="btn ghost sm" id="proj-miss-btn">⚠ Missing</button>
+        <button class="btn ghost sm" id="btn-new-project" title="Create an empty project on the card">＋ New project</button>
         <span class="stat-chip" id="projs-stat" style="margin-left:auto"></span>
         <div class="vtog-wrap">
           <button class="vtog active" id="vtog-list" title="List  L">☰</button>
@@ -1108,15 +1218,16 @@
       <div class="toolbar">
         <button class="btn" id="btn-usb-connect">CONNECT USB</button>
         <button class="btn ghost sm" id="btn-usb-refresh" disabled>↺ Refresh screen</button>
-        <button class="btn ghost sm" id="btn-usb-png" disabled>⬇ PNG</button>
+        <button class="btn ghost sm" id="btn-usb-png">⬇ PNG</button>
         <button class="btn ghost sm" id="btn-usb-input" disabled style="display:none" title="Disabled: the Advance reacts unexpectedly to the proposed input opcode — needs firmware-side agreement first">⌨ Input (experimental)</button>
-        <button class="btn ghost sm" id="btn-usb-full" disabled title="Show only the mirrored screen">⛶ Full screen</button>
-        <button class="btn ghost sm" id="btn-usb-popout" disabled title="Open the mirror in its own window (handy for OBS / capture)">⧉ Pop out</button>
+        <button class="btn ghost sm" id="btn-usb-full" title="Show only the mirrored screen">⛶ Full screen</button>
+        <button class="btn ghost sm" id="btn-usb-popout" title="Open the mirror in its own window (handy for OBS / capture)">⧉ Pop out</button>
+        <button class="btn ghost sm" id="btn-usb-fx" title="Show or hide the output effects">✨ Effects</button>
         <span class="stat-chip" id="usb-status" style="margin-left:auto">Not connected</span>
       </div>
       <div class="scroll-area" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:16px">
         <div id="usb-stage" style="display:flex;align-items:center;justify-content:center;background:#000;border:1px solid var(--border2);border-radius:8px;max-width:100%">
-          <canvas id="usb-canvas" width="960" height="720" style="max-width:100%;max-height:calc(100vh - 300px);aspect-ratio:4/3;image-rendering:pixelated;display:block"></canvas>
+          <canvas id="usb-canvas" width="960" height="720" style="max-width:100%;max-height:52vh;aspect-ratio:4/3;image-rendering:pixelated;display:block"></canvas>
         </div>
         <div id="usb-pad" style="display:none;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center">
           <div style="display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,34px);gap:4px;margin-right:14px">
@@ -1134,11 +1245,32 @@
             Keys: arrows · Z=ENTER · X=EDIT · A=ALT · S=NAV · Space=PLAY
           </span>
         </div>
+        <div id="fx-panel" class="fx-panel">
+          <div class="fx-top">
+            <label class="fx-master"><input type="checkbox" id="fx-on"> OUTPUT EFFECTS</label>
+            <select id="fx-preset" title="Load a preset"></select>
+            <label class="fx-mini" title="Animate the effects that move (noise, jitter, glitch, interlace)"><input type="checkbox" id="fx-anim"> Motion</label>
+            <span class="fx-sep"></span>
+            <label class="fx-mini">Output <select id="fx-output" title="Size of the canvas that OBS or a capture card sees"></select></label>
+            <label class="fx-mini" title="0% fits the 4:3 screen inside the frame; 100% fills the frame and crops the sides">Fill <input type="range" id="fx-zoom" min="0" max="100" step="1"><span id="fx-zoom-v" class="fx-pval"></span></label>
+            <label class="fx-mini" title="Colour of the letterbox bars and the bezel">Bars <input type="color" id="fx-bg" value="#000000"></label>
+            <span class="fx-sep"></span>
+            <button class="btn ghost sm" id="fx-record">● Record</button>
+            <button class="btn ghost sm" id="fx-reset" title="Turn every effect off and restore defaults">Reset</button>
+            <span class="stat-chip" id="fx-fps" style="margin-left:auto"></span>
+          </div>
+          <div class="fx-grid" id="fx-grid"></div>
+          <div class="fx-note" id="fx-note"></div>
+        </div>
         <div style="font-size:11px;color:var(--muted);max-width:640px;text-align:center;line-height:1.7">
           Live mirror of the picoTracker screen over USB (Remote UI protocol), drawn with the
           device's own font. Stock firmware is view-only — the experimental input mode speaks a
           proposed key-event opcode that needs firmware support. Requires Chrome/Edge (WebSerial)
           and Remote UI set to On in the device config.
+          <br>The output effects run on the GPU and are applied to the mirror only — nothing is
+          ever sent to the device. Pop the mirror out into its own window and capture that window
+          in OBS, or record straight to a .webm here. The screen above is a stand-in until a
+          device is connected, so a look can be dialled in ahead of time.
         </div>
       </div>
     </div>
@@ -1147,14 +1279,28 @@
 </div><!-- #app -->
 
 <!-- Project modal -->
+<!-- Save preview: exactly what is about to be written to the card -->
+<div id="save-preview">
+  <div class="savep-box">
+    <div class="savep-hdr"><span id="savep-title"></span></div>
+    <div class="savep-body" id="savep-body"></div>
+    <div class="savep-foot">
+      <span class="savep-note">The original is backed up to PTLibrarian_Backups/ first, and the write is verified byte-for-byte.</span>
+      <button class="btn ghost sm" id="btn-savep-cancel">Cancel</button>
+      <button class="btn sm" id="btn-savep-go">Write to card</button>
+    </div>
+  </div>
+</div>
+
 <!-- Transport: what is playing, where it is, and how to stop it -->
 <div id="transport" aria-live="polite">
-  <button class="btn sm" id="tr-stop" title="Stop playback">■</button>
+  <button class="btn sm" id="tr-stop" title="Stop playback (Space)">■</button>
+  <button class="btn ghost sm" id="tr-loop" title="Loop what is playing">↻</button>
   <div id="tr-info">
     <div id="tr-title"></div>
     <div id="tr-sub"></div>
   </div>
-  <div id="tr-barwrap"><div id="tr-bar"></div></div>
+  <div id="tr-barwrap" title="Click or drag to jump"><div id="tr-bar"></div><div id="tr-head"></div></div>
   <span id="tr-time"></span>
 </div>
 
@@ -1166,6 +1312,8 @@
       <span class="proj-modal-meta" id="modal-meta"></span>
       <button class="btn sm" id="btn-modal-play" title="Play this project in the browser (approximate — sample channels only)">▶ Play</button>
       <button class="btn ghost sm" id="btn-modal-midi" title="Export as a Standard MIDI File">⬇ MIDI</button>
+      <button class="btn ghost sm" id="btn-modal-wav" title="Render the song to a WAV file">⬇ WAV</button>
+      <button class="btn ghost sm" id="btn-modal-stems" title="Render one WAV per channel that plays">⬇ Stems</button>
       <button class="btn ghost sm" id="btn-modal-diff">⇌ Compare</button>
       <button class="modal-nav-btn" id="btn-modal-next" title="Next project (→)">›</button>
       <button class="btn ghost sm" id="btn-modal-close">✕</button>
@@ -1173,6 +1321,7 @@
     <div class="modal-tabs">
       <button class="modal-tab active" id="btn-modal-overview">Overview</button>
       <button class="modal-tab" id="btn-modal-patterns">Patterns</button>
+      <button class="modal-tab" id="btn-modal-tables">Tables &amp; Grooves</button>
     </div>
     <div class="proj-modal-body" id="modal-body"></div>
   </div>
@@ -1624,6 +1773,7 @@ const PT = (() => {
     const groovesEl = firstChild(root, 'GROOVES');
     if (groovesEl) {
       const g = decodeHexBuffer(groovesEl, GROOVE_COUNT * STEPS, EMPTY);
+      out.grooveRaw = g;                      // editable buffer; out.grooves is the digest
       for (let i = 0; i < GROOVE_COUNT; i++) {
         const steps = [];
         for (let s = 0; s < STEPS; s++) {
@@ -2080,6 +2230,122 @@ const PT = (() => {
   // inside <SONG>, before <TABLES> which reuses some element names) with
   // re-encoded buffers, leaving every other byte of the file untouched.
   // Refuses legacy 2-byte-command files.
+  // ── Rewrite the GROOVES buffer ─────────────────────────
+  // Grooves live at the top level, not inside <SONG>, so this is a simple
+  // scoped replacement of the one element.
+  // The player, MIDI export, renders and the length readout all read the
+  // groove DIGEST rather than the raw buffer, so an edit to grooveRaw has to
+  // rebuild it or every preview stays on the old timing while the card gets
+  // the new one.
+  function rebuildGrooveDigest(proj) {
+    if (!proj || !proj.grooveRaw) return proj;
+    const out = [];
+    for (let g = 0; g < GROOVE_COUNT; g++) {
+      const steps = [];
+      for (let st = 0; st < STEPS; st++) {
+        const v = proj.grooveRaw[g * STEPS + st];
+        if (v === EMPTY) break;
+        steps.push(v);
+      }
+      out.push(steps);
+    }
+    proj.grooves = out;
+    return proj;
+  }
+
+  function rewriteGrooves(text, parsed) {
+    if (!parsed.grooveRaw) return { ok: false, error: 'this project has no groove buffer to rewrite' };
+    const open = text.indexOf('<GROOVES>');
+    const close = text.indexOf('</GROOVES>');
+    if (open < 0 || close < 0 || close < open)
+      return { ok: false, error: 'GROOVES element not found' };
+    const body = encodeHexBuffer(Uint8Array.from(parsed.grooveRaw));
+    return { ok: true, text: text.slice(0, open) + '<GROOVES>' + body + text.slice(close) };
+  }
+
+  // ── Rewrite a single TABLE's command/param buffers ─────
+  // Scoped to the one <TABLE ID="nn"> block: TABLE reuses the CMD/PARAM
+  // element names that also appear elsewhere, so a document-wide search
+  // would corrupt a different table or the song.
+  function rewriteTable(text, tableIdHex, table) {
+    const idRe = new RegExp(`<TABLE\\b[^>]*\\bID="${escapeRe(tableIdHex)}"[^>]*>`);
+    const m = idRe.exec(text);
+    if (!m) return { ok: false, error: `table ID="${tableIdHex}" not found` };
+    if (m[0].endsWith('/>')) return { ok: false, error: `table ${tableIdHex} is self-closing` };
+    const start = m.index;
+    const end = text.indexOf('</TABLE>', start);
+    if (end < 0) return { ok: false, error: `table ${tableIdHex} is not closed` };
+    let block = text.slice(start, end);
+    const sections = [
+      ['CMD1', encodeHexBuffer(Uint8Array.from(table.cmd[0] || []))],
+      ['PARAM1', encodeHexBuffer(u16leBytes(table.param[0] || []))],
+      ['CMD2', encodeHexBuffer(Uint8Array.from(table.cmd[1] || []))],
+      ['PARAM2', encodeHexBuffer(u16leBytes(table.param[1] || []))],
+      ['CMD3', encodeHexBuffer(Uint8Array.from(table.cmd[2] || []))],
+      ['PARAM3', encodeHexBuffer(u16leBytes(table.param[2] || []))],
+    ];
+    for (const [name, body] of sections) {
+      const o = block.indexOf(`<${name}>`);
+      const c = block.indexOf(`</${name}>`);
+      if (o < 0 || c < 0 || c < o) continue;      // absent section: leave alone
+      block = block.slice(0, o) + `<${name}>` + body + block.slice(c);
+    }
+    return { ok: true, text: text.slice(0, start) + block + text.slice(end) };
+  }
+
+  // ── Build an empty project file ────────────────────────
+  // Enough structure for the device and for this app's own parser: an
+  // empty song grid, empty chains/phrases/tables, a default groove, and
+  // one silent instrument slot. Round-tripped through parseProject in the
+  // tests so a malformed template can't ship.
+  function buildEmptyProject(opts = {}) {
+    const rows = opts.songRows ?? SONG_ROWS;
+    const phrases = opts.phraseCount ?? PHRASE_COUNT;
+    const tables = opts.tableCount ?? TABLE_COUNT;
+    // Use the same encoder as every other write, so the template's chunking
+    // matches what the firmware itself produces (64-byte chunks) rather than
+    // one enormous run element that only this app is known to accept.
+    const run = (v, n) => encodeHexBuffer(new Uint8Array(n).fill(v));
+    const run16 = (v, n) => encodeHexBuffer(u16leBytes(new Array(n).fill(v)));
+    const esc2 = v => String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const P = phrases * STEPS;
+    const tableXml = Array.from({ length: tables }, (_, i) =>
+      `<TABLE ID="${hx2(i)}">` +
+      `<CMD1>${run(CMD_NONE, STEPS)}</CMD1><PARAM1>${run16(0, STEPS)}</PARAM1>` +
+      `<CMD2>${run(CMD_NONE, STEPS)}</CMD2><PARAM2>${run16(0, STEPS)}</PARAM2>` +
+      `<CMD3>${run(CMD_NONE, STEPS)}</CMD3><PARAM3>${run16(0, STEPS)}</PARAM3>` +
+      `</TABLE>`).join('');
+    // groove 0 defaults to 6/6 like the firmware; the rest are unset
+    const grooveBytes = new Uint8Array(GROOVE_COUNT * STEPS).fill(EMPTY);
+    grooveBytes[0] = 6; grooveBytes[1] = 6;
+    return `<PICOTRACKER>` +
+      `<PROJECT VERSION="${esc2(opts.version ?? '3.0')}">` +
+      `<PARAMETER NAME="tempo" VALUE="${parseInt(opts.tempo, 10) || 120}"/>` +
+      `<PARAMETER NAME="master" VALUE="${parseInt(opts.master, 10) || 100}"/>` +
+      `<PARAMETER NAME="transpose" VALUE="0"/>` +
+      `<PARAMETER NAME="scale" VALUE="None (Chromatic)"/>` +
+      `<PARAMETER NAME="scaleroot" VALUE="C "/>` +
+      `<PARAMETER NAME="wrap" VALUE="false"/>` +
+      `</PROJECT>` +
+      `<SONG>` +
+      `<SONG>${run(EMPTY, rows * CHANNELS)}</SONG>` +
+      `<CHAINS>${run(EMPTY, CHAIN_COUNT * STEPS)}</CHAINS>` +
+      `<TRANSPOSES>${run(0, CHAIN_COUNT * STEPS)}</TRANSPOSES>` +
+      `<NOTES>${run(EMPTY, P)}</NOTES>` +
+      `<INSTRUMENTS>${run(EMPTY, P)}</INSTRUMENTS>` +
+      `<COMMAND1>${run(CMD_NONE, P)}</COMMAND1><PARAM1>${run16(0, P)}</PARAM1>` +
+      `<COMMAND2>${run(CMD_NONE, P)}</COMMAND2><PARAM2>${run16(0, P)}</PARAM2>` +
+      `</SONG>` +
+      `<INSTRUMENTBANK>` +
+      `<INSTRUMENT ID="00" TYPE="SAMPLE" VERSION="1"><PARAM NAME="volume" VALUE="128"/>` +
+      `<PARAM NAME="root note" VALUE="60"/><PARAM NAME="loopmode" VALUE="none"/>` +
+      `<PARAM NAME="table" VALUE="-1"/></INSTRUMENT>` +
+      `</INSTRUMENTBANK>` +
+      `<TABLES>${tableXml}</TABLES>` +
+      `<GROOVES>${encodeHexBuffer(grooveBytes)}</GROOVES>` +
+      `<MIXER/></PICOTRACKER>`;
+  }
+
   function rewriteSongSections(text, parsed) {
     if ((parsed.geometry?.cmdWidth ?? 1) !== 1)
       return { ok: false, error: 'this project uses a legacy beta command encoding — editing is disabled for safety' };
@@ -2154,9 +2420,9 @@ const PT = (() => {
             ? (cs === 0 ? { phrase: opts.phrase, transpose: 0 } : { phrase: EMPTY, transpose: 0 })
             : chainStep(proj, c, cs);
           if (phrase === EMPTY || phrase >= geom(proj).phraseCount) continue;
-          // Position marks let the UI show what is playing where: which
-          // grid cell, which chain step, which phrase, per channel.
-          marks.push({ time: tick * tickSec, ch: t, row, chain: c, step: cs, phrase });
+          // Position marks let the UI show what is playing where: grid cell,
+          // chain step, phrase and phrase step, per channel. Emitted per
+          // phrase step so the phrase grid gets a playhead too.
           const enterAt = hopEntry; hopEntry = 0;
           for (let ps = enterAt; ps < STEPS; ps++) {
             const st = phraseStep(proj, phrase, ps);
@@ -2169,6 +2435,7 @@ const PT = (() => {
               if (g < GROOVE_COUNT) { gSteps = grooveOf(g); gPos = 0; }
             }
             const time = tick * tickSec;
+            marks.push({ time, ch: t, row, chain: c, step: cs, phrase, pstep: ps });
             if (st.cmd1 === CMD_KIL || st.cmd2 === CMD_KIL || st.note === NOTE_OFF)
               events.push({ time, ch: t, type: 'off' });
             for (const [cmd, param] of [[st.cmd1, st.param1], [st.cmd2, st.param2]]) {
@@ -2331,6 +2598,7 @@ const PT = (() => {
     parseXml, decodeHexBuffer, u16leFrom, buildPti, buildPtt, rewriteConfigTheme, defaultConfigXml,
     noteFromStr, encodeHexBuffer, rewriteSongSections, buildEventTimeline,
     sliceWindow, loopWindow, slicePadCount,
+    rewriteGrooves, rewriteTable, buildEmptyProject, rebuildGrooveDigest,
     rewriteInstrumentSlices, rewriteInstrumentParams, detectOnsets, snapZeroCross,
     parseProject, parsePti, parseTheme, parseConfig, parseInstrumentEl,
     parseWavHeader, rewriteSampleRef,
@@ -3237,7 +3505,18 @@ const Demo = (() => {
     </SONG>
     <INSTRUMENTBANK>${instXml}
     </INSTRUMENTBANK>
-    <TABLES><TABLE ID="00"/></TABLES>
+    <TABLES>${(() => {
+      // one populated table (so the editor is exercisable) plus a couple of
+      // empty-but-present ones; a self-closing TABLE has nothing to rewrite
+      const none = new Array(16).fill(0x2D), zero = new Array(32).fill(0);
+      const withCmds = none.slice(); withCmds[0] = 0x45; withCmds[4] = 0x2A;
+      const pars = zero.slice(); pars[0] = 0x80; pars[8] = 0x40;
+      const tbl = (id, c, p2) => `<TABLE ID="${id}">` +
+        `<CMD1>${chunksOf(c)}</CMD1><PARAM1>${chunksOf(p2)}</PARAM1>` +
+        `<CMD2>${chunksOf(none)}</CMD2><PARAM2>${chunksOf(zero)}</PARAM2>` +
+        `<CMD3>${chunksOf(none)}</CMD3><PARAM3>${chunksOf(zero)}</PARAM3></TABLE>`;
+      return tbl('00', withCmds, pars) + tbl('01', none, zero);
+    })()}</TABLES>
     <GROOVES>${grooveXml}</GROOVES>
     <MIXER/>
 </PICOTRACKER>`;
@@ -3372,6 +3651,811 @@ const Demo = (() => {
 // Client sends FE 02 to request a full repaint. Coordinates in
 // TEXT are cell indices + 0x0F; grid is 32x24 cells of 10x10 px.
 // ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// FX — real-time output effects for the USB screen mirror.
+//
+// The mirror paints the device's screen into an offscreen 960x720
+// canvas; this module takes that canvas and renders it through a
+// single WebGL fragment shader into the visible output canvas, so a
+// full chain of effects still runs at 60fps and can be fed straight
+// to OBS, a capture card or a projector.
+//
+// The effect list, parameter ranges and most of the tuned constants
+// come from DMG Darkroom (github.com/clickysteve/dmg-darkroom), whose
+// filters are 2D-canvas passes over a still image. They are reworked
+// here as one shader pass because this runs live at video rate.
+//
+// Effects are applied in a fixed order: geometry (curve, warp, jitter,
+// glitch, interlace shift) → sampling (RGB offset, planes, ghosting) →
+// colour (channel swap, grade, tint) → composite (bloom, scanlines,
+// LCD, grid, dots, interlace darkening, noise, vignette, dither).
+// ══════════════════════════════════════════════════════════
+const FX = (() => {
+
+  // ── Effect definitions — the single source of truth for the UI,
+  // defaults, presets and the sidecar/localStorage format. Shape
+  // deliberately matches DMG Darkroom's FILTER_DEFS so parameters
+  // mean the same thing in both apps.
+  const DEFS = [
+    { id:'curve', label:'Screen curve', hint:'Barrel distortion and a glass highlight, like a tube monitor.', params:[
+      { key:'amount', label:'Curvature',    def:35, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'corner', label:'Corner radius',def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'spec',   label:'Glass glare',  def:25, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'warp', label:'Wave warp', hint:'Rolling horizontal ripple, like a mistracked signal.', params:[
+      { key:'amplitude', label:'Amplitude', def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'frequency', label:'Frequency', def:40, min:1, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'speed',     label:'Speed',     def:30, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Still' },
+    ]},
+    { id:'jitter', label:'Scanline jitter', hint:'Random rows kicked sideways. Animates when Motion is on.', params:[
+      { key:'amount',    label:'Jitter amount', def:30, min:1, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'frequency', label:'Affected rows', def:35, min:1, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'rate',      label:'Rate',          def:40, min:1, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'glitch', label:'Block glitch', hint:'Horizontal bands torn sideways with wraparound.', params:[
+      { key:'shift',   label:'Shift amount', def:35, min:1, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'density', label:'Tear chance', def:25, min:1, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'size',    label:'Band height',  def:20, min:1, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'rate',    label:'Rate',         def:25, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Still' },
+    ]},
+    { id:'rgbshift', label:'RGB offset', hint:'Red and blue pulled apart from green. The classic chromatic-aberration look.', params:[
+      { key:'shiftH', label:'Horizontal', def:60, min:0, max:400, step:1, fmt:v=>`${v}%` },
+      { key:'shiftV', label:'Vertical',   def:0,  min:0, max:400, step:1, fmt:v=>`${v}%` },
+      { key:'shiftR', label:'Radial',     def:0,  min:-400, max:400, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'planes', label:'RGB planes', hint:'Per-row channel split — the prism-strip signal-corruption look.', params:[
+      { key:'shift',   label:'Channel split', def:40, min:1, max:300, step:1, fmt:v=>`${v}%` },
+      { key:'scatter', label:'Row scatter',   def:40, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'ghost', label:'VHS ghosting', hint:'Two dimmer echoes trailing to the right, like a worn tape.', params:[
+      { key:'offset', label:'Echo offset', def:50, min:1, max:150, step:1, fmt:v=>`${v}%` },
+      { key:'fade',   label:'Echo fade',   def:70, min:1, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'chswap', label:'Channel swap', hint:'Rearrange the red, green and blue channels.', params:[
+      { key:'mode', type:'seg', label:'Mode', def:'rbg', opts:[['rgb','RGB'],['rbg','RBG'],['grb','GRB'],['gbr','GBR'],['brg','BRG'],['bgr','BGR']] },
+    ]},
+    { id:'grade', label:'Colour grade', hint:'Brightness, contrast and saturation for the capture chain.', params:[
+      { key:'brightness', label:'Brightness', def:100, min:0, max:200, step:1, fmt:v=>`${v}%` },
+      { key:'contrast',   label:'Contrast',   def:100, min:0, max:200, step:1, fmt:v=>`${v}%` },
+      { key:'saturation', label:'Saturation', def:100, min:0, max:300, step:1, fmt:v=>`${v}%` },
+      { key:'gamma',      label:'Gamma',      def:100, min:40, max:200, step:1, fmt:v=>(v/100).toFixed(2) },
+    ]},
+    { id:'tint', label:'Phosphor tint', hint:'Recolour the whole picture through a single phosphor.', params:[
+      { key:'colour', type:'seg', label:'Phosphor', def:'green', opts:[['green','Green'],['amber','Amber'],['blue','Blue'],['red','Red'],['white','White']] },
+      { key:'amount', label:'Amount', def:80, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'bloom', label:'Phosphor glow', hint:'Bright pixels bleed outward. The single biggest win on a projector.', params:[
+      { key:'intensity', label:'Intensity',   def:55, min:0, max:150, step:1, fmt:v=>`${v}%` },
+      { key:'radius',    label:'Bloom radius',def:80, min:5, max:300, step:5, fmt:v=>`${v}%` },
+      { key:'threshold', label:'Threshold',   def:25, min:0, max:90,  step:1, fmt:v=>v?`${v}%`:'Everything' },
+      { key:'colour', type:'seg', label:'Glow colour', def:'none', opts:[['none','Source'],['green','Green'],['amber','Amber'],['blue','Blue']] },
+    ]},
+    { id:'scanlines', label:'CRT scanlines', hint:'A dark gap between device pixel rows, measured on the picture so it follows the curve.', params:[
+      { key:'variant', type:'seg', label:'Weight', def:'medium', opts:[['fine','Fine'],['medium','Medium'],['thick','Thick'],['wide','Wide']] },
+      { key:'pitch', label:'Line pitch', def:1, min:1, max:4, step:1, fmt:v=>v===1?'Every row':`${v} rows` },
+      { key:'mix',   label:'Depth',      def:70, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'lcd', label:'LCD panel', hint:'Sub-pixel tint columns and backlight bleed.', params:[
+      { key:'subpixel', label:'Sub-pixel tint',  def:30, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'bleed',    label:'Backlight bleed', def:15, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'grid', label:'Pixel grid', hint:'A line on every device-pixel boundary.', params:[
+      { key:'opacity', label:'Grid opacity', def:30, min:1, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'weight',  label:'Line weight',  def:1,  min:0.5, max:4, step:0.5, fmt:v=>`${v}px` },
+    ]},
+    { id:'dot', label:'Dot matrix', hint:'Each device pixel becomes a round dot with gaps between.', params:[
+      { key:'radius',   label:'Dot size', def:44, min:15, max:80, step:1, fmt:v=>`${v}%` },
+      { key:'depth',    label:'Gap darkness', def:80, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'halation', label:'Halation', def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'interlace', label:'Interlace', hint:'Alternate field offset and darkening, like broadcast video.', params:[
+      { key:'intensity', label:'Intensity', def:50, min:1, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'flip',      label:'Field flip',def:1,  min:0, max:1,   step:1, fmt:v=>v?'Alternating':'Static' },
+    ]},
+    { id:'noise', label:'Noise', hint:'Film grain, static or horizontal banding.', params:[
+      { key:'amount', label:'Amount', def:25, min:1, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'type', type:'seg', label:'Type', def:'film', opts:[['film','Film'],['static','Static'],['bands','Bands']] },
+    ]},
+    { id:'vignette', label:'Vignette', hint:'Darkened edges, round through to square.', params:[
+      { key:'falloff', label:'Intensity', def:45, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'shape',   label:'Shape',     def:0,  min:0, max:100, step:1, fmt:v=>v<=5?'Round':v>=95?'Square':`${v}%` },
+    ]},
+    { id:'dither', label:'Posterise / dither', hint:'Ordered Bayer dithering down to a few tones per channel.', params:[
+      { key:'levels', label:'Tones', def:4, min:2, max:12, step:1, fmt:v=>v===2?'2 (1-bit)':`${v}` },
+    ]},
+  ];
+
+  // Applied in this order regardless of the order the user toggles them.
+  const ORDER = DEFS.map(d => d.id);
+
+  function defaults() {
+    const out = {};
+    for (const d of DEFS) {
+      out[d.id] = {};
+      for (const p of d.params) out[d.id][p.key] = p.def;
+    }
+    return out;
+  }
+
+  // ── Presets ─────────────────────────────────────────────
+  // Each lists the effects that are ON plus any parameter overrides;
+  // everything unlisted falls back to the definition defaults.
+  const PRESETS = [
+    { id:'off',  label:'Off',       on:[], p:{} },
+    { id:'crt',  label:'CRT monitor', on:['curve','bloom','scanlines','vignette','rgbshift'], p:{
+      curve:{amount:30,corner:18,spec:22}, bloom:{intensity:50,radius:70},
+      scanlines:{variant:'medium',mix:65}, vignette:{falloff:40}, rgbshift:{shiftH:25} } },
+    { id:'arcade', label:'Arcade tube', on:['curve','bloom','scanlines','vignette','grade'], p:{
+      curve:{amount:40,corner:16,spec:28}, bloom:{intensity:75,radius:85},
+      scanlines:{variant:'thick',mix:72}, vignette:{falloff:52},
+      grade:{brightness:112,contrast:106,saturation:110,gamma:96} } },
+    { id:'vhs',  label:'VHS tape',   on:['ghost','rgbshift','jitter','noise','interlace','grade'], p:{
+      ghost:{offset:65,fade:66}, rgbshift:{shiftH:110}, jitter:{amount:22,frequency:22,rate:35},
+      noise:{amount:22,type:'bands'}, interlace:{intensity:45}, grade:{brightness:104,contrast:92,saturation:120,gamma:100} } },
+    { id:'lcd',  label:'Handheld LCD', on:['grid','lcd','grade'], p:{
+      grid:{opacity:38,weight:1}, lcd:{subpixel:34,bleed:26}, grade:{brightness:104,contrast:96,saturation:88,gamma:100} } },
+    { id:'dmd',  label:'Dot matrix', on:['dot','bloom','vignette'], p:{
+      dot:{radius:42,depth:86,halation:30}, bloom:{intensity:60,radius:55}, vignette:{falloff:35} } },
+    { id:'green',label:'Green phosphor', on:['tint','bloom','scanlines','vignette'], p:{
+      tint:{colour:'green',amount:92}, bloom:{intensity:80,radius:95,colour:'green'},
+      scanlines:{variant:'medium',mix:60}, vignette:{falloff:50} } },
+    { id:'amber',label:'Amber phosphor', on:['tint','bloom','scanlines','vignette'], p:{
+      tint:{colour:'amber',amount:92}, bloom:{intensity:80,radius:95,colour:'amber'},
+      scanlines:{variant:'fine',mix:55}, vignette:{falloff:50} } },
+    { id:'glitch', label:'Glitch',   on:['glitch','planes','jitter','chswap','noise'], p:{
+      glitch:{shift:45,density:35,size:22,rate:35}, planes:{shift:60,scatter:55},
+      jitter:{amount:40,frequency:30,rate:60}, chswap:{mode:'rbg'}, noise:{amount:30,type:'static'} } },
+    { id:'proj', label:'Projector',  on:['bloom','grade','vignette'], p:{
+      bloom:{intensity:35,radius:60}, grade:{brightness:118,contrast:112,saturation:106,gamma:92},
+      vignette:{falloff:22} } },
+  ];
+
+  function presetState(id) {
+    const pre = PRESETS.find(p => p.id === id) || PRESETS[0];
+    const params = defaults();
+    for (const k in pre.p) Object.assign(params[k], pre.p[k]);
+    const enabled = {};
+    for (const d of DEFS) enabled[d.id] = pre.on.includes(d.id);
+    return { preset: pre.id, enabled, params };
+  }
+
+  // ── Output sizes ────────────────────────────────────────
+  // The device screen is 320x240 device pixels, mirrored at 3x into a
+  // 960x720 source canvas. Output can be any size; 16:9 options are
+  // pillarboxed so OBS scenes need no extra cropping.
+  const OUTPUTS = [
+    { id:'960x720',   label:'960 × 720 (4:3)',    w:960,  h:720  },
+    { id:'1440x1080', label:'1440 × 1080 (4:3)',  w:1440, h:1080 },
+    { id:'1280x720',  label:'1280 × 720 (16:9)',  w:1280, h:720  },
+    { id:'1920x1080', label:'1920 × 1080 (16:9)', w:1920, h:1080 },
+  ];
+
+  const SRC_W = 960, SRC_H = 720, DEV_W = 320, DEV_H = 240;
+
+  // ── Shaders ─────────────────────────────────────────────
+  const VERT = `
+attribute vec2 aPos;
+varying vec2 vUv;
+void main() {
+  vUv = aPos * 0.5 + 0.5;
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}`;
+
+  // Bloom prepass: letterbox the source into output space, tint it,
+  // and keep only what is bright enough to be worth blooming.
+  const PRE = `
+precision mediump float;
+varying vec2 vUv;
+uniform sampler2D uSrc;
+uniform vec2 uOff, uSize;
+uniform vec3 uTint;
+uniform float uThresh;
+void main() {
+  vec2 q = (vUv - uOff) / uSize;
+  vec3 c = vec3(0.0);
+  if (q.x >= 0.0 && q.x <= 1.0 && q.y >= 0.0 && q.y <= 1.0) c = texture2D(uSrc, q).rgb;
+  // Bright pass with a soft knee. Without it the screen blend in the
+  // main pass lifts the black background as much as the text and the
+  // whole picture goes milky instead of the highlights glowing.
+  float l = dot(c, vec3(0.299, 0.587, 0.114));
+  c *= smoothstep(uThresh, uThresh + 0.25, l);
+  c *= uTint;
+  gl_FragColor = vec4(c, 1.0);
+}`;
+
+  const BLUR = `
+precision mediump float;
+varying vec2 vUv;
+uniform sampler2D uTex;
+uniform vec2 uDir;      // texel step, already scaled by radius
+void main() {
+  vec3 sum = texture2D(uTex, vUv).rgb * 0.227027;
+  sum += (texture2D(uTex, vUv + uDir * 1.384615).rgb + texture2D(uTex, vUv - uDir * 1.384615).rgb) * 0.316216;
+  sum += (texture2D(uTex, vUv + uDir * 3.230769).rgb + texture2D(uTex, vUv - uDir * 3.230769).rgb) * 0.070270;
+  gl_FragColor = vec4(sum, 1.0);
+}`;
+
+  const FRAG = `
+precision highp float;
+varying vec2 vUv;
+
+uniform sampler2D uSrc;
+uniform sampler2D uBloom;
+uniform vec2  uOutRes;
+uniform vec2  uOff, uSize;     // content rect within the output, 0..1
+uniform vec3  uBg;
+uniform float uPx;             // output pixels per device pixel
+
+// Everything time-dependent is quantised on the CPU and arrives here as
+// a small number. Feeding raw seconds into hash()/sin() looks fine for a
+// minute and then degrades: after an hour of streaming, floor(t*24) is
+// past a float32 mantissa and the grain stops moving.
+uniform vec4  uSeed;           // noise step, jitter step, glitch step, field parity
+
+uniform vec3  uCurve;          // amount, corner, specular
+uniform vec3  uWarp;           // amplitude, frequency, phase 0..1
+uniform vec3  uJit;            // amount, frequency, unused
+uniform vec4  uGlitch;         // shift, density, bands, unused
+uniform vec3  uRgb;            // h, v, radial  (device px)
+uniform vec2  uPlanes;         // shift, scatter
+uniform vec2  uGhost;          // offset (device px), fade
+uniform mat3  uChMat;
+uniform vec4  uGrade;          // brightness, contrast, saturation, gamma
+uniform vec4  uTint;           // rgb, amount
+uniform float uBloomAmt;
+uniform vec3  uScan;           // gap, depth, pitch (device px)
+uniform vec2  uLcd;            // subpixel, bleed
+uniform vec2  uGrid;           // opacity, weight (output px)
+uniform vec3  uDot;            // radius, depth, halation
+uniform vec2  uInter;          // intensity, flip
+uniform vec2  uNoise;          // amount, type (0 film,1 static,2 bands)
+uniform vec2  uVig;            // falloff, shape
+uniform float uDither;         // levels, 0 = off
+
+const float TAU = 6.28318530718;
+
+float hash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+
+float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+
+float bayer4(vec2 p) {
+  // 4x4 ordered dither matrix, unrolled — GLSL ES 1.0 has no dynamic
+  // indexing into a const array in all drivers.
+  float x = mod(p.x, 4.0), y = mod(p.y, 4.0);
+  float v = 0.0;
+  if (y < 1.0)      v = x < 1.0 ?  0.0 : x < 2.0 ?  8.0 : x < 3.0 ?  2.0 : 10.0;
+  else if (y < 2.0) v = x < 1.0 ? 12.0 : x < 2.0 ?  4.0 : x < 3.0 ? 14.0 :  6.0;
+  else if (y < 3.0) v = x < 1.0 ?  3.0 : x < 2.0 ? 11.0 : x < 3.0 ?  1.0 :  9.0;
+  else              v = x < 1.0 ? 15.0 : x < 2.0 ?  7.0 : x < 3.0 ? 13.0 :  5.0;
+  return v / 16.0;
+}
+
+void main() {
+  vec2 p = vUv;
+  vec2 q = (p - uOff) / uSize;
+
+  // ── Geometry ───────────────────────────────────────────
+  // c is the picture in -1..1 with the curve applied, and is what the
+  // rounded bezel is measured against — the corner radius has to work
+  // on a flat screen too, so it is not nested inside the curve.
+  vec2 c = q * 2.0 - 1.0;
+  if (uCurve.x > 0.0) {
+    c *= 1.0 + uCurve.x * 0.30 * dot(c, c);
+    q = c * 0.5 + 0.5;
+  }
+  float corner = 0.0;
+  if (uCurve.y > 0.0) {
+    vec2 a = abs(c) - (1.0 - uCurve.y * 0.16);
+    corner = smoothstep(0.0, 0.02, length(max(a, 0.0)) - uCurve.y * 0.10);
+  }
+
+  // uWarp.z is a phase already wrapped into 0..1 on the CPU, which is
+  // exact inside the TAU multiply and never loses precision.
+  if (uWarp.x > 0.0)
+    q.x += sin((q.y * (1.0 + uWarp.y * 7.0) + uWarp.z) * TAU) * uWarp.x * 0.25;
+
+  float devRow = floor(q.y * ${DEV_H}.0);
+
+  if (uJit.x > 0.0) {
+    // Two independent hashes: reusing one for both the row pick and the
+    // displacement makes every affected row jump the same way, and hard.
+    float sel = hash(vec2(devRow, uSeed.y));
+    if (sel > 1.0 - uJit.y) {
+      float amt = hash(vec2(devRow + 0.5, uSeed.y + 17.0)) * 2.0 - 1.0;
+      q.x += amt * uJit.x * 0.35;
+    }
+  }
+
+  if (uGlitch.x > 0.0) {
+    float band = floor(q.y * uGlitch.z);
+    float pick = hash(vec2(band * 7.13, uSeed.z));
+    if (pick < uGlitch.y) {
+      float amt = (hash(vec2(band * 3.71 + 1.0, uSeed.z)) - 0.5) * 2.0 * uGlitch.x * 0.5;
+      q.x = fract(q.x + amt + 4.0);
+    }
+  }
+
+  float interDark = 1.0;
+  if (uInter.x > 0.0) {
+    if (mod(devRow + uSeed.w, 2.0) > 0.5) {
+      q.x += uInter.x * 2.0 / ${DEV_W}.0;
+      interDark = 1.0 - uInter.x * 0.65;
+    }
+  }
+
+  bool oob = q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0 || corner > 0.5;
+
+  vec3 col = uBg;
+  if (!oob) {
+    // ── Sampling ─────────────────────────────────────────
+    vec2 unit = vec2(1.0 / ${DEV_W}.0, 1.0 / ${DEV_H}.0);
+    vec2 sh = uRgb.xy * unit;
+    vec2 rad = vec2(0.0);
+    if (abs(uRgb.z) > 0.0001) {
+      vec2 d = q * 2.0 - 1.0;
+      rad = normalize(d + vec2(0.0001)) * uRgb.z * unit;
+    }
+    vec2 rOff = sh + rad, bOff = -sh - rad;
+
+    if (uPlanes.x > 0.0) {
+      float n = hash(vec2(devRow * 1.37, 3.0)) - 0.5;
+      float base = uPlanes.x * unit.x;
+      rOff.x += (0.35 + n * uPlanes.y) * base;
+      bOff.x -= (0.35 - n * uPlanes.y) * base;
+    }
+
+    col.r = texture2D(uSrc, q + rOff).r;
+    col.g = texture2D(uSrc, q).g;
+    col.b = texture2D(uSrc, q + bOff).b;
+
+    if (uGhost.x > 0.0) {
+      float o = uGhost.x * unit.x;
+      vec3 g1 = texture2D(uSrc, q - vec2(o, 0.0)).rgb;
+      vec3 g2 = texture2D(uSrc, q - vec2(o * 2.0, 0.0)).rgb;
+      float a1 = (1.0 - uGhost.y) * 0.8, a2 = (1.0 - uGhost.y) * 0.35;
+      col = min(vec3(1.0), col + g1 * a1 + g2 * a2);
+    }
+
+    // ── Colour ───────────────────────────────────────────
+    col = clamp(uChMat * col, 0.0, 1.0);
+
+    if (uTint.w > 0.0) col = mix(col, uTint.rgb * lum(col), uTint.w);
+
+    col = pow(max(col, 0.0), vec3(uGrade.w));
+    col = (col - 0.5) * uGrade.y + 0.5;
+    col *= uGrade.x;
+    col = mix(vec3(lum(col)), col, uGrade.z);
+    col = clamp(col, 0.0, 1.0);
+
+    // ── Masks ────────────────────────────────────────────
+    // All of these are measured in DEVICE pixels off q, not in output
+    // pixels off p, so they follow the curve and the fill instead of
+    // beating against it, and look identical at every output size.
+    if (uScan.y > 0.0) {
+      float f = fract(q.y * ${DEV_H}.0 / uScan.z);
+      // Soften by about half an output pixel so the gap does not alias
+      // when the pitch is not a whole number of screen pixels.
+      float soft = clamp(0.5 / max(uPx * uScan.z, 1.0), 0.02, 0.30);
+      float m = smoothstep(1.0 - uScan.x - soft, 1.0 - uScan.x + soft, f);
+      col *= 1.0 - m * uScan.y;
+      // Put back the light the mask removed, or heavy scanlines read as
+      // "the picture got dark" rather than as scanlines.
+      col *= 1.0 / (1.0 - uScan.x * uScan.y * 0.8);
+    }
+
+    if (uLcd.x > 0.0) {
+      float sub = mod(floor(q.x * ${DEV_W}.0 * 3.0), 3.0);
+      vec3 tintv = sub < 1.0 ? vec3(1.0, 1.0 - uLcd.x, 1.0 - uLcd.x)
+                 : sub < 2.0 ? vec3(1.0 - uLcd.x, 1.0, 1.0 - uLcd.x)
+                             : vec3(1.0 - uLcd.x, 1.0 - uLcd.x, 1.0);
+      col *= tintv;
+    }
+
+    if (uGrid.x > 0.0) {
+      vec2 g = fract(q * vec2(${DEV_W}.0, ${DEV_H}.0));
+      float w = clamp(uGrid.y / max(uPx, 1.0), 0.02, 0.9);
+      float line = max(smoothstep(1.0 - w, 1.0, g.x), smoothstep(1.0 - w, 1.0, g.y));
+      col *= 1.0 - line * uGrid.x;
+    }
+
+    if (uDot.y > 0.0) {
+      vec2 dc = fract(q * vec2(${DEV_W}.0, ${DEV_H}.0)) - 0.5;
+      float d = length(dc);
+      float edge = clamp(0.6 / max(uPx, 1.0), 0.02, 0.2);
+      float inside = 1.0 - smoothstep(uDot.x - edge, uDot.x + edge, d);
+      col *= mix(1.0 - uDot.y, 1.0, inside);
+      col *= 1.0 / (1.0 - uDot.y * 0.45);
+      if (uDot.z > 0.0)
+        col += vec3(uDot.z * 0.35 * (1.0 - smoothstep(uDot.x, uDot.x + 0.35, d)) * lum(col));
+    }
+
+    col *= interDark;
+
+    // The two compensations above deliberately push the lit part of a
+    // mask over 1.0. Rescale rather than clamp, so a bright pixel comes
+    // back to white instead of shifting hue channel by channel.
+    float mx = max(col.r, max(col.g, col.b));
+    if (mx > 1.0) col /= mx;
+
+    // ── Glow ─────────────────────────────────────────────
+    // Sampled at the post-geometry position, so the halo follows the
+    // curve, the warp and the tears instead of sitting still behind them.
+    if (uBloomAmt > 0.0) {
+      vec3 b = clamp(texture2D(uBloom, uOff + q * uSize).rgb * uBloomAmt, 0.0, 1.0);
+      col = vec3(1.0) - (vec3(1.0) - col) * (vec3(1.0) - b);
+    }
+
+    // ── Frame ────────────────────────────────────────────
+    // Everything below is confined to the picture so the letterbox bars
+    // stay exactly the chosen colour and can be keyed out in OBS.
+    if (uLcd.y > 0.0) {
+      float e = clamp(max(abs(c.x), abs(c.y)), 0.0, 1.0);
+      col += vec3(uLcd.y * 0.20 * smoothstep(0.45, 1.0, e));
+    }
+
+    if (uNoise.x > 0.0) {
+      vec2 np = floor(p * uOutRes);
+      float n;
+      if (uNoise.y < 0.5)      n = hash(np + uSeed.x) - 0.5;                 // film
+      else if (uNoise.y < 1.5) n = hash(np * 1.7 + uSeed.x * 3.0) - 0.5;     // static
+      else                     n = hash(vec2(np.y, uSeed.x)) - 0.5;          // bands
+      col += vec3(n * uNoise.x);
+      if (uNoise.y > 0.5 && uNoise.y < 1.5) {
+        col.r += (hash(np + uSeed.x + 11.0) - 0.5) * uNoise.x * 0.6;
+        col.b += (hash(np + uSeed.x + 23.0) - 0.5) * uNoise.x * 0.6;
+      }
+    }
+
+    if (uVig.x > 0.0) {
+      float rr = mix(length(c), max(abs(c.x), abs(c.y)), uVig.y);
+      float inner = 0.20 - uVig.x * 0.18;
+      float outer = 1.30 - uVig.x * 0.35;
+      col *= 1.0 - smoothstep(inner, outer, rr) * (0.30 + uVig.x * 0.68);
+    }
+
+    if (uCurve.z > 0.0) {
+      // Glass glare — a soft highlight across the upper third of the
+      // picture. c.y is +1 at the top, since vUv.y is 0 at the bottom.
+      vec2 g = (c - vec2(0.0, 0.66)) / vec2(1.24, 0.68);
+      col += vec3(uCurve.z * 0.16 * max(0.0, 1.0 - dot(g, g)));
+    }
+
+    col = clamp(col, 0.0, 1.0);
+
+    if (uDither > 1.5) {
+      // levels tones means levels-1 steps between black and white.
+      float steps = uDither - 1.0;
+      col = floor(col * steps + bayer4(floor(p * uOutRes))) / steps;
+    }
+  }
+
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}`;
+
+  // ── Renderer ────────────────────────────────────────────
+  const CH_MAPS = {
+    rgb:[0,1,2], rbg:[0,2,1], grb:[1,0,2], gbr:[1,2,0], brg:[2,0,1], bgr:[2,1,0],
+  };
+  const PHOSPHOR = {
+    none:[1,1,1], green:[0.35,1.25,0.55], amber:[1.30,0.85,0.25],
+    blue:[0.45,0.80,1.35], red:[1.35,0.40,0.35], white:[1,1,1],
+  };
+  const TINT_RGB = {
+    green:[0.30,1.15,0.45], amber:[1.15,0.72,0.18], blue:[0.42,0.72,1.20],
+    red:[1.15,0.30,0.28], white:[1.0,1.0,1.0],
+  };
+
+  function compile(gl, type, src) {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS))
+      throw new Error('shader: ' + gl.getShaderInfoLog(sh));
+    return sh;
+  }
+  function program(gl, vs, fs) {
+    const p = gl.createProgram();
+    gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, vs));
+    gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fs));
+    gl.bindAttribLocation(p, 0, 'aPos');
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS))
+      throw new Error('link: ' + gl.getProgramInfoLog(p));
+    return p;
+  }
+
+  function createRenderer(canvas) {
+    let gl;
+    try {
+      gl = canvas.getContext('webgl', { preserveDrawingBuffer:true, alpha:false, antialias:false, depth:false })
+        || canvas.getContext('experimental-webgl', { preserveDrawingBuffer:true, alpha:false, antialias:false, depth:false });
+    } catch { gl = null; }
+    if (!gl) return null;
+
+    let progMain, progPre, progBlur;
+    try {
+      progMain = program(gl, VERT, FRAG);
+      progPre  = program(gl, VERT, PRE);
+      progBlur = program(gl, VERT, BLUR);
+    } catch (e) {
+      // Hand the context back rather than abandoning it: a live GL
+      // context pins the canvas element, and browsers only allow a
+      // handful of them per page.
+      console.warn('FX: shader compile failed, effects disabled.', e);
+      try { gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch {}
+      return null;
+    }
+
+    const quad = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    function makeTex(filter) {
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+      return t;
+    }
+    const srcTex = makeTex(gl.NEAREST);
+
+    // Two half-resolution ping-pong targets for the bloom blur.
+    let bloomW = 0, bloomH = 0;
+    const bTex = [makeTex(gl.LINEAR), makeTex(gl.LINEAR)];
+    const bFbo = [gl.createFramebuffer(), gl.createFramebuffer()];
+
+    function sizeBloom(w, h) {
+      const nw = Math.max(2, Math.floor(w / 3)), nh = Math.max(2, Math.floor(h / 3));
+      if (nw === bloomW && nh === bloomH) return;
+      bloomW = nw; bloomH = nh;
+      for (let i = 0; i < 2; i++) {
+        gl.bindTexture(gl.TEXTURE_2D, bTex[i]);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, nw, nh, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, bFbo[i]);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, bTex[i], 0);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+
+    const locCache = new Map();
+    function u(prog, name) {
+      const key = prog.__id + name;
+      if (!locCache.has(key)) locCache.set(key, gl.getUniformLocation(prog, name));
+      return locCache.get(key);
+    }
+    progMain.__id = 'm'; progPre.__id = 'p'; progBlur.__id = 'b';
+
+    // Give the bloom targets real storage up front: sampling a
+    // never-allocated texture is "incomplete" and some drivers log a
+    // warning every frame even when the branch that reads it is off.
+    sizeBloom(6, 6);
+
+    let srcW = 0, srcH = 0, everUploaded = false;
+
+    function render(srcCanvas, st, time, upload) {
+      const out = OUTPUTS.find(o => o.id === st.output) || OUTPUTS[0];
+      if (canvas.width !== out.w || canvas.height !== out.h) {
+        canvas.width = out.w; canvas.height = out.h;
+      }
+      const on = id => !!(st.on && st.enabled[id]);
+      const P = id => st.params[id] || {};
+
+      // Content rect: fit the 4:3 source inside the output, centred.
+      // Zoom > 0 overscans, which is how you fill a 16:9 frame if you
+      // would rather crop the edges than live with pillarbox bars.
+      const fit  = Math.min(out.w / SRC_W, out.h / SRC_H);
+      const fill = Math.max(out.w / SRC_W, out.h / SRC_H);
+      const z    = Math.min(100, Math.max(0, st.zoom ?? 0)) / 100;
+      const scale = fit + (fill - fit) * z;
+      const cw = SRC_W * scale, ch = SRC_H * scale;
+      const offX = (out.w - cw) / 2 / out.w, offY = (out.h - ch) / 2 / out.h;
+      const sizeX = cw / out.w, sizeY = ch / out.h;
+      const px = ch / DEV_H;
+
+      // Upload the source frame. The device screen changes far less
+      // often than the effects animate, so skipping the ~2.7MB upload
+      // on unchanged frames is most of the cost of an idle mirror.
+      if (upload !== false || !everUploaded) {
+        gl.bindTexture(gl.TEXTURE_2D, srcTex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        if (srcCanvas.width !== srcW || srcCanvas.height !== srcH) {
+          srcW = srcCanvas.width; srcH = srcCanvas.height;
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, srcCanvas);
+        } else {
+          gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, srcCanvas);
+        }
+        everUploaded = true;
+      }
+
+      const bg = hexToRgb(st.bg || '#000000');
+
+      // ── Bloom passes ─────────────────────────────────────
+      const bloomOn = on('bloom') && (P('bloom').intensity || 0) > 0;
+      if (bloomOn) {
+        sizeBloom(out.w, out.h);
+        const tint = PHOSPHOR[P('bloom').colour] || PHOSPHOR.none;
+        gl.useProgram(progPre);
+        gl.uniform1i(u(progPre, 'uSrc'), 0);
+        gl.uniform2f(u(progPre, 'uOff'), offX, offY);
+        gl.uniform2f(u(progPre, 'uSize'), sizeX, sizeY);
+        gl.uniform3f(u(progPre, 'uTint'), tint[0], tint[1], tint[2]);
+        gl.uniform1f(u(progPre, 'uThresh'), (P('bloom').threshold ?? 25) / 100);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, srcTex);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, bFbo[0]);
+        gl.viewport(0, 0, bloomW, bloomH);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+        // No lower clamp: the slider's own minimum is 5%, and clamping
+        // to 0.25 made its bottom fifth do nothing at all.
+        const r = Math.max(0.02, (P('bloom').radius ?? 80) / 100) * 1.6;
+        gl.useProgram(progBlur);
+        gl.uniform1i(u(progBlur, 'uTex'), 0);
+        for (let pass = 0; pass < 2; pass++) {
+          const from = pass % 2, to = 1 - from;
+          gl.bindTexture(gl.TEXTURE_2D, bTex[from]);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, bFbo[to]);
+          gl.viewport(0, 0, bloomW, bloomH);
+          if (pass === 0) gl.uniform2f(u(progBlur, 'uDir'), r / bloomW, 0);
+          else            gl.uniform2f(u(progBlur, 'uDir'), 0, r / bloomH);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      }
+
+      // ── Main pass ────────────────────────────────────────
+      gl.useProgram(progMain);
+      gl.viewport(0, 0, out.w, out.h);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, srcTex);
+      gl.uniform1i(u(progMain, 'uSrc'), 0);
+      // Pass 0 (horizontal) lands in bTex[1], pass 1 (vertical) in
+      // bTex[0] — so the finished blur is always bTex[0].
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, bTex[0]);
+      gl.uniform1i(u(progMain, 'uBloom'), 1);
+      gl.activeTexture(gl.TEXTURE0);
+
+      gl.uniform2f(u(progMain, 'uOutRes'), out.w, out.h);
+      gl.uniform2f(u(progMain, 'uOff'), offX, offY);
+      gl.uniform2f(u(progMain, 'uSize'), sizeX, sizeY);
+      gl.uniform3f(u(progMain, 'uBg'), bg[0], bg[1], bg[2]);
+      // Quantise every time-dependent term here rather than in the
+      // shader, and wrap it: a float32 running at page-uptime seconds
+      // loses its low bits after an hour and animated grain freezes.
+      const wrap = (v, n) => ((v % n) + n) % n;
+      const jitRate = Math.max(0.001, (P('jitter').rate ?? 40) / 100 * 30);
+      const gliRate = Math.max(0.001, (P('glitch').rate ?? 25) / 100 * 20);
+      gl.uniform4f(u(progMain, 'uSeed'),
+        wrap(Math.floor(time * 24), 4096),
+        wrap(Math.floor(time * jitRate), 4096),
+        wrap(Math.floor(time * gliRate), 4096),
+        (P('interlace').flip ?? 1) ? wrap(Math.floor(time * 30), 2) : 0);
+      gl.uniform1f(u(progMain, 'uPx'), px);
+
+      const c = P('curve');
+      gl.uniform3f(u(progMain, 'uCurve'),
+        on('curve') ? (c.amount ?? 0) / 100 : 0,
+        on('curve') ? (c.corner ?? 0) / 100 : 0,
+        on('curve') ? (c.spec ?? 0) / 100 : 0);
+
+      const w = P('warp');
+      gl.uniform3f(u(progMain, 'uWarp'),
+        on('warp') ? (w.amplitude ?? 0) / 100 : 0,
+        on('warp') ? (w.frequency ?? 0) / 100 : 0,
+        wrap(time * (w.speed ?? 0) / 100 * 0.6, 1));
+
+      const j = P('jitter');
+      gl.uniform3f(u(progMain, 'uJit'),
+        on('jitter') ? (j.amount ?? 0) / 100 : 0,
+        on('jitter') ? (j.frequency ?? 0) / 100 : 0, 0);
+
+      const g = P('glitch');
+      gl.uniform4f(u(progMain, 'uGlitch'),
+        on('glitch') ? (g.shift ?? 0) / 100 : 0,
+        on('glitch') ? (g.density ?? 0) / 100 * 0.6 : 0,
+        Math.max(1, 60 - (g.size ?? 20) / 100 * 55), 0);
+
+      const r = P('rgbshift');
+      gl.uniform3f(u(progMain, 'uRgb'),
+        on('rgbshift') ? (r.shiftH ?? 0) / 100 : 0,
+        on('rgbshift') ? (r.shiftV ?? 0) / 100 : 0,
+        on('rgbshift') ? (r.shiftR ?? 0) / 100 : 0);
+
+      const pl = P('planes');
+      gl.uniform2f(u(progMain, 'uPlanes'),
+        on('planes') ? (pl.shift ?? 0) / 100 * 12 : 0,
+        (pl.scatter ?? 40) / 100);
+
+      const gh = P('ghost');
+      gl.uniform2f(u(progMain, 'uGhost'),
+        on('ghost') ? (gh.offset ?? 0) / 100 * 6 : 0,
+        (gh.fade ?? 70) / 100);
+
+      const map = CH_MAPS[P('chswap').mode] || CH_MAPS.rgb;
+      const m = [0,0,0, 0,0,0, 0,0,0];
+      if (on('chswap')) { m[map[0] * 3 + 0] = 1; m[map[1] * 3 + 1] = 1; m[map[2] * 3 + 2] = 1; }
+      else { m[0] = 1; m[4] = 1; m[8] = 1; }
+      gl.uniformMatrix3fv(u(progMain, 'uChMat'), false, new Float32Array(m));
+
+      const gr = P('grade');
+      gl.uniform4f(u(progMain, 'uGrade'),
+        on('grade') ? (gr.brightness ?? 100) / 100 : 1,
+        on('grade') ? (gr.contrast ?? 100) / 100 : 1,
+        on('grade') ? (gr.saturation ?? 100) / 100 : 1,
+        on('grade') ? (gr.gamma ?? 100) / 100 : 1);
+
+      const tn = TINT_RGB[P('tint').colour] || TINT_RGB.green;
+      gl.uniform4f(u(progMain, 'uTint'), tn[0], tn[1], tn[2],
+        on('tint') ? (P('tint').amount ?? 0) / 100 : 0);
+
+      gl.uniform1f(u(progMain, 'uBloomAmt'), bloomOn ? (P('bloom').intensity ?? 0) / 100 : 0);
+
+      const GAPS = { fine:0.22, medium:0.40, thick:0.58, wide:0.76 };
+      const DEPTH = { fine:0.45, medium:0.70, thick:0.84, wide:0.94 };
+      const sc = P('scanlines'), sv = sc.variant || 'medium';
+      gl.uniform3f(u(progMain, 'uScan'),
+        GAPS[sv] ?? 0.40,
+        on('scanlines') ? (DEPTH[sv] ?? 0.7) * ((sc.mix ?? 70) / 100) : 0,
+        Math.max(1, sc.pitch ?? 1));
+
+      const lc = P('lcd');
+      gl.uniform2f(u(progMain, 'uLcd'),
+        on('lcd') ? (lc.subpixel ?? 0) / 100 * 0.8 : 0,
+        on('lcd') ? (lc.bleed ?? 0) / 100 : 0);
+
+      const gd = P('grid');
+      gl.uniform2f(u(progMain, 'uGrid'),
+        on('grid') ? (gd.opacity ?? 0) / 100 : 0,
+        Math.max(0.5, gd.weight ?? 1));
+
+      const dt = P('dot');
+      gl.uniform3f(u(progMain, 'uDot'),
+        (dt.radius ?? 44) / 100,
+        on('dot') ? (dt.depth ?? 80) / 100 : 0,
+        on('dot') ? (dt.halation ?? 0) / 100 : 0);
+
+      const il = P('interlace');
+      gl.uniform2f(u(progMain, 'uInter'),
+        on('interlace') ? (il.intensity ?? 0) / 100 : 0,
+        (il.flip ?? 1) ? 1 : 0);
+
+      const nt = { film:0, static:1, bands:2 }[P('noise').type] ?? 0;
+      gl.uniform2f(u(progMain, 'uNoise'),
+        on('noise') ? (P('noise').amount ?? 0) / 100 * 0.8 : 0, nt);
+
+      const vg = P('vignette');
+      gl.uniform2f(u(progMain, 'uVig'),
+        on('vignette') ? (vg.falloff ?? 0) / 100 : 0,
+        (vg.shape ?? 0) / 100);
+
+      gl.uniform1f(u(progMain, 'uDither'), on('dither') ? (P('dither').levels ?? 4) : 0);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+
+    return { render, gl, dispose() { try { gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch {} } };
+  }
+
+  function hexToRgb(hex) {
+    const h = (hex || '#000000').replace('#', '');
+    const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16) || 0;
+    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  }
+
+  return { DEFS, ORDER, PRESETS, OUTPUTS, defaults, presetState, createRenderer,
+           SRC_W, SRC_H, DEV_W, DEV_H, hexToRgb };
+})();
+
+
 const USB = (() => {
   const COLS = 32, ROWS = 24, CELLW = 10, CELLH = 10, SCALE = 3;
 
@@ -3396,19 +4480,30 @@ const USB = (() => {
   }
   const MARKER = 0xFE, ESC = 0xFD, ESC_XOR = 0x20, OFFSET = 0x0F;
   let port = null, reader = null, running = false;
-  let canvas = null, ctx = null;
   let fg = [173,173,173], bg = [15,15,15];
   let onStatus = () => {};
+
+  // The device screen is painted here and nowhere else. Mirror owns the
+  // visible canvas and decides how these pixels reach the screen, so the
+  // effect chain, the pop-out and the recorder all see the same frame.
+  const canvas = Object.assign(document.createElement('canvas'),
+    { width: COLS * CELLW * SCALE, height: ROWS * CELLH * SCALE });
+  const ctx = canvas.getContext('2d');
+  let dirty = true;
+  const sourceCanvas = () => canvas;
+  const takeDirty = () => { const d = dirty; dirty = false; return d; };
 
   const rgb = a => `rgb(${a[0]},${a[1]},${a[2]})`;
 
   function clearScreen() {
     ctx.fillStyle = rgb(bg);
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    dirty = true;
   }
 
   function drawChar(ch, col, row, invert) {
     if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return;
+    dirty = true;
     const x = col * CELLW * SCALE, y = row * CELLH * SCALE;
     const cellFg = invert ? bg : fg, cellBg = invert ? fg : bg;
     ctx.fillStyle = rgb(cellBg);
@@ -3425,6 +4520,7 @@ const USB = (() => {
   }
 
   function drawRect(l, t, w, h) {
+    dirty = true;
     ctx.fillStyle = rgb(fg);
     ctx.fillRect(l * SCALE, t * SCALE, w * SCALE, h * SCALE);
   }
@@ -3493,8 +4589,6 @@ const USB = (() => {
       port = null;
       return false;
     }
-    canvas = document.getElementById('usb-canvas');
-    ctx = canvas.getContext('2d');
     fg = [173,173,173]; bg = [15,15,15]; buf = [];
     clearScreen();
     running = true;
@@ -3562,19 +4656,586 @@ const USB = (() => {
     onStatus('Disconnected', false);
   }
 
-  function snapshotPng() {
-    if (!canvas) return;
-    canvas.toBlob(blob => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'picotracker-screen.png';
-      a.click();
-      URL.revokeObjectURL(a.href);
+  // A stand-in song screen, drawn with the device's own font, so the
+  // output effects can be set up and rehearsed before a picoTracker is
+  // plugged in. Overwritten the moment a real frame arrives.
+  function setDemo() {
+    if (port) return;
+    bg = [15,15,15]; fg = [173,173,173];
+    clearScreen();
+    const put = (str, col, row, inv) => {
+      for (let i = 0; i < str.length; i++) drawChar(str.charCodeAt(i), col + i, row, !!inv);
+    };
+    fg = [121,181,227];
+    put('SONG', 0, 0);
+    put('PT LIBRARIAN', 18, 0);
+    fg = [123,133,140];
+    put('  1 2 3 4 5 6 7 8', 0, 2);
+    const rows = [
+      '00 01 -- 04 -- 07 -- 0A', '02 01 03 04 -- 07 09 0A',
+      '02 05 03 06 -- 08 09 0B', '04 05 -- 06 -- 08 -- 0B',
+      '04 -- 03 -- 0C 08 09 --', '06 01 03 04 0C 07 09 0A',
+      '06 01 -- 04 0D 07 -- 0A', '08 05 03 06 0D -- 09 0B',
+      '08 05 03 06 -- -- 09 0B', '0A -- -- -- 0E 07 -- --',
+    ];
+    rows.forEach((r, i) => {
+      fg = [123,133,140];
+      put(String(i).padStart(2, '0'), 0, 4 + i);
+      fg = i === 4 ? [252,211,77] : [173,173,173];
+      put(r.slice(3), 3, 4 + i, i === 4);
     });
+    fg = [52,211,153];
+    put('C-4 01 V40', 0, 16);
+    put('D#4 01 ---', 0, 17);
+    put('G-4 02 K02', 0, 18);
+    fg = [121,181,227];
+    put('TEMPO 138   MIRROR DEMO', 0, 21);
+    fg = [173,173,173];
+    dirty = true;
   }
 
   const isConnected = () => !!port;
-  return { connect, disconnect, requestRefresh, snapshotPng, isConnected, feed, setKeyBit, releaseAllKeys };
+  return { connect, disconnect, requestRefresh, isConnected, feed, setKeyBit,
+           releaseAllKeys, sourceCanvas, takeDirty, setDemo };
+})();
+
+
+// ══════════════════════════════════════════════════════════
+// MIRROR — owns the visible output canvas for the USB screen
+// mirror: the render loop, the effects state, the settings UI,
+// the pop-out window and WebM recording.
+//
+// USB paints the device screen into an offscreen 960x720 canvas and
+// never touches anything visible; everything the user sees comes out
+// of here, so effects, output size and letterboxing are decided in one
+// place and the same pixels feed the preview, the pop-out, the PNG
+// snapshot and the recorder.
+// ══════════════════════════════════════════════════════════
+const Mirror = (() => {
+  const LS_KEY = 'ptlib-fx-v1';
+  const $ = id => document.getElementById(id);
+
+  let out = null, renderer = null, ctx2d = null;
+  let state = null, raf = 0, started = 0, needsDraw = true;
+  let popWin = null, popCtx = null, popRaf = 0;
+  let recorder = null, recChunks = [], recStream = null, recTimer = 0, recMimeUsed = '';
+  let frames = 0, fpsAt = 0, lastStep = -1;
+  let built = false, lost = false;
+
+  // ── State ───────────────────────────────────────────────
+  function blankState() {
+    const st = FX.presetState('off');
+    st.on = false; st.animate = true;
+    st.output = '960x720'; st.bg = '#000000'; st.zoom = 0;
+    return st;
+  }
+
+  // Merged defensively: a stale or hand-edited blob in localStorage
+  // must never be able to stop the mirror from drawing.
+  function loadState() {
+    const st = blankState();
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch {}
+    if (!raw || typeof raw !== 'object') return st;
+    const params = FX.defaults();
+    for (const d of FX.DEFS) {
+      const got = raw.params && raw.params[d.id];
+      if (!got || typeof got !== 'object') continue;
+      for (const p of d.params) {
+        const v = got[p.key];
+        if (p.type === 'seg') {
+          if (p.opts.some(o => o[0] === v)) params[d.id][p.key] = v;
+        } else if (typeof v === 'number' && isFinite(v)) {
+          // Snap to the slider's own step as well as its range, or the
+          // stored number and the thumb position disagree and the first
+          // nudge of the slider jumps.
+          const clamped = Math.min(p.max, Math.max(p.min, v));
+          const snapped = p.min + Math.round((clamped - p.min) / p.step) * p.step;
+          params[d.id][p.key] = Math.round(Math.min(p.max, snapped) * 1000) / 1000;
+        }
+      }
+    }
+    st.params = params;
+    for (const d of FX.DEFS) st.enabled[d.id] = !!(raw.enabled && raw.enabled[d.id]);
+    st.on = !!raw.on;
+    st.animate = raw.animate !== false;
+    if (FX.OUTPUTS.some(o => o.id === raw.output)) st.output = raw.output;
+    if (typeof raw.bg === 'string' && /^#[0-9a-f]{6}$/i.test(raw.bg)) st.bg = raw.bg;
+    st.zoom = Math.min(100, Math.max(0, Number(raw.zoom) || 0));
+    st.preset = FX.PRESETS.some(x => x.id === raw.preset) ? raw.preset : 'custom';
+    return st;
+  }
+
+  function save() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
+  }
+
+  // ── Drawing ─────────────────────────────────────────────
+  function outputCanvas() { return out; }
+
+  function sizeFallback() {
+    const o = FX.OUTPUTS.find(o => o.id === state.output) || FX.OUTPUTS[0];
+    if (out.width !== o.w || out.height !== o.h) { out.width = o.w; out.height = o.h; }
+    return o;
+  }
+
+  // No WebGL: letterbox the source with plain 2D drawing so the mirror
+  // still works (and still honours the output size), just without any
+  // of the effects.
+  function blit() {
+    const o = sizeFallback();
+    const src = USB.sourceCanvas();
+    ctx2d.fillStyle = state.bg || '#000';
+    ctx2d.fillRect(0, 0, o.w, o.h);
+    const fit  = Math.min(o.w / FX.SRC_W, o.h / FX.SRC_H);
+    const fill = Math.max(o.w / FX.SRC_W, o.h / FX.SRC_H);
+    const s = fit + (fill - fit) * (Math.min(100, Math.max(0, state.zoom || 0)) / 100);
+    const cw = FX.SRC_W * s, ch = FX.SRC_H * s;
+    ctx2d.imageSmoothingEnabled = false;
+    ctx2d.drawImage(src, (o.w - cw) / 2, (o.h - ch) / 2, cw, ch);
+  }
+
+  function draw(tSec, upload) {
+    if (renderer) renderer.render(USB.sourceCanvas(), state, tSec, upload !== false);
+    else blit();
+    const o = FX.OUTPUTS.find(x => x.id === state.output) || FX.OUTPUTS[0];
+    const ar = (o.w / o.h).toFixed(4);
+    if (out.style.aspectRatio !== ar) out.style.aspectRatio = ar;
+    if (popWin && !popWin.closed && popCtx) {
+      const pc = popCtx.canvas;
+      if (pc.width !== out.width || pc.height !== out.height) {
+        pc.width = out.width; pc.height = out.height;
+      }
+      popCtx.drawImage(out, 0, 0);
+    }
+  }
+
+  // The loop runs while the Device tab is visible, while a pop-out is
+  // open, or while recording — an idle background tab should not be
+  // burning a GPU on a screen nobody is looking at.
+  function wanted() {
+    if (recorder) return true;
+    if (popWin && !popWin.closed) return true;
+    const pane = $('tab-device');
+    return !!(pane && pane.classList.contains('active'));
+  }
+
+  function reportFps(ts, drew) {
+    if (drew) frames++;
+    if (ts - fpsAt < 500) return;
+    const rate = Math.round(frames * 1000 / (ts - fpsAt));
+    frames = 0; fpsAt = ts;
+    const chip = $('fx-fps');
+    if (chip) chip.textContent = rate > 0 ? rate + ' fps' : 'idle';
+  }
+
+  // A single render step. Both the main window's rAF and the pop-out's
+  // own rAF call this; the timestamp guard stops them rendering the
+  // same frame twice when both windows are visible.
+  function step(ts) {
+    if (!out || lost) return;
+    if (!wanted()) return;
+    if (ts - lastStep < 6) return;
+    lastStep = ts;
+    const moving = state.on && state.animate;
+    // takeDirty() clears the flag, so read it exactly once per step.
+    const dirty = USB.takeDirty();
+    // captureStream only emits a frame when the canvas is drawn to, so a
+    // recording of a still screen with the effects off has to keep
+    // drawing or it comes out as a single frame — or as nothing at all.
+    const force = !!recorder;
+    if (!moving && !dirty && !needsDraw && !force) { reportFps(ts, false); return; }
+    const upload = dirty || needsDraw;
+    needsDraw = false;
+    draw(moving ? (ts - started) / 1000 : 0, upload);
+    reportFps(ts, true);
+  }
+
+  function tick(ts) {
+    raf = requestAnimationFrame(tick);
+    step(ts);
+  }
+
+  function invalidate() { needsDraw = true; }
+
+  // ── Snapshot / pop-out / recording ──────────────────────
+  function download(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+
+  function stamp() {
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  }
+
+  function snapshotPng() {
+    if (!out) return;
+    // Draw immediately before reading: with preserveDrawingBuffer the
+    // WebGL buffer survives, but a fresh frame is never wrong.
+    draw(state.animate && state.on ? (performance.now() - started) / 1000 : 0, true);
+    out.toBlob(b => { if (b) download(b, `picotracker-screen-${stamp()}.png`); });
+  }
+
+  function closePop() {
+    if (popWin && popRaf) { try { popWin.cancelAnimationFrame(popRaf); } catch {} }
+    popRaf = 0; popWin = null; popCtx = null;
+  }
+
+  function popOut() {
+    if (popWin && !popWin.closed) { popWin.focus(); return; }
+    // window.open with an empty URL returns an EXISTING window of that
+    // name without navigating it — after a reload of this page the old
+    // pop-out is still out there, so wipe its body rather than stacking
+    // a second canvas into it.
+    popWin = window.open('', 'pt-mirror', 'width=960,height=740');
+    if (!popWin) { setNote('The browser blocked the pop-out window. Allow pop-ups for this site and try again.'); return; }
+    const doc = popWin.document;
+    doc.title = 'picoTracker mirror';
+    doc.body.innerHTML = '';
+    doc.body.style.cssText =
+      'margin:0;background:' + (state.bg || '#000') +
+      ';display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden';
+    const pc = doc.createElement('canvas');
+    pc.width = out.width; pc.height = out.height;
+    pc.style.cssText = 'max-width:100vw;max-height:100vh;image-rendering:pixelated;display:block';
+    doc.body.appendChild(pc);
+    popCtx = pc.getContext('2d');
+    popWin.addEventListener('pagehide', closePop);
+    popWin.addEventListener('unload', closePop);
+    // The pop-out drives its own frames. requestAnimationFrame is
+    // suspended in a hidden document, so if this loop lived in the main
+    // window the pop-out would freeze the moment you switched tabs —
+    // which is exactly when it is being captured on the other screen.
+    const loop = () => {
+      if (!popWin || popWin.closed) { closePop(); return; }
+      popRaf = popWin.requestAnimationFrame(loop);
+      step(performance.now());
+    };
+    loop();
+    invalidate();
+  }
+
+  // Do not leave an orphaned mirror on screen when this page goes away.
+  window.addEventListener('pagehide', () => {
+    try { if (popWin && !popWin.closed) popWin.close(); } catch {}
+    closePop();
+    if (recorder) { try { recorder.stop(); } catch {} }
+    releaseStream();
+  });
+
+  function recMime() {
+    const want = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    for (const m of want)
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+    return '';
+  }
+
+  // A capture track keeps the output canvas registered as a frame source
+  // for as long as it lives, so every un-stopped stream is a permanent
+  // tax on the mirror's frame rate.
+  function releaseStream() {
+    if (!recStream) return;
+    try { recStream.getTracks().forEach(t => t.stop()); } catch {}
+    recStream = null;
+  }
+
+  function finishRecording() {
+    clearInterval(recTimer); recTimer = 0;
+    const blob = new Blob(recChunks, { type: recMimeUsed || 'video/webm' });
+    recChunks = [];
+    recorder = null;
+    releaseStream();
+    lockOutputControls(false);
+    paintRecordBtn();
+    if (blob.size) {
+      download(blob, `picotracker-mirror-${stamp()}.webm`);
+      setNote('');
+    } else {
+      setNote('Recording produced no data. Try again and give it a second or two.');
+    }
+  }
+
+  function toggleRecord() {
+    if (recorder) { stopRecord(); return; }
+    if (!out || !out.captureStream || !window.MediaRecorder) {
+      setNote('Recording needs a browser with MediaRecorder and canvas capture (Chrome or Edge).');
+      return;
+    }
+    recMimeUsed = recMime();
+    try { recStream = out.captureStream(60); } catch { recStream = null; }
+    if (!recStream) { setNote('Could not capture the output canvas for recording.'); return; }
+    try {
+      recorder = new MediaRecorder(recStream,
+        recMimeUsed ? { mimeType: recMimeUsed, videoBitsPerSecond: 12_000_000 } : undefined);
+    } catch (e) {
+      recorder = null;
+      releaseStream();
+      setNote('Recording failed to start: ' + (e.message || e));
+      return;
+    }
+    recChunks = [];
+    recorder.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
+    recorder.onstop = finishRecording;
+    recorder.onerror = e => {
+      setNote('Recording stopped on an error: ' + ((e && e.error && e.error.name) || 'unknown'));
+      try { recorder.stop(); } catch { finishRecording(); }
+    };
+    try {
+      recorder.start(250);
+    } catch (e) {
+      recorder = null;
+      releaseStream();
+      setNote('Recording failed to start: ' + (e.message || e));
+      return;
+    }
+    // Resizing the canvas mid-stream changes the track's frame size
+    // after the container header is written, so the size controls are
+    // held until the recording stops.
+    lockOutputControls(true);
+    // Best effort for a backgrounded tab: rAF is suspended when the
+    // document is hidden, and a frozen canvas records as a still image.
+    clearInterval(recTimer);
+    recTimer = setInterval(() => step(performance.now()), 33);
+    setNote('Recording. Keep this tab (or the popped-out window) visible — a hidden tab stops producing frames.');
+    paintRecordBtn();
+  }
+
+  function stopRecord() {
+    if (!recorder) return;
+    try { recorder.stop(); }
+    catch { finishRecording(); }          // never strand the captured chunks
+  }
+
+  function lockOutputControls(lock) {
+    for (const id of ['fx-output', 'fx-zoom', 'fx-reset']) {
+      const el = $(id);
+      if (el) el.disabled = lock;
+    }
+  }
+
+  function paintRecordBtn() {
+    const b = $('fx-record');
+    if (!b) return;
+    b.classList.toggle('on', !!recorder);
+    b.textContent = recorder ? '■ Stop recording' : '● Record';
+    b.title = recorder ? 'Stop and download the .webm' : 'Record the output canvas to a .webm file';
+  }
+
+  function setNote(msg) {
+    const n = $('fx-note');
+    if (n) n.textContent = msg || '';
+  }
+
+  // ── Settings UI ─────────────────────────────────────────
+  function buildUI() {
+    if (built) return;
+    built = true;
+
+    const pre = $('fx-preset');
+    pre.innerHTML = FX.PRESETS.map(p => `<option value="${p.id}">${p.label}</option>`).join('')
+      + '<option value="custom">Custom</option>';
+
+    const outSel = $('fx-output');
+    outSel.innerHTML = FX.OUTPUTS.map(o => `<option value="${o.id}">${o.label}</option>`).join('');
+
+    const grid = $('fx-grid');
+    grid.innerHTML = FX.DEFS.map(d => `
+      <div class="fx-card" data-fx="${d.id}">
+        <label class="fx-head">
+          <input type="checkbox" class="fx-en" data-fx="${d.id}">
+          <span class="fx-name">${d.label}</span>
+        </label>
+        <div class="fx-hint">${d.hint}</div>
+        <div class="fx-params">${d.params.map(p => p.type === 'seg' ? `
+          <div class="fx-p">
+            <span class="fx-plab" id="lbl-${d.id}-${p.key}">${p.label}</span>
+            <div class="fx-seg" role="group" aria-labelledby="lbl-${d.id}-${p.key}"
+                 data-fx="${d.id}" data-key="${p.key}">${
+              p.opts.map(o => `<button type="button" class="fx-segb" aria-pressed="false" data-val="${o[0]}">${o[1]}</button>`).join('')
+            }</div>
+          </div>` : `
+          <div class="fx-p">
+            <span class="fx-plab">${p.label}</span>
+            <input type="range" class="fx-range" data-fx="${d.id}" data-key="${p.key}"
+                   aria-label="${d.label}: ${p.label}"
+                   aria-describedby="val-${d.id}-${p.key}"
+                   min="${p.min}" max="${p.max}" step="${p.step}">
+            <span class="fx-pval" id="val-${d.id}-${p.key}" data-fx="${d.id}" data-key="${p.key}"></span>
+          </div>`).join('')}</div>
+      </div>`).join('');
+
+    // ── Events ──
+    $('fx-on').addEventListener('change', e => {
+      state.on = e.target.checked;
+      syncUI(); save(); invalidate();
+    });
+    $('fx-anim').addEventListener('change', e => {
+      state.animate = e.target.checked;
+      started = performance.now();
+      save(); invalidate();
+    });
+    pre.addEventListener('change', e => {
+      if (e.target.value === 'custom') { state.preset = 'custom'; save(); return; }
+      const next = FX.presetState(e.target.value);
+      state.enabled = next.enabled;
+      state.params = next.params;
+      state.preset = next.preset;
+      if (e.target.value !== 'off') state.on = true;
+      syncUI(); save(); invalidate();
+    });
+    outSel.addEventListener('change', e => {
+      state.output = e.target.value;
+      save(); invalidate();
+    });
+    $('fx-zoom').addEventListener('input', e => {
+      state.zoom = +e.target.value;
+      $('fx-zoom-v').textContent = state.zoom ? state.zoom + '%' : 'Fit';
+      save(); invalidate();
+    });
+    $('fx-bg').addEventListener('input', e => {
+      state.bg = e.target.value;
+      save(); invalidate();
+    });
+    $('fx-reset').addEventListener('click', () => {
+      // Clears the look only. Output size, fill and bar colour are how
+      // the stream is plumbed, not part of the look, and dropping them
+      // would resize the canvas OBS is already capturing.
+      const keep = { output: state.output, bg: state.bg, zoom: state.zoom, animate: state.animate };
+      state = Object.assign(blankState(), keep);
+      syncUI(); save(); invalidate();
+    });
+    $('fx-record').addEventListener('click', toggleRecord);
+
+    grid.addEventListener('change', e => {
+      const cb = e.target.closest('.fx-en');
+      if (!cb) return;
+      state.enabled[cb.dataset.fx] = cb.checked;
+      if (cb.checked) state.on = true;
+      markCustom(); syncUI(); save(); invalidate();
+    });
+    grid.addEventListener('input', e => {
+      const r = e.target.closest('.fx-range');
+      if (!r) return;
+      state.params[r.dataset.fx][r.dataset.key] = +r.value;
+      paintValue(r.dataset.fx, r.dataset.key);
+      markCustom(); save(); invalidate();
+    });
+    grid.addEventListener('click', e => {
+      const b = e.target.closest('.fx-segb');
+      if (!b) return;
+      const seg = b.parentElement;
+      state.params[seg.dataset.fx][seg.dataset.key] = b.dataset.val;
+      markCustom(); syncUI(); save(); invalidate();
+    });
+
+    if (!renderer) {
+      // The preset picker lives outside #fx-grid, so disable it too —
+      // otherwise picking "CRT monitor" lights up five cards and ticks
+      // the master checkbox while the picture never changes.
+      setNote('WebGL is not available in this browser, so effects are off. The mirror still works, ' +
+              'and output size, fill, pop-out and recording all still apply.');
+      $('fx-on').disabled = true;
+      pre.disabled = true;
+      grid.querySelectorAll('input,button').forEach(el => { el.disabled = true; });
+    }
+  }
+
+  function markCustom() {
+    state.preset = 'custom';
+    const sel = $('fx-preset');
+    if (sel) sel.value = 'custom';
+  }
+
+  function paintValue(fxId, key) {
+    const def = FX.DEFS.find(d => d.id === fxId);
+    const p = def && def.params.find(x => x.key === key);
+    const el = document.querySelector(`.fx-pval[data-fx="${fxId}"][data-key="${key}"]`);
+    if (!p || !el) return;
+    el.textContent = p.fmt ? p.fmt(state.params[fxId][key]) : state.params[fxId][key];
+  }
+
+  function syncUI() {
+    if (!built) return;
+    $('fx-on').checked = state.on;
+    $('fx-anim').checked = state.animate;
+    $('fx-preset').value = FX.PRESETS.some(p => p.id === state.preset) ? state.preset : 'custom';
+    $('fx-output').value = state.output;
+    $('fx-zoom').value = state.zoom;
+    $('fx-zoom-v').textContent = state.zoom ? state.zoom + '%' : 'Fit';
+    $('fx-bg').value = state.bg;
+    $('fx-panel').classList.toggle('fx-dim', !state.on);
+    for (const d of FX.DEFS) {
+      const card = document.querySelector(`.fx-card[data-fx="${d.id}"]`);
+      if (!card) continue;
+      const en = !!state.enabled[d.id];
+      card.classList.toggle('on', en);
+      card.querySelector('.fx-en').checked = en;
+      for (const p of d.params) {
+        if (p.type === 'seg') {
+          card.querySelectorAll(`.fx-seg[data-key="${p.key}"] .fx-segb`).forEach(b => {
+            const sel = b.dataset.val === state.params[d.id][p.key];
+            b.classList.toggle('on', sel);
+            b.setAttribute('aria-pressed', sel ? 'true' : 'false');
+          });
+        } else {
+          const r = card.querySelector(`.fx-range[data-key="${p.key}"]`);
+          if (r) r.value = state.params[d.id][p.key];
+          paintValue(d.id, p.key);
+        }
+      }
+    }
+    paintRecordBtn();
+  }
+
+  // ── Init ────────────────────────────────────────────────
+  function init() {
+    state = loadState();
+    let cv = $('usb-canvas');
+    if (!cv) return;
+    renderer = FX.createRenderer(cv);
+    if (!renderer) {
+      // getContext('webgl') may already have claimed the element even
+      // though the shaders failed; swap in a fresh one for 2D.
+      const fresh = cv.cloneNode(false);
+      cv.replaceWith(fresh);
+      cv = fresh;
+      ctx2d = cv.getContext('2d');
+      state.on = false;
+      if (!ctx2d) { setNote('This browser gave the mirror neither WebGL nor a 2D canvas.'); return; }
+    }
+    out = cv;
+    // A GPU reset, a laptop switching graphics, or too many WebGL
+    // contexts across tabs kills the context. Without this the mirror
+    // just goes black for the rest of the session with no explanation.
+    out.addEventListener('webglcontextlost', e => {
+      e.preventDefault();
+      lost = true;
+      setNote('The graphics context was lost (a GPU reset, or too many WebGL pages open). Reload the page to bring the mirror back.');
+    });
+    out.addEventListener('webglcontextrestored', () => {
+      lost = false;
+      renderer = FX.createRenderer(out);
+      if (!renderer) { state.on = false; setNote('The graphics context came back but the effects could not be rebuilt. Reload the page.'); }
+      else setNote('');
+      invalidate();
+    });
+    buildUI();
+    syncUI();
+    USB.setDemo();          // something to look at before a device is plugged in
+    started = performance.now();
+    fpsAt = started;
+    invalidate();
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(tick);
+  }
+
+  return { init, invalidate, snapshotPng, popOut, outputCanvas, toggleRecord,
+           isRecording: () => !!recorder, hasEffects: () => !!renderer,
+           getState: () => state, syncUI };
 })();
 
 
@@ -3587,24 +5248,45 @@ const USB = (() => {
 // ══════════════════════════════════════════════════════════
 const SongPlayer = (() => {
   let ctx = null, timer = null, state = null;
+  let loopMode = false;   // when set, playback restarts instead of ending
 
+  let bufCache = { key: null, ctx: null, buffers: null };
   async function loadBuffers(sd, projDirName, parsed, isDemoPool) {
     const actx = new (window.AudioContext || window.webkitAudioContext)();
+    // Seeking and looping rebuild the graph constantly; re-decoding the whole
+    // sample pool each time made dragging the scrubber unusable. Decoded
+    // buffers are bound to their context, so cache raw bytes and re-decode
+    // only when the project changes.
+    const key = projDirName;
     const wanted = new Set(parsed.instruments.map(i => i.sample).filter(Boolean));
     const buffers = new Map();
+    const reuse = bufCache.key === key ? bufCache.raw : null;
+    const rawCache = new Map();
     for (const name of wanted) {
       try {
-        const dir = await (await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(projDirName)).getDirectoryHandle('samples');
-        const f = await (await dir.getFileHandle(name)).getFile();
-        const bytes = await f.arrayBuffer();
-        // Read the native rate BEFORE decoding: decodeAudioData detaches the
-        // buffer, and slice/loop offsets are frames at this rate, not at the
-        // AudioContext rate the decoded buffer ends up in.
-        const hdr = PT.parseWavHeader(new Uint8Array(bytes.slice(0, 4096)), bytes.byteLength);
+        let bytes, srcRate;
+        const hit = reuse?.get(name);
+        if (hit) {
+          bytes = hit.bytes.slice(0);          // decodeAudioData detaches, so hand it a copy
+          srcRate = hit.srcRate;
+        } else {
+          const dir = await (await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(projDirName)).getDirectoryHandle('samples');
+          const f = await (await dir.getFileHandle(name)).getFile();
+          const raw = await f.arrayBuffer();
+          // Read the native rate BEFORE decoding: decodeAudioData detaches the
+          // buffer, and slice/loop offsets are frames at this rate, not at the
+          // AudioContext rate the decoded buffer ends up in.
+          const hdr = PT.parseWavHeader(new Uint8Array(raw.slice(0, 4096)), raw.byteLength);
+          srcRate = (hdr && hdr.sampleRate) || 0;
+          rawCache.set(name, { bytes: raw.slice(0), srcRate });
+          bytes = raw;
+        }
         const buf = await actx.decodeAudioData(bytes);
-        buffers.set(name, { buf, srcRate: (hdr && hdr.sampleRate) || buf.sampleRate });
+        buffers.set(name, { buf, srcRate: srcRate || buf.sampleRate });
+        if (hit) rawCache.set(name, hit);
       } catch { /* missing or undecodable — channel stays silent */ }
     }
+    bufCache = { key, raw: rawCache };
     return { actx, buffers };
   }
 
@@ -3625,18 +5307,21 @@ const SongPlayer = (() => {
     };
   }
 
-  function stop() {
+  // `silent` is used by seek/loop, which tear down and rebuild the graph
+  // internally: firing the caller's onEnd there would hide the transport
+  // and reset the play button while audio carried on.
+  function stop(silent) {
     playToken++;
     if (timer) { clearInterval(timer); timer = null; }
     if (ctx) { try { ctx.close(); } catch {} ctx = null; }
     const cb = state?.onEnd;
     state = null;
-    cb?.();
+    if (!silent) cb?.();
   }
 
   let playToken = 0;
   async function play(sd, proj, parsed, onProgress, onEnd, opts) {
-    stop();
+    stop(opts?.internal);
     const token = ++playToken;
     const tl = PT.buildEventTimeline(parsed, opts);
     if (!tl) { onEnd?.(); return false; }
@@ -3666,7 +5351,8 @@ const SongPlayer = (() => {
       if (pan) { g.connect(pan); pan.connect(master); } else g.connect(master);
       chans.push({ g, pan, sources: [] });
     }
-    const t0 = ctx.currentTime + 0.15;
+    const seek = Math.max(0, opts?.startAt || 0);
+    const t0 = ctx.currentTime + 0.15 - seek;   // shift the whole schedule back to start mid-song
 
     // per-channel: compute each note's stop time (next on/off on channel)
     const byCh = Array.from({ length: 8 }, () => []);
@@ -3677,14 +5363,17 @@ const SongPlayer = (() => {
         const e = evs[i];
         // VOL param is 0..255 → 0..1. The old 1.4x boost had no basis and
         // pushed full-volume channels straight into clipping.
-        if (e.type === 'vol') chans[c].g.gain.setValueAtTime(e.value, t0 + e.time);
-        else if (e.type === 'pan' && chans[c].pan) chans[c].pan.pan.setValueAtTime(e.value, t0 + e.time);
+        // gain/pan before the seek point still apply, just immediately
+        const at = Math.max(ctx.currentTime, t0 + e.time);
+        if (e.type === 'vol') chans[c].g.gain.setValueAtTime(e.value, at);
+        else if (e.type === 'pan' && chans[c].pan) chans[c].pan.pan.setValueAtTime(e.value, at);
         else if (e.type === 'on') {
           const m = instr.get(e.instr);
           if (!m || !m.sample) continue;
           const ent = buffers.get(m.sample);
           if (!ent) continue;
           const buf = ent.buf, srcRate = ent.srcRate;
+          if (e.time < seek) continue;              // already past when seeking
           let stopAt = t0 + tl.duration;
           for (let j = i + 1; j < evs.length; j++)
             if (evs[j].type === 'on' || evs[j].type === 'off') { stopAt = t0 + evs[j].time; break; }
@@ -3725,13 +5414,19 @@ const SongPlayer = (() => {
         }
       }
     }
-    state = { onEnd, duration: tl.duration, t0, tl, label: proj?.name || '' };
+    state = { onEnd, duration: tl.duration, t0, tl, label: proj?.name || '',
+              ctxArgs: { sd, proj, parsed, onProgress, onEnd, opts } };
     onProgress?.(0, tl.duration);
     timer = setInterval(() => {
       if (!ctx) return;
       const t = ctx.currentTime - t0;
       onProgress?.(Math.max(0, t), state.duration);
-      if (t >= state.duration + 0.3) stop();
+      if (t >= state.duration + 0.3) {
+        if (loopMode && state.ctxArgs) {
+          const a = state.ctxArgs;
+          play(a.sd, a.proj, a.parsed, a.onProgress, a.onEnd, { ...(a.opts || {}), startAt: 0, internal: true });
+        } else stop();
+      }
     }, 200);
     return true;
   }
@@ -3739,7 +5434,17 @@ const SongPlayer = (() => {
   const isPlaying = () => !!state;
   const timeline = () => state?.tl ?? null;
   const label = () => state?.label ?? '';
-  return { play, stop, isPlaying, timeline, label };
+  const setLoop = v => { loopMode = !!v; };
+  const isLooping = () => loopMode;
+  // Restart the current thing from a new position.
+  function seekTo(t) {
+    if (!state?.ctxArgs) return false;
+    const a = state.ctxArgs;
+    const at = Math.max(0, Math.min(state.duration, t));
+    play(a.sd, a.proj, a.parsed, a.onProgress, a.onEnd, { ...(a.opts || {}), startAt: at, internal: true });
+    return true;
+  }
+  return { play, stop, isPlaying, timeline, label, setLoop, isLooping, seekTo };
 })();
 
 
@@ -3801,13 +5506,18 @@ const UI = (() => {
   let sampbrRows = [], sampbrSelIdx = -1;
   let writeMode = false;
   const fullCache = new Map(); // dirName → full parsed project (never persisted)
+  const fullCacheClean = new Map(); // dirName → parse of what is on the card, for diffing
   const dirtyPhrases = new Map(); // dirName → Set of edited phrase indices
   const dirtyChains = new Map();  // dirName → Set of edited chain indices
   const dirtyGrid = new Set();    // dirNames whose song grid was edited
-  const isDirty = d => !!d && (dirtyGrid.has(d) ||
+  const dirtyTables = new Set();  // dirNames with edited tables
+  const dirtyGrooves = new Set(); // dirNames with edited grooves
+  const isDirty = d => !!d && (dirtyGrid.has(d) || dirtyTables.has(d) || dirtyGrooves.has(d) ||
     (dirtyPhrases.get(d)?.size ?? 0) > 0 || (dirtyChains.get(d)?.size ?? 0) > 0);
   const dirtySummary = d => [
     dirtyGrid.has(d) ? 'the song grid' : null,
+    dirtyTables.has(d) ? 'tables' : null,
+    dirtyGrooves.has(d) ? 'grooves' : null,
     dirtyChains.get(d)?.size ? `${dirtyChains.get(d).size} chain(s)` : null,
     dirtyPhrases.get(d)?.size ? `${dirtyPhrases.get(d).size} phrase(s)` : null,
   ].filter(Boolean).join(', ');
@@ -3818,23 +5528,67 @@ const UI = (() => {
   let pvSel = null;               // {r0,t0,r1,t1} normalised selection
   let pvFocus = null;             // {r,t} last focused cell, survives re-render
   let pvBlockClip = null;         // {w,h,cells:[[chain,…],…]}
-  let pvUndo = [];                // arrangement undo: grid/chains/transposes snapshots
-  function pushArrUndo(parsed) {
-    pvUndo.push({
+  // ── One undo history per project ─────────────────────
+  // There used to be two stacks (phrase edits and arrangement edits) that
+  // could not see each other, and the phrase one reset whenever you moved
+  // between phrases. A single snapshot of everything editable means undo
+  // works the same wherever you are and survives navigation.
+  let songUndo = [], songRedo = [];
+  const SONG_FIELDS = ['notes', 'instr', 'cmd1', 'param1', 'cmd2', 'param2'];
+  function songSnapshot(parsed) {
+    const snap = {
       grid: Uint8Array.from(parsed.grid),
       chains: Uint8Array.from(parsed.chains),
       transposes: Uint8Array.from(parsed.transposes),
-    });
-    if (pvUndo.length > 50) pvUndo.shift();
+      phrases: {},
+    };
+    for (const f of SONG_FIELDS) snap.phrases[f] = parsed.phrases[f].slice();
+    if (parsed.grooveRaw) snap.grooveRaw = Uint8Array.from(parsed.grooveRaw);
+    // tables too, or undo in the table editor pops a snapshot that predates
+    // the table edit and silently reverts something else instead
+    snap.tables = (parsed.tables || []).map(t => ({
+      cmd: t.cmd.map(c => c && Uint8Array.from(c)),
+      param: t.param.map(c => c && Uint16Array.from(c)),
+    }));
+    return snap;
   }
-  function popArrUndo(parsed) {
-    const u = pvUndo.pop();
+  function songRestore(parsed, snap) {
+    parsed.grid.set(snap.grid);
+    parsed.chains.set(snap.chains);
+    parsed.transposes.set(snap.transposes);
+    for (const f of SONG_FIELDS) parsed.phrases[f].set(snap.phrases[f]);
+    if (snap.grooveRaw && parsed.grooveRaw) { parsed.grooveRaw.set(snap.grooveRaw); rebuildGrooveDigest(parsed); }
+    if (snap.tables)
+      snap.tables.forEach((t, i) => {
+        const live = parsed.tables[i];
+        if (!live) return;
+        t.cmd.forEach((c, j) => { if (c && live.cmd[j]) live.cmd[j].set(c); });
+        t.param.forEach((c, j) => { if (c && live.param[j]) live.param[j].set(c); });
+        live.empty = live.cmd.every(c => !c || [...c].every(v => v === PT.CMD_NONE)) &&
+                     live.param.every(q => !q || [...q].every(v => v === 0));
+      });
+  }
+  function pushUndoSnap(parsed) {
+    songUndo.push(songSnapshot(parsed));
+    if (songUndo.length > 40) songUndo.shift();
+    songRedo = [];                       // a fresh edit invalidates redo
+  }
+  function undoSong(parsed) {
+    const u = songUndo.pop();
     if (!u) return false;
-    parsed.grid.set(u.grid);
-    parsed.chains.set(u.chains);
-    parsed.transposes.set(u.transposes);
+    songRedo.push(songSnapshot(parsed));
+    songRestore(parsed, u);
     return true;
   }
+  function redoSong(parsed) {
+    const r = songRedo.pop();
+    if (!r) return false;
+    songUndo.push(songSnapshot(parsed));
+    songRestore(parsed, r);
+    return true;
+  }
+  const pushArrUndo = pushUndoSnap;      // arrangement call sites
+  const popArrUndo = undoSong;
 
   const cacheKey = () => sd ? `card:${sd.name}` : null;
 
@@ -3862,6 +5616,7 @@ const UI = (() => {
       chainColors = cached.chainColors || {};
       afterScan(true, cached.savedAt);
     }
+    await loadColourSidecar();     // colours written by another machine
     await rescan(cached?.lib);
   }
 
@@ -3894,6 +5649,8 @@ const UI = (() => {
     // silently destroy work the dirty bar still advertises
     for (const k of [...fullCache.keys()])
       if (!isDirty(k)) fullCache.delete(k);
+    for (const k of [...fullCacheClean.keys()])
+      if (!fullCache.has(k)) fullCacheClean.delete(k);   // keep the diff source in step
     sampleNameMap = Scanner.buildSampleNameMap(lib.projects, lib.library);
     dupeNameMap = Scanner.buildInstrDupeMap(lib.ptis);
     renderHealth();
@@ -3935,6 +5692,7 @@ const UI = (() => {
     curTab = tab;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-'+tab));
+    if (tab === 'device') Mirror.invalidate();
   }
 
   // ── PROJECTS ───────────────────────────────────────────
@@ -4146,8 +5904,9 @@ const UI = (() => {
     // Grid selection, focus and clipboards are per-project: carrying them
     // across would let a Delete or a paste land on rows in a project the
     // user never selected.
-    pvSel = null; pvFocus = null; pvBlockClip = null; pvRowClip = null; pvUndo = [];
-    peClipRow = null; peClipPhrase = null; peUndo = [];
+    pvSel = null; pvFocus = null; pvBlockClip = null; pvRowClip = null;
+    songUndo = []; songRedo = [];
+    peClipRow = null; peClipPhrase = null; peSel = null; peBlockClip = null;
     $('proj-modal').style.display = 'flex';
     $('modal-title').textContent = p.name;
     $('modal-meta').textContent = `${p.tempo??'—'} BPM · fw ${p.version??'?'} · ${fmtDate(p.lastModified)}`;
@@ -4166,6 +5925,7 @@ const UI = (() => {
       parsed = full.parsed;
       if (!parsed) { body.innerHTML = '<div class="no-results">Could not parse project file.</div>'; return; }
       fullCache.set(p.dirName, parsed);
+      fullCacheClean.set(p.dirName, PT.parseProject(await full.file.text()));
     }
     const hist = PT.detectScales(parsed);
 
@@ -4309,7 +6069,8 @@ const UI = (() => {
         </div>
       </div>
       </div>
-      <div id="modal-pattern-section" style="display:none"></div>`;
+      <div id="modal-pattern-section" style="display:none"></div>
+      <div id="modal-tables-section" style="display:none"></div>`;
     body.querySelectorAll('.ichip-instr').forEach(ch =>
       ch.addEventListener('click', () => showInstrParams(p, parseInt(ch.dataset.id, 10))));
     body.querySelectorAll('.play-btn').forEach(b =>
@@ -4471,9 +6232,18 @@ const UI = (() => {
   function setModalTab(tab) {
     $('btn-modal-overview')?.classList.toggle('active', tab === 'overview');
     $('btn-modal-patterns')?.classList.toggle('active', tab === 'patterns');
-    const ov = $('modal-overview'), pv = $('modal-pattern-section');
+    $('btn-modal-tables')?.classList.toggle('active', tab === 'tables');
+    const ov = $('modal-overview'), pv = $('modal-pattern-section'), tv = $('modal-tables-section');
     if (ov) ov.style.display = tab === 'overview' ? 'block' : 'none';
     if (pv) pv.style.display = tab === 'patterns' ? 'block' : 'none';
+    if (tv) tv.style.display = tab === 'tables' ? 'block' : 'none';
+  }
+  function toggleTablesView() {
+    const sec = $('modal-tables-section');
+    const parsed = modalProj && fullCache.get(modalProj.dirName);
+    if (!sec || !parsed) return;
+    setModalTab('tables');
+    renderTablesGrooves(sec, modalProj, parsed);
   }
   function togglePatternView() {
     const sec = $('modal-pattern-section');
@@ -4560,6 +6330,8 @@ const UI = (() => {
         <span class="pv-hint">arrows move · <b>shift+arrows</b> or shift+click select a block · <b>Enter</b> pick a chain ·
           <b>Del</b> clear · <b>⌘/Ctrl+C/V</b> copy &amp; paste · <b>⌘/Ctrl+A</b> all · ▶ plays a whole row
           <span id="pv-selinfo"></span></span>
+        <button class="btn ghost sm" id="btn-pv-jump" title="Open any chain or phrase, placed in the song or not (⌘/Ctrl+G)">⤳ Go to…</button>
+        <button class="btn ghost sm" id="btn-pv-savecol" title="Write chain colours to the card so they travel with it">🎨 Save colours</button>
         <button class="btn ghost sm" id="btn-pv-recolour" ${customColours ? '' : 'disabled'}
           title="${customColours ? `Discard your ${customColours} custom chain colour${customColours>1?'s':''} and go back to the by-group palette` : 'No custom chain colours to reset — pick one with a swatch first'}">↺ Colours</button>
       </div>
@@ -4603,6 +6375,8 @@ const UI = (() => {
         renderPatterns(host, p, parsed);
       }));
     host.querySelectorAll('.pv-rowpaste').forEach(b => { if (!pvRowClip) b.style.display = 'none'; });
+    host.querySelector('#btn-pv-jump').addEventListener('click', e => openJump(e.currentTarget, p, parsed, host));
+    host.querySelector('#btn-pv-savecol').addEventListener('click', saveColourSidecar);
     host.querySelector('#btn-pv-recolour').addEventListener('click', async () => {
       for (const k of Object.keys(chainColors))
         if (k.startsWith(`${p.dirName}:`)) delete chainColors[k];
@@ -4733,7 +6507,8 @@ const UI = (() => {
         if (!gridEditable) return;
         if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'z') {
           ev.preventDefault();
-          if (popArrUndo(parsed)) { markGridDirty(); renderPatterns(host, p, parsed); }
+          const done = ev.shiftKey ? redoSong(parsed) : undoSong(parsed);
+          if (done) { markGridDirty(); renderPatterns(host, p, parsed); }
           return;
         }
         if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'c') { ev.preventDefault(); copyBlock(); return; }
@@ -4772,6 +6547,86 @@ const UI = (() => {
     updateSaveBar(host);
   }
 
+  // ── Reaching any chain or phrase, and cloning them ─────
+  // Previously the only way into a phrase was through a chain already
+  // placed in the song, so sketching an idea meant editing the
+  // arrangement first. These give a way in without touching it.
+  function chainHasSteps(parsed, c) {
+    for (let s = 0; s < PT.STEPS; s++) if (parsed.chains[c * PT.STEPS + s] !== PT.EMPTY) return true;
+    return false;
+  }
+  function phraseHasContent(parsed, ph) {
+    for (let s = 0; s < PT.STEPS; s++) {
+      const k = ph * PT.STEPS + s, q = parsed.phrases;
+      if (q.notes[k] !== PT.EMPTY || q.instr[k] !== PT.EMPTY ||
+          q.cmd1[k] !== PT.CMD_NONE || q.cmd2[k] !== PT.CMD_NONE) return true;
+    }
+    return false;
+  }
+  function firstFreeChain(parsed) {
+    for (let c = 0; c < PT.CHAIN_COUNT; c++) if (!chainHasSteps(parsed, c)) return c;
+    return -1;
+  }
+  function firstFreePhrase(parsed) {
+    const n = parsed.geometry?.phraseCount ?? PT.PHRASE_COUNT;
+    for (let ph = 0; ph < n; ph++) if (!phraseHasContent(parsed, ph)) return ph;
+    return -1;
+  }
+  // where a phrase is referenced: [{chain, step}]
+  function phraseUsage(parsed, ph) {
+    const out = [];
+    for (let c = 0; c < PT.CHAIN_COUNT; c++)
+      for (let s = 0; s < PT.STEPS; s++)
+        if (parsed.chains[c * PT.STEPS + s] === ph) out.push({ chain: c, step: s });
+    return out;
+  }
+  function chainUsage(parsed, c) {
+    const out = [];
+    const last = PT.lastSongRow(parsed);
+    for (let r = 0; r <= last; r++)
+      for (let t = 0; t < PT.CHANNELS; t++)
+        if (PT.gridCell(parsed, r, t) === c) out.push({ row: r, ch: t });
+    return out;
+  }
+  // Jump straight to any chain or phrase, placed or not.
+  function openJump(anchorEl, p, parsed, host) {
+    const items = [];
+    const nPh = parsed.geometry?.phraseCount ?? PT.PHRASE_COUNT;
+    for (let c = 0; c < PT.CHAIN_COUNT; c++)
+      if (chainHasSteps(parsed, c))
+        items.push({ value: `c${c}`, label: `Chain ${PT.hx2(c)}`,
+          hint: `${chainUsage(parsed, c).length} in song`, color: chainColorOf(p, c, groupChainColor(c)),
+          group: 'Chains with content' });
+    for (let ph = 0; ph < nPh; ph++)
+      if (phraseHasContent(parsed, ph))
+        items.push({ value: `p${ph}`, label: `Phrase ${PT.hx2(ph)}`,
+          hint: `${phraseUsage(parsed, ph).length} refs`, group: 'Phrases with content' });
+    const fc = firstFreeChain(parsed), fp = firstFreePhrase(parsed);
+    if (fc >= 0) items.push({ value: `c${fc}`, label: `Chain ${PT.hx2(fc)}`, hint: 'first empty', group: 'Empty' });
+    if (fp >= 0) items.push({ value: `p${fp}`, label: `Phrase ${PT.hx2(fp)}`, hint: 'first empty', group: 'Empty' });
+    openPicker(anchorEl, {
+      items,
+      placeholder: 'chain or phrase, e.g. 1A or p 0C…',
+      rawHint: 'c<hex> / p<hex>',
+      synth: q => {
+        const m = /^([cp])\s*([0-9a-fA-F]{1,2})$/.exec(q.trim());
+        if (!m) return null;
+        const v = parseInt(m[2], 16);
+        const isCh = m[1].toLowerCase() === 'c';
+        if (isCh ? v >= PT.CHAIN_COUNT : v >= nPh) return null;
+        return { value: `${m[1].toLowerCase()}${v}`,
+          label: `${isCh ? 'Chain' : 'Phrase'} ${PT.hx2(v)}`, hint: 'go here', group: '' };
+      },
+      onPick: v => {
+        const n = parseInt(v.slice(1), 10);
+        if (v[0] === 'c') showChain(parsed, n, host);
+        else { jumpPhraseFrom = null; showPhrase(parsed, n, host); }
+      },
+    });
+  }
+  // Breadcrumb context: which chain/step a phrase was opened from.
+  let jumpPhraseFrom = null;   // {chain, step} or null when opened directly
+
   function previewChain(p, parsed, c, el) {
     if (SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
     const orig = el.textContent;
@@ -4805,6 +6660,7 @@ const UI = (() => {
     const det = host.querySelector('#pv-chain-detail');
     det.style.display = 'block';
     det.dataset.chain = String(c);
+    jumpPhraseFrom = null;
     const hint = host.querySelector('#pv-side-hint');
     if (hint) hint.style.display = 'none';
     // usage: where in the song does this chain appear?
@@ -4833,7 +6689,12 @@ const UI = (() => {
     det.innerHTML = `<div class="pv-detail-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span>Chain ${PT.hx2(c)}</span>
         <span class="cp-play" style="cursor:pointer;font-size:13px" title="preview this chain">▶</span>
-        <span style="font-weight:400;letter-spacing:0;text-transform:none">used at ${uses.length} spot${uses.length===1?'':'s'}: ${uses.slice(0,12).map(esc).join('  ')}${uses.length>12?' …':''}</span>
+        ${editable ? `<button class="btn ghost sm" id="btn-chain-clone"
+          title="Copy this chain into the first empty slot and point the grid cells you came from at the copy">⧉ Clone</button>` : ''}
+        <span style="flex:1"></span>
+        <span class="usage-note ${uses.length > 1 ? 'shared' : ''}">${uses.length
+          ? `used at ${uses.length} spot${uses.length===1?'':'s'}: ${uses.slice(0,12).map(esc).join('  ')}${uses.length>12?' …':''}`
+          : 'not placed in the song yet'}</span>
       </div>
       <div class="pv-cs-head"><span>#</span><span>phrase</span><span>tsp</span><span>notes</span></div>
       <div class="pv-csteps">${rows}</div>
@@ -4842,7 +6703,27 @@ const UI = (() => {
         Edits stay in memory until you press “Save edits to card”.</div>` : ''}`;
     det.querySelector('.cp-play').addEventListener('click', e => previewChain(pRef, parsed, c, e.target));
     det.querySelectorAll('.cgo').forEach(el =>
-      el.addEventListener('click', () => showPhrase(parsed, parseInt(el.dataset.p, 10), host)));
+      el.addEventListener('click', () => {
+        jumpPhraseFrom = { chain: c, step: parseInt(el.closest('.pv-cstep').dataset.step, 10) };
+        showPhrase(parsed, parseInt(el.dataset.p, 10), host);
+      }));
+    det.querySelector('#btn-chain-clone')?.addEventListener('click', () => {
+      const dst = firstFreeChain(parsed);
+      if (dst < 0) { setCacheBar('No empty chain slots left.', false); return; }
+      pushUndoSnap(parsed);
+      for (let st = 0; st < PT.STEPS; st++) {
+        parsed.chains[dst * PT.STEPS + st] = parsed.chains[c * PT.STEPS + st];
+        parsed.transposes[dst * PT.STEPS + st] = parsed.transposes[c * PT.STEPS + st];
+      }
+      // repoint the places this chain was used so the clone is actually heard
+      for (const u of chainUsage(parsed, c)) parsed.grid[u.row * PT.CHANNELS + u.ch] = dst;
+      dirtyGrid.add(modalProj.dirName);
+      if (!dirtyChains.has(modalProj.dirName)) dirtyChains.set(modalProj.dirName, new Set());
+      dirtyChains.get(modalProj.dirName).add(dst);
+      setCacheBar(`Chain ${PT.hx2(c)} cloned to ${PT.hx2(dst)} — the song now points at the copy.`, true);
+      renderPatterns(host, p, parsed);
+      showChain(parsed, dst, host);
+    });
     if (editable) wireChainEdit(det, parsed, c, host, phraseMax);
     host.querySelector('#pv-phrase-detail').style.display = 'none';
   }
@@ -4859,16 +6740,20 @@ const UI = (() => {
     const apply = (step, f, raw) => {
       const k = c * PT.STEPS + step;
       const s = String(raw).trim();
-      pushArrUndo(parsed);
+      // snapshot only once the value is known good, or a rejected keystroke
+      // pushes a no-op undo and clears the redo stack
+      const snap = () => pushArrUndo(parsed);
       if (f === 'phrase') {
-        if (s === '' || s === '--' || s === '·') { parsed.chains[k] = PT.EMPTY; return true; }
+        if (s === '' || s === '--' || s === '·') { snap(); parsed.chains[k] = PT.EMPTY; return true; }
         const v = parseInt(s, 16);
         if (isNaN(v) || v < 0 || v > phraseMax) return false;
+        snap();
         parsed.chains[k] = v;
       } else {
-        if (s === '' || s === '·') { parsed.transposes[k] = 0; return true; }
+        if (s === '' || s === '·') { snap(); parsed.transposes[k] = 0; return true; }
         const v = parseInt(s, 10);
         if (isNaN(v) || v < -128 || v > 127) return false;
+        snap();
         parsed.transposes[k] = v & 0xFF;
       }
       return true;
@@ -4920,17 +6805,263 @@ const UI = (() => {
           else if (ev.key === 'Escape') { ev.preventDefault(); done = true; showChain(parsed, c, host); }
         });
       };
-      cell.addEventListener('click', e => { e.stopPropagation(); begin(); });
+      // click selects (so Del can clear it); Enter or typing opens the editor
+      cell.addEventListener('click', e => { e.stopPropagation(); cell.focus(); });
+      cell.addEventListener('dblclick', e => { e.stopPropagation(); begin(); });
       cell.addEventListener('keydown', ev => {
         if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); cell.blur(); return; }
+        const step = parseInt(cell.dataset.step, 10);
+        const cells = [...det.querySelectorAll('[data-f]')];
+        const idx = cells.indexOf(cell);
+        const cols = 2;                                  // phrase, transpose
+        if (ev.key === 'ArrowUp')   { ev.preventDefault(); cells[idx - cols]?.focus(); return; }
+        if (ev.key === 'ArrowDown') { ev.preventDefault(); cells[idx + cols]?.focus(); return; }
+        if (ev.key === 'ArrowLeft') { ev.preventDefault(); if (idx % cols) cells[idx - 1]?.focus(); return; }
+        if (ev.key === 'ArrowRight'){ ev.preventDefault(); if ((idx + 1) % cols) cells[idx + 1]?.focus(); return; }
+        if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'z') {
+          ev.preventDefault();
+          if (ev.shiftKey ? redoSong(parsed) : undoSong(parsed)) { markDirty(); showChain(parsed, c, host); }
+          return;
+        }
         if (ev.key === 'Enter') { ev.preventDefault(); begin(); }
         else if (ev.key === 'Delete' || ev.key === 'Backspace') {
           ev.preventDefault();
-          if (apply(parseInt(cell.dataset.step, 10), cell.dataset.f, '')) markDirty();
+          if (apply(step, cell.dataset.f, '')) markDirty();
           showChain(parsed, c, host);
         } else if (ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey) { ev.preventDefault(); begin(ev.key); }
       });
     });
+  }
+
+  // ── Create a new project on the card ───────────────────
+  async function createProject() {
+    if (!sd) return;
+    const raw = prompt('New project name (letters, numbers, - and _):', 'NEW SONG');
+    if (raw === null) return;
+    const name = raw.trim().replace(/[^\w .-]+/g, '').replace(/^\.+|\.+$/g, '').slice(0, 32).trim();
+    if (!name) { setCacheBar('That name has no usable characters.', false); return; }
+    if (/^\.+$/.test(name) || name === '.' || name === '..') {
+      setCacheBar('That name is not usable as a folder.', false); return;
+    }
+    if (lib.projects.some(x => x.dirName.toLowerCase() === name.toLowerCase())) {
+      setCacheBar(`A project called ${name} already exists.`, false);
+      return;
+    }
+    const bpmRaw = prompt('Tempo (BPM):', '120');
+    if (bpmRaw === null) return;
+    if (!await ensureWrite()) return;
+    try {
+      const projRoot = await sd.getDirectoryHandle('projects', { create: true });
+      // refuse if the folder is already there, whatever the scan thought
+      let exists = false;
+      try { await projRoot.getDirectoryHandle(name); exists = true; } catch {}
+      if (exists) throw new Error(`projects/${name} already exists on the card`);
+      const dir = await projRoot.getDirectoryHandle(name, { create: true });
+      await dir.getDirectoryHandle('samples', { create: true });
+      // match the card's own convention: Advance cards use ptsav.dat
+      const advance = lib.projects.some(x => x.datName === 'ptsav.dat');
+      const datName = advance ? 'ptsav.dat' : 'lgptsav.dat';
+      const bpm = Math.max(10, Math.min(400, parseInt(bpmRaw, 10) || 120));
+      const xml = PT.buildEmptyProject({ tempo: bpm });
+      const w = await (await dir.getFileHandle(datName, { create: true })).createWritable();
+      await w.write(xml); await w.close();
+      // verify it reads back as a project before telling anyone it worked
+      const back = PT.parseProject(await (await (await dir.getFileHandle(datName)).getFile()).text());
+      if (!back) throw new Error('the new project file did not parse back — nothing usable was written');
+      logRepair(true, 'new-project', `created projects/${name}/${datName}`);
+      await persist();
+      setCacheBar(`Created ${name} — rescanning…`, true);
+      await rescan(lib);
+      const made = projByDir(name);
+      if (made) openProjModal(made.dirName);
+    } catch (e) {
+      logRepair(false, 'new-project', `${name}: ${e.message || e}`);
+      setCacheBar(`Could not create the project: ${e.message || e}`, false);
+    }
+  }
+
+  // ── Chain colours as a sidecar on the card ─────────────
+  // They lived only in this browser, so they didn't travel with the card.
+  const COLOUR_FILE = 'PTLibrarian_colours.json';
+  async function saveColourSidecar() {
+    if (!sd || demoMode) return false;
+    if (!await ensureWrite()) return false;
+    try {
+      const w = await (await sd.getFileHandle(COLOUR_FILE, { create: true })).createWritable();
+      await w.write(JSON.stringify({ version: 1, chainColors }, null, 1));
+      await w.close();
+      setCacheBar(`Chain colours written to ${COLOUR_FILE} on the card.`, true);
+      return true;
+    } catch (e) {
+      setCacheBar(`Could not write colours: ${e.message || e}`, false);
+      return false;
+    }
+  }
+  async function loadColourSidecar() {
+    if (!sd) return;
+    try {
+      const txt = await (await (await sd.getFileHandle(COLOUR_FILE)).getFile()).text();
+      const data = JSON.parse(txt);
+      if (data && data.chainColors && typeof data.chainColors === 'object') {
+        // the card is the shared source; merge without clobbering local picks
+        for (const [k, v] of Object.entries(data.chainColors))
+          if (/^#[0-9a-fA-F]{6}$/.test(v) && !(k in chainColors)) chainColors[k] = v;
+      }
+    } catch {}
+  }
+
+  // ── WAV encoding + offline render ──────────────────────
+  function encodeWav(buf) {
+    const chans = buf.numberOfChannels, len = buf.length, rate = buf.sampleRate;
+    const bytes = 44 + len * chans * 2;
+    const out = new ArrayBuffer(bytes);
+    const dv = new DataView(out);
+    const str = (o, t) => { for (let i = 0; i < t.length; i++) dv.setUint8(o + i, t.charCodeAt(i)); };
+    str(0, 'RIFF'); dv.setUint32(4, bytes - 8, true); str(8, 'WAVE');
+    str(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true);
+    dv.setUint16(22, chans, true); dv.setUint32(24, rate, true);
+    dv.setUint32(28, rate * chans * 2, true); dv.setUint16(32, chans * 2, true);
+    dv.setUint16(34, 16, true);
+    str(36, 'data'); dv.setUint32(40, len * chans * 2, true);
+    const data = [];
+    for (let c = 0; c < chans; c++) data.push(buf.getChannelData(c));
+    let o = 44;
+    for (let i = 0; i < len; i++)
+      for (let c = 0; c < chans; c++) {
+        let v = Math.max(-1, Math.min(1, data[c][i]));
+        dv.setInt16(o, v < 0 ? v * 0x8000 : v * 0x7FFF, true);
+        o += 2;
+      }
+    return new Uint8Array(out);
+  }
+  const dlBytes = (bytes, name, mime = 'audio/wav') => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
+
+  // Render a project (or one channel of it) to an AudioBuffer offline.
+  // Reuses the player's own scheduling so a render sounds like the preview.
+  async function renderProject(p, parsed, opts = {}) {
+    const RATE = 44100;
+    const tl = PT.buildEventTimeline(parsed, {});
+    if (!tl || !(tl.duration > 0)) throw new Error('nothing to render — the song grid is empty');
+    const tail = 2;
+    const off = new OfflineAudioContext(2, Math.ceil((tl.duration + tail) * RATE), RATE);
+    // load and decode every pool sample into this context
+    const wanted = new Set(parsed.instruments.map(i => i.sample).filter(Boolean));
+    const buffers = new Map();
+    for (const name of wanted) {
+      try {
+        const dir = await (await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(p.dirName)).getDirectoryHandle('samples');
+        const f = await (await dir.getFileHandle(name)).getFile();
+        const raw = await f.arrayBuffer();
+        const hdr = PT.parseWavHeader(new Uint8Array(raw.slice(0, 4096)), raw.byteLength);
+        const b = await off.decodeAudioData(raw);
+        buffers.set(name, { buf: b, srcRate: (hdr && hdr.sampleRate) || b.sampleRate });
+      } catch {}
+    }
+    const master = off.createGain();
+    master.gain.value = 0.32;
+    const lim = off.createDynamicsCompressor();
+    lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20;
+    lim.attack.value = 0.002; lim.release.value = 0.12;
+    master.connect(lim); lim.connect(off.destination);
+    const chans = [];
+    for (let c = 0; c < 8; c++) {
+      const g = off.createGain();
+      const pan = off.createStereoPanner ? off.createStereoPanner() : null;
+      if (pan) { g.connect(pan); pan.connect(master); } else g.connect(master);
+      chans.push({ g, pan });
+    }
+    const instrOf = new Map(parsed.instruments.map(i => [i.id, i]));
+    const meta = i => {
+      const q = i.params || {};
+      const num = (k, d) => { const v = parseInt(q[k], 10); return isNaN(v) ? d : v; };
+      return { sample: i.sample, rootNote: num('root note', 60),
+        gain: Math.min(2, num('volume', num('level', 128)) / 128),
+        loopMode: q.loopmode || 'none', start: num('start', 0),
+        loopStart: num('loopstart', 0), loopEnd: num('end', 0),
+        slices: (i.slices || []).slice().sort((a, b) => a.index - b.index),
+        pads: PT.slicePadCount(i) };
+    };
+    const only = opts.channel;                 // undefined = full mix
+    const byCh = Array.from({ length: 8 }, () => []);
+    for (const e of tl.events) byCh[e.ch].push(e);
+    for (let c = 0; c < 8; c++) {
+      if (only !== undefined && c !== only) continue;
+      const evs = byCh[c];
+      for (let i = 0; i < evs.length; i++) {
+        const e = evs[i];
+        if (e.type === 'vol') { chans[c].g.gain.setValueAtTime(e.value, e.time); continue; }
+        if (e.type === 'pan') { if (chans[c].pan) chans[c].pan.pan.setValueAtTime(e.value, e.time); continue; }
+        if (e.type !== 'on') continue;
+        const inst = instrOf.get(e.instr);
+        if (!inst) continue;
+        const m = meta(inst);
+        const ent = m.sample && buffers.get(m.sample);
+        if (!ent) continue;
+        const { buf, srcRate } = ent;
+        let stopAt = tl.duration + tail;
+        for (let j = i + 1; j < evs.length; j++)
+          if (evs[j].type === 'on' || evs[j].type === 'off') { stopAt = evs[j].time; break; }
+        const src = off.createBufferSource();
+        src.buffer = buf;
+        const vg = off.createGain();
+        vg.gain.value = m.gain;
+        src.connect(vg); vg.connect(chans[c].g);
+        let offset = 0, dur = null, rate = 1;
+        if (m.slices.length && e.note >= PT.SLICE_NOTE_BASE && e.note < PT.SLICE_NOTE_BASE + m.pads) {
+          const w = PT.sliceWindow(m.slices, e.note - PT.SLICE_NOTE_BASE, srcRate, buf.duration, m.pads);
+          if (!w) continue;
+          offset = w.offset; dur = w.dur;
+        } else {
+          rate = Math.pow(2, (e.note + e.transpose - m.rootNote) / 12);
+          if (m.start > 0 && m.start / srcRate < buf.duration) offset = m.start / srcRate;
+          if (m.loopMode !== 'none') {
+            const lw = PT.loopWindow(m.loopStart, m.loopEnd, srcRate, buf.duration);
+            if (lw) { src.loop = true; src.loopStart = lw.start; src.loopEnd = lw.end; }
+          }
+        }
+        src.playbackRate.value = rate;
+        vg.gain.setValueAtTime(m.gain, Math.max(e.time, stopAt - 0.006));
+        vg.gain.linearRampToValueAtTime(0, stopAt);
+        try {
+          if (dur !== null && !src.loop) src.start(e.time, offset, Math.min(dur, stopAt - e.time + 0.01));
+          else { src.start(e.time, offset); src.stop(stopAt); }
+        } catch {}
+      }
+    }
+    return off.startRendering();
+  }
+
+  async function renderToWav(p, stems) {
+    const parsed = fullCache.get(p.dirName) || (await readProjectFull(p)).parsed;
+    const safe = p.name.replace(/[^\w.-]+/g, '_');
+    setCacheBar(stems ? 'Rendering stems…' : 'Rendering…', true);
+    try {
+      if (!stems) {
+        const buf = await renderProject(p, parsed);
+        dlBytes(encodeWav(buf), `${safe}.wav`);
+        setCacheBar(`Rendered ${safe}.wav (${fmtDur(buf.duration)}).`, true);
+        return;
+      }
+      // one file per channel that actually plays something
+      const used = new Set(PT.buildEventTimeline(parsed, {}).events.filter(e => e.type === 'on').map(e => e.ch));
+      if (!used.size) throw new Error('no channels play anything');
+      let n = 0;
+      for (const ch of [...used].sort((a, b) => a - b)) {
+        setCacheBar(`Rendering stem ${n + 1}/${used.size} (channel ${ch + 1})…`, true);
+        const buf = await renderProject(p, parsed, { channel: ch });
+        dlBytes(encodeWav(buf), `${safe}_ch${ch + 1}.wav`);
+        n++;
+      }
+      setCacheBar(`Rendered ${n} stem${n > 1 ? 's' : ''}.`, true);
+    } catch (e) {
+      setCacheBar(`Render failed: ${e.message || e}`, false);
+    }
   }
 
   // ── Transport bar ──────────────────────────────────────
@@ -4953,12 +7084,44 @@ const UI = (() => {
     clearLiveMarks();
   }
   function transportProgress(t, dur) {
-    $('tr-bar').style.width = `${dur ? Math.min(100, t / dur * 100) : 0}%`;
+    const pct = dur ? Math.min(100, t / dur * 100) : 0;
+    $('tr-bar').style.width = `${pct}%`;
+    $('tr-head').style.left = `calc(${pct}% - 1px)`;
     $('tr-time').textContent = `${fmtClock(t)} / ${fmtClock(dur)}`;
     paintLiveMarks(t);
   }
+  function wireTransport() {
+    const wrap = $('tr-barwrap');
+    const seekFromEvent = e => {
+      const r = wrap.getBoundingClientRect();
+      const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+      const tl = SongPlayer.timeline();
+      if (tl) SongPlayer.seekTo(frac * tl.duration);
+    };
+    // Each seek rebuilds the audio graph, so drag only moves the head and the
+    // actual jump happens on release.
+    let dragging = false;
+    const previewAt = e => {
+      const r = wrap.getBoundingClientRect();
+      const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+      $('tr-head').style.left = `calc(${frac * 100}% - 1px)`;
+      $('tr-bar').style.width = `${frac * 100}%`;
+    };
+    wrap.addEventListener('pointerdown', e => { dragging = true; wrap.setPointerCapture(e.pointerId); previewAt(e); });
+    wrap.addEventListener('pointermove', e => { if (dragging) previewAt(e); });
+    wrap.addEventListener('pointerup', e => {
+      if (!dragging) return;
+      dragging = false;
+      try { wrap.releasePointerCapture(e.pointerId); } catch {}
+      seekFromEvent(e);
+    });
+    $('tr-loop').addEventListener('click', () => {
+      SongPlayer.setLoop(!SongPlayer.isLooping());
+      $('tr-loop').classList.toggle('on', SongPlayer.isLooping());
+    });
+  }
   function clearLiveMarks() {
-    document.querySelectorAll('.pv-cell.live, .pv-gutter.live, .pv-chainrow.live, .pv-cstep.playing')
+    document.querySelectorAll('.pv-cell.live, .pv-gutter.live, .pv-chainrow.live, .pv-cstep.playing, .pe-row.playing')
       .forEach(el => el.classList.remove('live', 'playing'));
   }
   // Highlight the grid cell, chain-list entry and chain step that each
@@ -4981,6 +7144,9 @@ const UI = (() => {
       const openChain = sec.querySelector('#pv-chain-detail')?.dataset.chain;
       if (openChain !== undefined && parseInt(openChain, 10) === m.chain)
         sec.querySelector(`.pv-cstep[data-step="${m.step}"]`)?.classList.add('playing');
+      const openPhrase = sec.querySelector('#pv-phrase-detail')?.dataset.phrase;
+      if (openPhrase !== undefined && parseInt(openPhrase, 10) === m.phrase && m.pstep !== undefined)
+        sec.querySelector(`.pe-row[data-step="${m.pstep}"]`)?.classList.add('playing');
     }
     for (const c of chains)
       sec.querySelector(`.pv-chainrow[data-chain="${c}"]`)?.classList.add('live');
@@ -5002,22 +7168,240 @@ const UI = (() => {
   const PIANO_OFF_KEY = 'a';        // adjacent to z, unused by the layout
   let pianoOn = localStorage.getItem('ptPiano') === '1';
   let pianoOct = parseInt(localStorage.getItem('ptPianoOct') || '3', 10);
-  let pianoStep = parseInt(localStorage.getItem('ptPianoStep') || '1', 10);
+  // One edit-step setting shared by every note-entry path, so picking from
+  // the list, typing a value and playing the piano all advance the same way.
+  let advanceOn = localStorage.getItem('ptAdvance') !== '0';
+  let editStep = parseInt(localStorage.getItem('ptEditStep') || '1', 10);
+  const setAdvance = v => { advanceOn = v; localStorage.setItem('ptAdvance', v ? '1' : '0'); };
+  const setEditStep = v => {
+    editStep = Math.max(1, Math.min(8, v));
+    localStorage.setItem('ptEditStep', String(editStep));
+  };
   const setPiano = v => { pianoOn = v; localStorage.setItem('ptPiano', v ? '1' : '0'); };
   const setPianoOct = v => {
     pianoOct = Math.max(0, Math.min(7, v));
     localStorage.setItem('ptPianoOct', String(pianoOct));
   };
-  const setPianoStep = v => {
-    pianoStep = Math.max(0, Math.min(8, v));
-    localStorage.setItem('ptPianoStep', String(pianoStep));
-  };
+
   // note value for a key, or null if it isn't a piano key
   function pianoNote(key) {
     const k = String(key).toLowerCase();
     if (!(k in PIANO_KEYS)) return null;
     const v = (pianoOct + 2) * 12 + PIANO_KEYS[k];   // noteStr: octave = v/12 - 2
     return (v >= 0 && v <= 119) ? v : null;
+  }
+
+  const rebuildGrooveDigest = PT.rebuildGrooveDigest;
+
+  // ── Tables and grooves ─────────────────────────────────
+  // Both parsed and displayed for a long time without being editable.
+  // Tables are three columns of command+param over 16 steps; grooves are
+  // up to 16 step lengths in ticks.
+  let tablesSel = 0;
+  const refreshTableEmpty = t => {
+    t.empty = t.cmd.every(c => !c || [...c].every(v => v === PT.CMD_NONE)) &&
+              t.param.every(q => !q || [...q].every(v => v === 0));
+  };
+  function renderTablesGrooves(host, p, parsed) {
+    const editable = (parsed.geometry?.cmdWidth ?? 1) === 1;
+    const tables = parsed.tables || [];
+    if (tablesSel >= tables.length) tablesSel = 0;
+    const t = tables[tablesSel];
+    const markTablesDirty = () => { dirtyTables.add(p.dirName); updateSaveBar(host.closest('.proj-modal-body') || host); };
+
+    const writable = tt => tt.cmd.some(Boolean);
+    const tabList = tables.map((tt, i) =>
+      `<button class="tg-tab${i === tablesSel ? ' on' : ''}${tt.empty ? ' empty' : ''}${writable(tt) ? '' : ' locked'}" data-t="${i}"
+        title="${!writable(tt) ? 'this table is stored empty in the file and cannot be edited here yet'
+                 : tt.empty ? 'empty' : 'has commands'}">${PT.hx2(tt.id)}</button>`).join('');
+    const canEditTable = !!t && writable(t);
+
+    let rows = '';
+    if (t) {
+      for (let st = 0; st < PT.STEPS; st++) {
+        rows += `<div class="tg-row${st % 4 === 0 ? ' beat' : ''}" data-step="${st}">
+          <span class="tg-i">${PT.hx2(st)}</span>` +
+          [0, 1, 2].map(col => {
+            const cmd = t.cmd[col] ? t.cmd[col][st] : PT.CMD_NONE;
+            const par = t.param[col] ? t.param[col][st] : 0;
+            const dim = cmd === PT.CMD_NONE ? ' dim' : '';
+            const tab = (editable && canEditTable) ? 0 : -1;
+            return `<span class="tg-c tg-cmd${dim}" data-col="${col}" data-f="cmd" data-step="${st}"
+                      tabindex="${tab}">${esc(PT.cmdName(cmd))}</span>
+                    <span class="tg-c tg-par${dim}" data-col="${col}" data-f="param" data-step="${st}"
+                      tabindex="${tab}">${PT.hx4(par)}</span>`;
+          }).join('') + `</div>`;
+      }
+    }
+
+    // grooves: each is up to 16 tick values, 0xFF meaning "end"
+    const gRaw = parsed.grooveRaw;
+    let grooveRows = '';
+    if (gRaw) {
+      for (let g = 0; g < PT.GROOVE_COUNT; g++) {
+        const steps = [];
+        for (let st = 0; st < PT.STEPS; st++) {
+          const v = gRaw[g * PT.STEPS + st];
+          if (v === PT.EMPTY) break;
+          steps.push(v);
+        }
+        const isDefault = steps.length === 2 && steps[0] === 6 && steps[1] === 6;
+        if (g > 0 && !steps.length) continue;         // hide unused grooves past 0
+        grooveRows += `<div class="tg-groove" data-g="${g}">
+          <span class="tg-gname">G${PT.hx2(g)}</span>
+          <span class="tg-gsteps">${Array.from({ length: PT.STEPS }, (_, st) => {
+            const v = gRaw[g * PT.STEPS + st];
+            const off = v === PT.EMPTY;
+            return `<span class="tg-gs${off ? ' off' : ''}" data-g="${g}" data-step="${st}"
+                      tabindex="${editable ? 0 : -1}" title="tick length; empty ends the groove">${off ? '·' : v}</span>`;
+          }).join('')}</span>
+          <span class="tg-gmeta">${isDefault ? 'default 6 6' : steps.length ? `${steps.length} steps` : 'unused'}</span>
+        </div>`;
+      }
+    }
+
+    host.innerHTML = `
+      <div class="pv-hdr"><span class="pv-hdr-title">Tables</span>
+        <span class="pv-hint">${editable
+          ? 'click a cell, <b>Enter</b> to choose a command or type a value, <b>Del</b> to clear'
+          : 'read only (legacy command encoding)'}</span></div>
+      <div class="tg-tabs">${tabList || '<span style="color:var(--muted);font-size:11px">no tables in this project</span>'}</div>
+      ${t && !canEditTable ? `<div class="tg-locked">Table ${PT.hx2(t.id)} is stored empty in the project file, so there is nothing here to rewrite. Add commands to it on the device first.</div>` : ''}
+      ${t ? `<div class="tg-head"><span>#</span><span>cmd 1</span><span>val</span><span>cmd 2</span><span>val</span><span>cmd 3</span><span>val</span></div>
+      <div class="tg-grid">${rows}</div>` : ''}
+      <div class="pv-hdr" style="margin-top:18px"><span class="pv-hdr-title">Grooves</span>
+        <span class="pv-hint">step lengths in ticks · 6 is a straight 1/16 · clear a step to end the groove</span></div>
+      <div class="tg-grooves">${grooveRows || '<span style="color:var(--muted);font-size:11px">this project has no groove buffer</span>'}</div>`;
+
+    host.querySelectorAll('.tg-tab').forEach(b =>
+      b.addEventListener('click', () => { tablesSel = parseInt(b.dataset.t, 10); renderTablesGrooves(host, p, parsed); }));
+    if (!editable) return;
+
+    // table cells
+    if (canEditTable) host.querySelectorAll('.tg-c').forEach(cell => {
+      const col = parseInt(cell.dataset.col, 10), st = parseInt(cell.dataset.step, 10);
+      const isCmd = cell.dataset.f === 'cmd';
+      const begin = seed => {
+        if (isCmd) {
+          openPicker(cell, {
+            items: fxItems(), seed, rawHint: 'or type a name',
+            onPick: v => {
+              pushUndoSnap(parsed);
+              if (t.cmd[col]) t.cmd[col][st] = v;
+              if (v === PT.CMD_NONE && t.param[col]) t.param[col][st] = 0;
+              refreshTableEmpty(t);
+              markTablesDirty(); renderTablesGrooves(host, p, parsed);
+            },
+          });
+          return;
+        }
+        const inp = document.createElement('input');
+        inp.className = 'pe-edit';
+        inp.value = seed !== undefined ? seed : cell.textContent.trim();
+        cell.textContent = ''; cell.appendChild(inp); inp.focus();
+        if (seed === undefined) inp.select();
+        let done = false;
+        const commit = () => {
+          if (done) return;
+          done = true;
+          const v = parseInt(inp.value.trim() || '0', 16);
+          if (!isNaN(v) && v >= 0 && v <= 0xFFFF && t.param[col]) {
+            pushUndoSnap(parsed);
+            t.param[col][st] = v;
+            refreshTableEmpty(t);
+            markTablesDirty();
+          }
+          renderTablesGrooves(host, p, parsed);
+        };
+        inp.addEventListener('blur', commit);
+        inp.addEventListener('keydown', ev => {
+          ev.stopPropagation();
+          if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+          else if (ev.key === 'Escape') { ev.preventDefault(); done = true; renderTablesGrooves(host, p, parsed); }
+        });
+      };
+      cell.addEventListener('click', e => { e.stopPropagation(); cell.focus(); });
+      cell.addEventListener('dblclick', e => { e.stopPropagation(); begin(); });
+      cell.addEventListener('keydown', ev => {
+        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); cell.blur(); return; }
+        if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'z') {
+          ev.preventDefault();
+          if (ev.shiftKey ? redoSong(parsed) : undoSong(parsed)) { markTablesDirty(); renderTablesGrooves(host, p, parsed); }
+          return;
+        }
+        if (ev.key === 'Enter') { ev.preventDefault(); begin(); }
+        else if (ev.key === 'Delete' || ev.key === 'Backspace') {
+          ev.preventDefault();
+          pushUndoSnap(parsed);
+          if (isCmd && t.cmd[col]) { t.cmd[col][st] = PT.CMD_NONE; if (t.param[col]) t.param[col][st] = 0; }
+          else if (t.param[col]) t.param[col][st] = 0;
+          refreshTableEmpty(t);
+          markTablesDirty(); renderTablesGrooves(host, p, parsed);
+        } else if (ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey) { ev.preventDefault(); begin(ev.key); }
+      });
+    });
+
+    // groove steps
+    host.querySelectorAll('.tg-gs').forEach(cell => {
+      const g = parseInt(cell.dataset.g, 10), st = parseInt(cell.dataset.step, 10);
+      const idx = g * PT.STEPS + st;
+      const begin = seed => {
+        const inp = document.createElement('input');
+        inp.className = 'pe-edit';
+        inp.value = seed !== undefined ? seed : (gRaw[idx] === PT.EMPTY ? '' : String(gRaw[idx]));
+        cell.textContent = ''; cell.appendChild(inp); inp.focus();
+        if (seed === undefined) inp.select();
+        let done = false;
+        const commit = () => {
+          if (done) return;
+          done = true;
+          const raw = inp.value.trim();
+          pushUndoSnap(parsed);
+          let okv = true;
+          if (raw === '' || raw === '·') gRaw[idx] = PT.EMPTY;
+          else {
+            const v = parseInt(raw, 10);
+            // 0 would stall the player; the firmware treats >0x80 as unset
+            if (!isNaN(v) && v >= 1 && v <= 0x80) gRaw[idx] = v; else okv = false;
+          }
+          if (!okv) { songUndo.pop(); renderTablesGrooves(host, p, parsed); return; }
+          rebuildGrooveDigest(parsed);
+          dirtyGrooves.add(p.dirName);
+          updateSaveBar(host.closest('.proj-modal-body') || host);
+          renderTablesGrooves(host, p, parsed);
+        };
+        inp.addEventListener('blur', commit);
+        inp.addEventListener('keydown', ev => {
+          ev.stopPropagation();
+          if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+          else if (ev.key === 'Escape') { ev.preventDefault(); done = true; renderTablesGrooves(host, p, parsed); }
+        });
+      };
+      cell.addEventListener('click', e => { e.stopPropagation(); cell.focus(); });
+      cell.addEventListener('dblclick', e => { e.stopPropagation(); begin(); });
+      cell.addEventListener('keydown', ev => {
+        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); cell.blur(); return; }
+        if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'z') {
+          ev.preventDefault();
+          if (ev.shiftKey ? redoSong(parsed) : undoSong(parsed)) {
+            dirtyGrooves.add(p.dirName);
+            updateSaveBar(host.closest('.proj-modal-body') || host);
+            renderTablesGrooves(host, p, parsed);
+          }
+          return;
+        }
+        if (ev.key === 'Enter') { ev.preventDefault(); begin(); }
+        else if (ev.key === 'Delete' || ev.key === 'Backspace') {
+          ev.preventDefault();
+          pushUndoSnap(parsed);
+          gRaw[idx] = PT.EMPTY;
+          rebuildGrooveDigest(parsed);
+          dirtyGrooves.add(p.dirName);
+          updateSaveBar(host.closest('.proj-modal-body') || host);
+          renderTablesGrooves(host, p, parsed);
+        } else if (/^[0-9]$/.test(ev.key)) { ev.preventDefault(); begin(ev.key); }
+      });
+    });
   }
 
   // ── Pick-list popup ────────────────────────────────────
@@ -5191,10 +7575,12 @@ const UI = (() => {
   // place, and every mutation pushes an undo snapshot.
   const CMD_OPTIONS = [0x2D, ...Object.keys(PT.COMMANDS).map(Number).filter(c => c !== 0x2D).sort((a,b)=>a-b)];
   const PE_FIELDS = ['note', 'instr', 'cmd1', 'param1', 'cmd2', 'param2'];
-  let peUndo = [];            // stack of {ph, snap}
+
   let peClipRow = null;       // copied single step
   let peClipPhrase = null;    // copied whole phrase
   let peCursor = { step: 0, col: 0 };
+  let peSel = null;              // {s0,c0,s1,c1} block selection in the phrase grid
+  let peBlockClip = null;        // {h,w,cells:[[{...},…],…]}
 
   const peKey = (ph, s) => ph * PT.STEPS + s;
   function phraseSnapshot(parsed, ph) {
@@ -5212,9 +7598,11 @@ const UI = (() => {
   function showPhrase(parsed, ph, host) {
     const det = host.querySelector('#pv-phrase-detail');
     det.style.display = 'block';
+    det.dataset.phrase = String(ph);
+    const hint = host.querySelector('#pv-side-hint');
+    if (hint) hint.style.display = 'none';
     const editable = (parsed.geometry?.cmdWidth ?? 1) === 1;
     peCursor = { step: 0, col: 0 };
-    peUndo = [];
     renderPhrase(parsed, ph, host, editable);
     det.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -5248,13 +7636,21 @@ const UI = (() => {
         }).join('')}
       </div>`;
     }
+    // Where this phrase is used, and how we got here. Editing a phrase used
+    // by several chains changes all of them, and nothing said so before.
+    const usage = phraseUsage(parsed, ph);
+    const crumb = jumpPhraseFrom
+      ? `<span class="pe-crumb"><a data-crumb="chain">Chain ${PT.hx2(jumpPhraseFrom.chain)}</a> · step ${PT.hx2(jumpPhraseFrom.step)} ›</span>`
+      : '';
     det.innerHTML = `
       <div class="pv-detail-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        ${crumb}
         <span>Phrase ${PT.hx2(ph)}</span>
         <button class="btn ghost sm" id="btn-ph-play" title="Audition this phrase">▶</button>
         ${editable ? `
           <span class="pe-sep"></span>
-          <button class="btn ghost sm" data-tsp="-12" title="Transpose down an octave">−12</button>
+          <span id="pe-selinfo" class="pe-selinfo"></span>
+          <button class="btn ghost sm" data-tsp="-12" title="Transpose the selection (or the whole phrase) down an octave">−12</button>
           <button class="btn ghost sm" data-tsp="-1">−1</button>
           <button class="btn ghost sm" data-tsp="1">+1</button>
           <button class="btn ghost sm" data-tsp="12" title="Transpose up an octave">+12</button>
@@ -5265,7 +7661,8 @@ const UI = (() => {
           <button class="btn ghost sm" id="btn-ph-copy" title="Copy the whole phrase">⧉ Copy</button>
           <button class="btn ghost sm" id="btn-ph-paste" title="Paste over this phrase"${peClipPhrase ? '' : ' disabled'}>Paste</button>
           <button class="btn ghost sm" id="btn-ph-clear" title="Clear every step">Clear</button>
-          <button class="btn ghost sm" id="btn-ph-undo" title="Undo the last edit"${peUndo.length ? '' : ' disabled'}>↶ Undo</button>
+          <button class="btn ghost sm" id="btn-ph-undo" title="Undo (⌘/Ctrl+Z)"${songUndo.length ? '' : ' disabled'}>↶ Undo</button>
+          <button class="btn ghost sm" id="btn-ph-redo" title="Redo (⌘/Ctrl+Shift+Z)"${songRedo.length ? '' : ' disabled'}>↷ Redo</button>
           <span class="pe-sep"></span>
           <button class="btn ghost sm${pianoOn ? ' on' : ''}" id="btn-ph-piano"
             title="Type notes with the keyboard: z s x d c v g b h n j m for one octave, q 2 w 3 e r 5 t 6 y 7 u for the next, ${PIANO_OFF_KEY} for note-off">🎹 Piano${pianoOn ? ' on' : ''}</button>
@@ -5273,26 +7670,67 @@ const UI = (() => {
             oct <button class="btn ghost sm" id="btn-ph-octdn" title="Octave down (also: [ )">−</button>
             <b id="ph-oct">${pianoOct}</b>
             <button class="btn ghost sm" id="btn-ph-octup" title="Octave up (also: ] )">+</button>
-            step <button class="btn ghost sm" id="btn-ph-stepdn" title="Smaller edit step">−</button>
-            <b id="ph-step">${pianoStep}</b>
-            <button class="btn ghost sm" id="btn-ph-stepup" title="Larger edit step">+</button>
           </span>` : ''}
+          <span class="pe-piano-cfg">
+            <button class="btn ghost sm${advanceOn ? ' on' : ''}" id="btn-ph-adv"
+              title="After entering a note, move the cursor down by the edit step">↓ Advance${advanceOn ? '' : ' off'}</button>
+            <button class="btn ghost sm" id="btn-ph-stepdn" title="Smaller edit step">−</button>
+            <b id="ph-step">${editStep}</b>
+            <button class="btn ghost sm" id="btn-ph-stepup" title="Larger edit step">+</button>
+          </span>
+          <span class="pe-sep"></span>
+          <button class="btn ghost sm" id="btn-ph-clone"
+            title="${usage.length > 1
+              ? 'Copy this phrase into an empty slot and point only THIS chain step at the copy, leaving the others alone'
+              : 'Copy this phrase into the first empty slot'}">⧉ Clone</button>
         ` : '<span style="opacity:.6;font-weight:400;letter-spacing:0;text-transform:none">read only</span>'}
         <span style="flex:1"></span>
+        <span class="usage-note ${usage.length > 1 ? 'shared' : ''}"
+          title="${usage.length > 1 ? 'Editing this phrase changes every chain step that points at it' : ''}">
+          ${usage.length > 1 ? `⚠ shared — used by ${usage.length} chain steps: ` +
+              usage.slice(0, 8).map(u => `${PT.hx2(u.chain)}·${PT.hx2(u.step)}`).join(' ') + (usage.length > 8 ? ' …' : '')
+            : usage.length === 1 ? `used once (chain ${PT.hx2(usage[0].chain)} step ${PT.hx2(usage[0].step)})`
+            : 'not referenced by any chain'}
+        </span>
       </div>
       <div class="pe-head"><span class="pe-i">#</span><span>note</span><span>ins</span><span>fx1</span><span>val</span><span>fx2</span><span>val</span></div>
       <div id="phrase-rows" class="pe-grid">${rows}</div>
       ${editable && pianoOn ? `<div class="pe-help pe-help-piano">🎹 <b>Piano entry on.</b> With the cursor in the <b>note</b> column:
         <code>z s x d c v g b h n j m</code> plays C–B in octave <b>${pianoOct}</b>,
         <code>q 2 w 3 e r 5 t 6 y 7 u</code> the octave above, <code>${PIANO_OFF_KEY}</code> is note-off.
-        <b>[</b> and <b>]</b> change octave. Each entry fills the instrument from the step above and moves down <b>${pianoStep}</b>.</div>` : ''}
+        <b>[</b> and <b>]</b> change octave. Each entry fills the instrument from the step above and moves down <b>${editStep}</b>.</div>` : ''}
       ${editable ? `<div class="pe-help">Click a cell and type. <b>↑↓←→</b> move · <b>Enter</b> edit · <b>Del</b> clear cell ·
-        <b>⌘/Ctrl+C</b> copy step · <b>⌘/Ctrl+V</b> paste step · <b>⌘/Ctrl+Z</b> undo.
+        <b>shift+arrows</b> select a block · <b>⌘/Ctrl+C/V</b> copy &amp; paste it · <b>⌘/Ctrl+A</b> all · <b>⌘/Ctrl+Z</b> undo, <b>⇧⌘Z</b> redo.
         Notes take <code>C-3</code>, <code>C#4</code>, <code>OFF</code> or <code>---</code>; values are hex.
         Edits stay in memory until you press “Save edits to card”.</div>` : ''}`;
 
     det.querySelector('#btn-ph-play')?.addEventListener('click', e => previewPhrase(parsed, ph, e.currentTarget));
+    det.querySelector('[data-crumb="chain"]')?.addEventListener('click', () => {
+      if (jumpPhraseFrom) showChain(parsed, jumpPhraseFrom.chain, host);
+    });
     if (!editable) return;
+    det.querySelector('#btn-ph-clone')?.addEventListener('click', () => {
+      const dst = firstFreePhrase(parsed);
+      if (dst < 0) { setCacheBar('No empty phrase slots left.', false); return; }
+      pushUndoSnap(parsed);
+      const base = ph * PT.STEPS, to = dst * PT.STEPS;
+      for (const f of ['notes', 'instr', 'cmd1', 'param1', 'cmd2', 'param2'])
+        for (let st = 0; st < PT.STEPS; st++) parsed.phrases[f][to + st] = parsed.phrases[f][base + st];
+      // Repoint only the step we arrived through, so a shared phrase can be
+      // varied in one place without changing it everywhere else.
+      let note = `Phrase ${PT.hx2(ph)} cloned to ${PT.hx2(dst)}`;
+      if (jumpPhraseFrom) {
+        parsed.chains[jumpPhraseFrom.chain * PT.STEPS + jumpPhraseFrom.step] = dst;
+        if (!dirtyChains.has(modalProj.dirName)) dirtyChains.set(modalProj.dirName, new Set());
+        dirtyChains.get(modalProj.dirName).add(jumpPhraseFrom.chain);
+        note += ` — chain ${PT.hx2(jumpPhraseFrom.chain)} step ${PT.hx2(jumpPhraseFrom.step)} now plays the copy`;
+      }
+      if (!dirtyPhrases.has(modalProj.dirName)) dirtyPhrases.set(modalProj.dirName, new Set());
+      dirtyPhrases.get(modalProj.dirName).add(dst);
+      updateSaveBar(host);
+      setCacheBar(note, true);
+      showPhrase(parsed, dst, host);
+    });
 
     const rerender = () => renderPhrase(parsed, ph, host, editable);
     const markDirty = () => {
@@ -5300,10 +7738,7 @@ const UI = (() => {
       dirtyPhrases.get(modalProj.dirName).add(ph);
       updateSaveBar(host);
     };
-    const pushUndo = () => {
-      peUndo.push({ ph, snap: phraseSnapshot(parsed, ph) });
-      if (peUndo.length > 50) peUndo.shift();
-    };
+    const pushUndo = () => pushUndoSnap(parsed);
     const focusCell = () => {
       const el = det.querySelector(`.pe-row[data-step="${peCursor.step}"] .pe-c[data-col="${peCursor.col}"]`);
       el?.focus();
@@ -5365,7 +7800,10 @@ const UI = (() => {
               pb[f][k] = v;
               if (v === PT.CMD_NONE) pb[f === 'cmd1' ? 'param1' : 'param2'][k] = 0;
             }
-            markDirty(); rerender(); focusCell();
+            markDirty();
+            // same advance rule as typing and the piano
+            if (advanceOn && f === 'note') peCursor.step = Math.min(PT.STEPS - 1, step + editStep);
+            rerender(); focusCell();
           },
           onRaw: raw => { pushUndo(); if (apply(step, f, raw)) markDirty(); rerender(); focusCell(); },
         });
@@ -5387,7 +7825,7 @@ const UI = (() => {
           pushUndo();
           if (apply(step, f, raw)) markDirty();
         }
-        if (advance && peCursor.step < PT.STEPS - 1) peCursor.step++;
+        if (advance && advanceOn) peCursor.step = Math.min(PT.STEPS - 1, peCursor.step + editStep);
         rerender();
         focusCell();
       };
@@ -5408,7 +7846,103 @@ const UI = (() => {
       });
     };
 
+    // ── Block selection over steps AND columns ──────────
+    const peBox = () => {
+      if (!peSel) return { s0: peCursor.step, s1: peCursor.step, c0: peCursor.col, c1: peCursor.col };
+      return { s0: Math.min(peSel.s0, peSel.s1), s1: Math.max(peSel.s0, peSel.s1),
+               c0: Math.min(peSel.c0, peSel.c1), c1: Math.max(peSel.c0, peSel.c1) };
+    };
+    const paintPeSel = () => {
+      det.querySelectorAll('.pe-c.sel').forEach(c => c.classList.remove('sel'));
+      if (!peSel) { const l = det.querySelector('#pe-selinfo'); if (l) l.textContent = ''; return; }
+      const b = peBox();
+      for (let st = b.s0; st <= b.s1; st++)
+        for (let co = b.c0; co <= b.c1; co++)
+          det.querySelector(`.pe-row[data-step="${st}"] .pe-c[data-col="${co}"]`)?.classList.add('sel');
+      const l = det.querySelector('#pe-selinfo');
+      if (l) l.textContent = `${b.s1-b.s0+1} step${b.s1-b.s0?'s':''} × ${b.c1-b.c0+1} col${b.c1-b.c0?'s':''}`;
+    };
+    const extendPeSel = (st, co) => {
+      if (!peSel) peSel = { s0: peCursor.step, c0: peCursor.col, s1: st, c1: co };
+      else { peSel.s1 = st; peSel.c1 = co; }
+      peCursor = { step: st, col: co };
+      focusCell();
+      paintPeSel();
+    };
+    const clearPeSel = () => { peSel = null; paintPeSel(); };
+    const cellData = (st, co) => {
+      const f = PE_FIELDS[co], k = peKey(ph, st);
+      return { f, v: parsed.phrases[f === 'note' ? 'notes' : f][k] };
+    };
+    const setCellData = (st, co, v) => {
+      const f = PE_FIELDS[co], k = peKey(ph, st);
+      parsed.phrases[f === 'note' ? 'notes' : f][k] = v;
+    };
+    const blankCell = (st, co) => {
+      const f = PE_FIELDS[co];
+      setCellData(st, co, f === 'note' || f === 'instr' ? PT.EMPTY
+        : (f === 'cmd1' || f === 'cmd2') ? PT.CMD_NONE : 0);
+      if (f === 'cmd1') setCellData(st, PE_FIELDS.indexOf('param1'), 0);
+      if (f === 'cmd2') setCellData(st, PE_FIELDS.indexOf('param2'), 0);
+    };
+    const copyPeBlock = () => {
+      const b = peBox();
+      peBlockClip = { h: b.s1 - b.s0 + 1, w: b.c1 - b.c0 + 1, c0: b.c0, cells: [] };
+      for (let st = b.s0; st <= b.s1; st++) {
+        const row = [];
+        for (let co = b.c0; co <= b.c1; co++) row.push(cellData(st, co).v);
+        peBlockClip.cells.push(row);
+      }
+    };
+    const pastePeBlock = () => {
+      if (!peBlockClip) return;
+      pushUndo();
+      const b = peBox();
+      for (let dr = 0; dr < peBlockClip.h; dr++)
+        for (let dc = 0; dc < peBlockClip.w; dc++) {
+          const st = b.s0 + dr;
+          // Paste into the SAME columns it came from. Shifting columns would
+          // drop a 16-bit param into the note column, where it truncates to a
+          // value that is neither a note nor OFF nor empty.
+          const co = peBlockClip.c0 + dc;
+          if (st >= PT.STEPS || co >= PE_FIELDS.length) continue;
+          setCellData(st, co, peBlockClip.cells[dr][dc]);
+        }
+      markDirty(); rerender(); focusCell();
+    };
+    const clearPeBlock = () => {
+      pushUndo();
+      const b = peBox();
+      for (let st = b.s0; st <= b.s1; st++)
+        for (let co = b.c0; co <= b.c1; co++) blankCell(st, co);
+      markDirty(); rerender(); focusCell();
+    };
+    // Transpose only the notes inside the selection (or the whole phrase
+    // when nothing is selected), so half a phrase can be moved.
+    const transposeSel = d => {
+      // With a selection that excludes the note column, transposing notes
+      // would be a surprise; treat it as a no-op instead.
+      if (peSel) {
+        const bb = peBox();
+        if (bb.c0 > 0) { setCacheBar('Select the note column to transpose those steps.', false); return; }
+      }
+      pushUndo();
+      const b = peSel ? peBox() : { s0: 0, s1: PT.STEPS - 1 };
+      for (let st = b.s0; st <= b.s1; st++) {
+        const k = peKey(ph, st), v = parsed.phrases.notes[k];
+        if (v === PT.EMPTY || v === PT.NOTE_OFF) continue;
+        const nv = v + d;
+        if (nv >= 0 && nv <= 119) parsed.phrases.notes[k] = nv;
+      }
+      markDirty(); rerender(); focusCell();
+    };
     det.querySelectorAll('.pe-c').forEach(cell => {
+      cell.addEventListener('mousedown', ev => {
+        const st = parseInt(cell.closest('.pe-row').dataset.step, 10);
+        const co = parseInt(cell.dataset.col, 10);
+        if (ev.shiftKey) { ev.preventDefault(); extendPeSel(st, co); }
+        else { peCursor = { step: st, col: co }; clearPeSel(); }
+      });
       cell.addEventListener('focus', () => {
         peCursor = { step: parseInt(cell.closest('.pe-row').dataset.step, 10), col: parseInt(cell.dataset.col, 10) };
         det.querySelectorAll('.pe-row').forEach(r => r.classList.toggle('cur', r.dataset.step == peCursor.step));
@@ -5419,28 +7953,22 @@ const UI = (() => {
         const mod = ev.metaKey || ev.ctrlKey;
         if (mod && ev.key.toLowerCase() === 'z') {
           ev.preventDefault();
-          const u = peUndo.pop();
-          if (u) { phraseRestore(parsed, u.ph, u.snap); markDirty(); rerender(); focusCell(); }
+          if (ev.shiftKey ? redoSong(parsed) : undoSong(parsed)) { markDirty(); rerender(); focusCell(); }
           return;
         }
-        if (mod && ev.key.toLowerCase() === 'c') {
+        if (mod && ev.key.toLowerCase() === 'a') {
           ev.preventDefault();
-          const st = PT.phraseStep(parsed, ph, step);
-          peClipRow = { note: st.note, instr: st.instr, cmd1: st.cmd1, param1: st.param1, cmd2: st.cmd2, param2: st.param2 };
+          peSel = { s0: 0, c0: 0, s1: PT.STEPS - 1, c1: PE_FIELDS.length - 1 };
+          paintPeSel();
           return;
         }
-        if (mod && ev.key.toLowerCase() === 'v') {
-          ev.preventDefault();
-          if (!peClipRow) return;
-          pushUndo();
-          const k = peKey(ph, step), p = parsed.phrases;
-          p.notes[k] = peClipRow.note; p.instr[k] = peClipRow.instr;
-          p.cmd1[k] = peClipRow.cmd1; p.param1[k] = peClipRow.param1;
-          p.cmd2[k] = peClipRow.cmd2; p.param2[k] = peClipRow.param2;
-          markDirty(); rerender(); focusCell();
+        if (mod && ev.key.toLowerCase() === 'c') { ev.preventDefault(); copyPeBlock(); return; }
+        if (mod && ev.key.toLowerCase() === 'v') { ev.preventDefault(); pastePeBlock(); return; }
+        if (ev.key === 'Escape') {
+          ev.preventDefault(); ev.stopPropagation();
+          if (peSel) clearPeSel(); else cell.blur();
           return;
         }
-        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); cell.blur(); return; }
         // Piano entry: only in the note column, only when switched on, and
         // never while a modifier is held (so ⌘C/⌘V/⌘Z still work).
         if (pianoOn && f === 'note' && !mod && !ev.altKey) {
@@ -5468,19 +7996,27 @@ const UI = (() => {
                 pb.instr[k] = parsed.instruments[0].id;
             }
             markDirty();
-            if (pianoStep > 0) peCursor.step = Math.min(PT.STEPS - 1, step + pianoStep);
+            if (advanceOn) peCursor.step = Math.min(PT.STEPS - 1, step + editStep);
             rerender(); focusCell();
             return;
           }
         }
+        const peMove = (ns, nc) => {
+          ev.preventDefault();
+          if (ev.shiftKey) extendPeSel(ns, nc);
+          else { clearPeSel(); peCursor = { step: ns, col: nc }; focusCell(); }
+        };
         switch (ev.key) {
-          case 'ArrowUp':    ev.preventDefault(); peCursor.step = Math.max(0, step - 1); focusCell(); break;
-          case 'ArrowDown':  ev.preventDefault(); peCursor.step = Math.min(PT.STEPS - 1, step + 1); focusCell(); break;
-          case 'ArrowLeft':  ev.preventDefault(); peCursor.col = Math.max(0, col - 1); focusCell(); break;
-          case 'ArrowRight': ev.preventDefault(); peCursor.col = Math.min(PE_FIELDS.length - 1, col + 1); focusCell(); break;
+          case 'ArrowUp':    return peMove(Math.max(0, step - 1), col);
+          case 'ArrowDown':  return peMove(Math.min(PT.STEPS - 1, step + 1), col);
+          case 'ArrowLeft':  return peMove(step, Math.max(0, col - 1));
+          case 'ArrowRight': return peMove(step, Math.min(PE_FIELDS.length - 1, col + 1));
           case 'Enter':      ev.preventDefault(); beginEdit(cell); break;
           case 'Delete': case 'Backspace':
-            ev.preventDefault(); pushUndo(); clearCell(step, f); markDirty(); rerender(); focusCell(); break;
+            ev.preventDefault();
+            if (peSel) clearPeBlock();
+            else { pushUndo(); clearCell(step, f); markDirty(); rerender(); focusCell(); }
+            break;
           default:
             // printable character starts an edit seeded with that character
             if (ev.key.length === 1 && !mod) { ev.preventDefault(); beginEdit(cell, ev.key); }
@@ -5488,20 +8024,9 @@ const UI = (() => {
       });
     });
 
+    paintPeSel();      // restore the block selection across the re-render
     det.querySelectorAll('[data-tsp]').forEach(b =>
-      b.addEventListener('click', () => {
-        const d = parseInt(b.dataset.tsp, 10);
-        pushUndo();
-        for (let st = 0; st < PT.STEPS; st++) {
-          const k = peKey(ph, st), v = parsed.phrases.notes[k];
-          if (v !== PT.EMPTY && v !== PT.NOTE_OFF) {
-            const nv = v + d;
-            if (nv >= 0 && nv <= 119) parsed.phrases.notes[k] = nv;
-          }
-        }
-        markDirty();
-        rerender();
-      }));
+      b.addEventListener('click', () => transposeSel(parseInt(b.dataset.tsp, 10))));
     // Insert/delete a step, shifting the rest of the phrase. Insert drops
     // whatever falls off the end; delete leaves a blank last step.
     const PF = ['notes', 'instr', 'cmd1', 'param1', 'cmd2', 'param2'];
@@ -5558,14 +8083,14 @@ const UI = (() => {
     });
     det.querySelector('#btn-ph-octdn')?.addEventListener('click', () => { setPianoOct(pianoOct - 1); rerender(); focusCell(); });
     det.querySelector('#btn-ph-octup')?.addEventListener('click', () => { setPianoOct(pianoOct + 1); rerender(); focusCell(); });
-    det.querySelector('#btn-ph-stepdn')?.addEventListener('click', () => { setPianoStep(pianoStep - 1); rerender(); focusCell(); });
-    det.querySelector('#btn-ph-stepup')?.addEventListener('click', () => { setPianoStep(pianoStep + 1); rerender(); focusCell(); });
+    det.querySelector('#btn-ph-adv')?.addEventListener('click', () => { setAdvance(!advanceOn); rerender(); focusCell(); });
+    det.querySelector('#btn-ph-stepdn')?.addEventListener('click', () => { setEditStep(editStep - 1); rerender(); focusCell(); });
+    det.querySelector('#btn-ph-stepup')?.addEventListener('click', () => { setEditStep(editStep + 1); rerender(); focusCell(); });
     det.querySelector('#btn-ph-undo').addEventListener('click', () => {
-      const u = peUndo.pop();
-      if (!u) return;
-      phraseRestore(parsed, u.ph, u.snap);
-      markDirty();
-      rerender();
+      if (undoSong(parsed)) { markDirty(); rerender(); }
+    });
+    det.querySelector('#btn-ph-redo').addEventListener('click', () => {
+      if (redoSong(parsed)) { markDirty(); rerender(); }
     });
   }
 
@@ -5585,8 +8110,9 @@ const UI = (() => {
     const nP = dirtyPhrases.get(d)?.size ?? 0;
     const nC = dirtyChains.get(d)?.size ?? 0;
     const gridDirty = dirtyGrid.has(d);
+    const tDirty = dirtyTables.has(d), gDirty = dirtyGrooves.has(d);
     let bar = host.querySelector('#pv-save-bar');
-    if (!nP && !nC && !gridDirty) { bar?.remove(); return; }
+    if (!nP && !nC && !gridDirty && !tDirty && !gDirty) { bar?.remove(); return; }
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'pv-save-bar';
@@ -5595,24 +8121,124 @@ const UI = (() => {
     }
     const parts = [];
     if (gridDirty) parts.push('song grid');
+    if (tDirty) parts.push('tables');
+    if (gDirty) parts.push('grooves');
     if (nC) parts.push(`${nC} chain${nC>1?'s':''}`);
     if (nP) parts.push(`${nP} phrase${nP>1?'s':''}`);
     bar.innerHTML = `<span>✎ ${parts.join(' · ')} edited (in memory only)</span>
       <span style="flex:1"></span>
       <button class="btn sm" id="btn-save-edits">💾 Save edits to card</button>
       <button class="btn ghost sm" id="btn-discard-edits">Discard</button>`;
-    bar.querySelector('#btn-save-edits').addEventListener('click', () => saveEdits(host));
+    bar.querySelector('#btn-save-edits').addEventListener('click', () => {
+      const parsed = modalProj && fullCache.get(modalProj.dirName);
+      if (!parsed) { saveEdits(host); return; }
+      showSavePreview(modalProj, parsed, () => saveEdits(host));
+    });
     bar.querySelector('#btn-discard-edits').addEventListener('click', async () => {
       if (!confirm(`Discard ${dirtySummary(modalProj.dirName)} in ${modalProj.name}?\n\nThis cannot be undone.`)) return;
       dirtyPhrases.delete(modalProj.dirName);
       dirtyChains.delete(modalProj.dirName);
       dirtyGrid.delete(modalProj.dirName);
+      dirtyTables.delete(modalProj.dirName);
+      dirtyGrooves.delete(modalProj.dirName);
       fullCache.delete(modalProj.dirName);
       openProjModal(modalProj.dirName);
     });
   }
 
+  const tableDiffers = (a, b) => {
+    for (let c = 0; c < 3; c++) {
+      const ac = a.cmd[c], bc = b.cmd[c], ap = a.param[c], bp = b.param[c];
+      if (!!ac !== !!bc || !!ap !== !!bp) return true;
+      if (ac && bc) for (let i = 0; i < ac.length; i++) if (ac[i] !== bc[i]) return true;
+      if (ap && bp) for (let i = 0; i < ap.length; i++) if (ap[i] !== bp[i]) return true;
+    }
+    return false;
+  };
   let saveInFlight = false;
+  // ── What will be written ───────────────────────────────
+  // Two data-loss bugs got past review; being shown the change before it
+  // goes to the card is the cheapest defence against the next one.
+  function describePendingEdits(p, parsed) {
+    const onCard = fullCacheClean.get(p.dirName);
+    const out = { grid: [], chains: [], phrases: [], tables: [], grooves: [] };
+    if (!onCard) return null;
+    const last = Math.max(PT.lastSongRow(parsed), PT.lastSongRow(onCard));
+    for (let r = 0; r <= last; r++)
+      for (let t = 0; t < PT.CHANNELS; t++) {
+        const a = PT.gridCell(onCard, r, t), b = PT.gridCell(parsed, r, t);
+        if (a !== b) out.grid.push({ row: r, ch: t, from: a, to: b });
+      }
+    for (let c = 0; c < PT.CHAIN_COUNT; c++) {
+      let changed = false;
+      for (let st = 0; st < PT.STEPS && !changed; st++) {
+        const k = c * PT.STEPS + st;
+        if (onCard.chains[k] !== parsed.chains[k] || onCard.transposes[k] !== parsed.transposes[k]) changed = true;
+      }
+      if (changed) out.chains.push(c);
+    }
+    const nPh = parsed.geometry?.phraseCount ?? PT.PHRASE_COUNT;
+    for (let ph = 0; ph < nPh; ph++) {
+      let changed = false;
+      for (let st = 0; st < PT.STEPS && !changed; st++) {
+        const k = ph * PT.STEPS + st;
+        for (const f of ['notes', 'instr', 'cmd1', 'param1', 'cmd2', 'param2'])
+          if (onCard.phrases[f][k] !== parsed.phrases[f][k]) { changed = true; break; }
+      }
+      if (changed) out.phrases.push(ph);
+    }
+    for (const tb of parsed.tables || []) {
+      const before = onCard.tables?.find(x => x.id === tb.id);
+      if (before && tableDiffers(before, tb)) out.tables.push(tb.id);
+    }
+    if (parsed.grooveRaw && onCard.grooveRaw)
+      for (let g = 0; g < PT.GROOVE_COUNT; g++) {
+        let changed = false;
+        for (let st = 0; st < PT.STEPS && !changed; st++) {
+          const k = g * PT.STEPS + st;
+          if (onCard.grooveRaw[k] !== parsed.grooveRaw[k]) changed = true;
+        }
+        if (changed) out.grooves.push(g);
+      }
+    return out;
+  }
+  function showSavePreview(p, parsed, onConfirm) {
+    const d = describePendingEdits(p, parsed);
+    const box = $('savep-body');
+    if (!d) {
+      box.innerHTML = '<div class="center-note">Could not read the version on the card to compare against. Saving will still verify the write byte-for-byte afterwards.</div>';
+    } else if (!d.grid.length && !d.chains.length && !d.phrases.length && !d.tables.length && !d.grooves.length) {
+      box.innerHTML = '<div class="center-note">Nothing differs from what is already on the card.</div>';
+    } else {
+      const cellTxt = v => v === PT.EMPTY ? '--' : PT.hx2(v);
+      box.innerHTML = `
+        ${d.grid.length ? `<div class="savep-sec"><h4>Song grid — ${d.grid.length} cell${d.grid.length>1?'s':''}</h4>
+          ${d.grid.slice(0, 60).map(g => `<div class="savep-row">
+            <span class="savep-at">row ${PT.hx2(g.row)} · ch ${g.ch + 1}</span>
+            <span class="savep-from">${cellTxt(g.from)}</span><span class="savep-arrow">→</span>
+            <span class="savep-to">${cellTxt(g.to)}</span></div>`).join('')}
+          ${d.grid.length > 60 ? `<div class="savep-more">…and ${d.grid.length - 60} more</div>` : ''}</div>` : ''}
+        ${d.chains.length ? `<div class="savep-sec"><h4>Chains — ${d.chains.length}</h4>
+          <div class="savep-list">${d.chains.map(c => PT.hx2(c)).join(' ')}</div></div>` : ''}
+        ${d.phrases.length ? `<div class="savep-sec"><h4>Phrases — ${d.phrases.length}</h4>
+          <div class="savep-list">${d.phrases.map(x => PT.hx2(x)).join(' ')}</div></div>` : ''}
+        ${d.tables.length ? `<div class="savep-sec"><h4>Tables — ${d.tables.length}</h4>
+          <div class="savep-list">${d.tables.map(x => PT.hx2(x)).join(' ')}</div></div>` : ''}
+        ${d.grooves.length ? `<div class="savep-sec"><h4>Grooves — ${d.grooves.length}</h4>
+          <div class="savep-list">${d.grooves.map(x => PT.hx2(x)).join(' ')}</div></div>` : ''}`;
+    }
+    $('savep-title').textContent = `Save ${p.name} to the card`;
+    $('save-preview').classList.add('open');
+    const go = $('btn-savep-go'), no = $('btn-savep-cancel');
+    const close = () => {
+      $('save-preview').classList.remove('open');
+      go.replaceWith(go.cloneNode(true));
+      no.replaceWith(no.cloneNode(true));
+    };
+    go.onclick = () => { close(); onConfirm(); };
+    no.onclick = close;
+  }
+
   async function saveEdits(host) {
     if (saveInFlight) return;                 // double-click must not run two passes
     const p = modalProj;
@@ -5635,8 +8261,28 @@ const UI = (() => {
       const { file: curFile, bytes: curBytes, text } = await readCardFileForEdit(projPath, p.datName);
       if (curFile.lastModified !== p.lastModified || curFile.size !== p.fileSize)
         throw new Error('project changed on card since the last scan — rescan first (nothing written)');
-      const res = PT.rewriteSongSections(text, parsed);
+      let res = PT.rewriteSongSections(text, parsed);
       if (!res.ok) throw new Error(res.error);
+      if (dirtyGrooves.has(p.dirName)) {
+        const g = PT.rewriteGrooves(res.text, parsed);
+        if (!g.ok) throw new Error(g.error);
+        res = g;
+      }
+      if (dirtyTables.has(p.dirName)) {
+        const clean = fullCacheClean.get(p.dirName);
+        for (const tb of parsed.tables) {
+          // Only touch tables that actually differ. Empty tables are often
+          // self-closing in the file, which rewriteTable cannot edit — and
+          // rewriting all of them would abort the whole save over a table
+          // the user never opened.
+          if (!tb.cmd.some(Boolean)) continue;
+          const before = clean?.tables?.find(x => x.id === tb.id);
+          if (before && !tableDiffers(before, tb)) continue;
+          const r2 = PT.rewriteTable(res.text, PT.hx2(tb.id), tb);
+          if (!r2.ok) throw new Error(r2.error);
+          res = r2;
+        }
+      }
       setBar('Backing up…');
       original = curBytes;
       await writeCardFile(`PTLibrarian_Backups/${stamp}/${p.dirName}`, p.datName, curBytes);
@@ -5654,9 +8300,26 @@ const UI = (() => {
       for (const f of ['grid','chains','transposes'])
         if (!same([...reread[f]], [...parsed[f]]))
           throw new Error(`verification failed: ${f} mismatch after write`);
+      if (dirtyGrooves.has(p.dirName) && parsed.grooveRaw && reread.grooveRaw &&
+          !same([...reread.grooveRaw], [...parsed.grooveRaw]))
+        throw new Error('verification failed: grooves mismatch after write');
+      if (dirtyTables.has(p.dirName))
+        for (let ti = 0; ti < parsed.tables.length; ti++) {
+          const a = parsed.tables[ti], b2 = reread.tables[ti];
+          if (!a.cmd.some(Boolean)) continue;      // nothing writable in this slot
+          if (!b2) throw new Error(`verification failed: table ${ti} missing after write`);
+          for (let col = 0; col < 3; col++) {
+            if (a.cmd[col] && b2.cmd[col] && !same([...b2.cmd[col]], [...a.cmd[col]]))
+              throw new Error(`verification failed: table ${PT.hx2(a.id)} cmd${col+1} mismatch`);
+            if (a.param[col] && b2.param[col] && !same([...b2.param[col]], [...a.param[col]]))
+              throw new Error(`verification failed: table ${PT.hx2(a.id)} param${col+1} mismatch`);
+          }
+        }
       const eP = dirtyPhrases.get(p.dirName), eC = dirtyChains.get(p.dirName);
       const what = [
         dirtyGrid.has(p.dirName) ? 'song grid' : null,
+        dirtyTables.has(p.dirName) ? 'tables' : null,
+        dirtyGrooves.has(p.dirName) ? 'grooves' : null,
         eC?.size ? `chains [${[...eC].map(PT.hx2).join(' ')}]` : null,
         eP?.size ? `phrases [${[...eP].map(PT.hx2).join(' ')}]` : null,
       ].filter(Boolean).join(', ');
@@ -5665,6 +8328,8 @@ const UI = (() => {
       dirtyPhrases.delete(p.dirName);
       dirtyChains.delete(p.dirName);
       dirtyGrid.delete(p.dirName);
+      dirtyTables.delete(p.dirName);
+      dirtyGrooves.delete(p.dirName);
       updateSaveBar(host);
       await persist();
       setCacheBar('Edits saved and verified — rescanning…', true);
@@ -5673,6 +8338,10 @@ const UI = (() => {
       // new mtime instead of failing the guard silently
       modalProj = projByDir(p.dirName) ?? modalProj;
       fullCache.set(p.dirName, parsed);
+      // the card now matches what's in memory: re-baseline the diff source,
+      // or the next save preview lists changes that are already written
+      try { fullCacheClean.set(p.dirName, PT.parseProject(await (await readCardFile(projPath, p.datName)).text())); }
+      catch { fullCacheClean.delete(p.dirName); }
     } catch(e) {
       // Only roll back if the failure happened before the write verified.
       // Afterwards the card is correct and reverting would destroy a good
@@ -7726,7 +10395,11 @@ const UI = (() => {
     $('proj-modal').addEventListener('click', e => { if (e.target === $('proj-modal')) closeProjModal(); });
     $('btn-modal-prev').addEventListener('click', () => modalNav(-1));
     $('btn-modal-next').addEventListener('click', () => modalNav(1));
+    $('btn-new-project').addEventListener('click', createProject);
+    $('btn-modal-wav').addEventListener('click', () => modalProj && renderToWav(modalProj, false));
+    $('btn-modal-stems').addEventListener('click', () => modalProj && renderToWav(modalProj, true));
     $('tr-stop').addEventListener('click', () => SongPlayer.stop());
+    wireTransport();
     $('btn-modal-play').addEventListener('click', async () => {
       if (SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
       if (!modalProj) return;
@@ -7746,6 +10419,7 @@ const UI = (() => {
     });
     $('btn-modal-patterns').addEventListener('click', togglePatternView);
     $('btn-modal-overview').addEventListener('click', () => setModalTab('overview'));
+    $('btn-modal-tables').addEventListener('click', toggleTablesView);
     $('btn-modal-midi').addEventListener('click', exportMidi);
     $('btn-modal-diff').addEventListener('click', () => modalProj && startDiff(modalProj));
 
@@ -7849,13 +10523,23 @@ const UI = (() => {
 
     // Keyboard
     window.addEventListener('beforeunload', e => {
-      const any = dirtyGrid.size || dirtyPhrases.size || dirtyChains.size;
+      const any = dirtyGrid.size || dirtyPhrases.size || dirtyChains.size ||
+                  dirtyTables.size || dirtyGrooves.size;
       if (any) { e.preventDefault(); e.returnValue = ''; }
     });
     document.addEventListener('keydown', e => {
-      const inInput = /^(input|select|textarea)$/i.test(e.target.tagName);
+      // The effects panel is mostly buttons, and clicking a button
+      // focuses it — without this, picking a phosphor and then typing
+      // anything would fire the app-wide tab and view shortcuts.
+      const inInput = /^(input|select|textarea)$/i.test(e.target.tagName)
+        || !!(e.target.closest && e.target.closest('#fx-panel'));
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); lib && openSearch(); return; }
       if (e.key === 'Escape') {
+        // the save preview sits above everything; dismiss it alone
+        if ($('save-preview').classList.contains('open')) {
+          $('save-preview').classList.remove('open');
+          return;
+        }
         closeSearch(); closeDiff(); closeFixModal(); closeSlicer();
         $('samp-modal').classList.remove('open');
         closeProjModal();
@@ -7866,6 +10550,23 @@ const UI = (() => {
       if ($('slice-modal').style.display !== 'none' || $('fix-modal').classList.contains('open') ||
           $('diff-modal').classList.contains('open') || $('samp-modal').classList.contains('open')) return;
       if ($('proj-modal').style.display !== 'none') {
+        // Space plays what you're looking at: the open phrase, else the open
+        // chain, else the whole song. Stops if something is already going.
+        if (e.key === ' ' && !inInput) {
+          e.preventDefault();
+          if (SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
+          const sec = $('modal-pattern-section');
+          const parsed = modalProj && fullCache.get(modalProj.dirName);
+          if (!parsed) { $('btn-modal-play').click(); return; }
+          const phEl = sec?.querySelector('#pv-phrase-detail');
+          const chEl = sec?.querySelector('#pv-chain-detail');
+          if (sec && sec.style.display !== 'none' && phEl?.style.display !== 'none' && phEl?.dataset.phrase !== undefined) {
+            previewPhrase(parsed, parseInt(phEl.dataset.phrase, 10), phEl.querySelector('#btn-ph-play') || phEl);
+          } else if (sec && sec.style.display !== 'none' && chEl?.style.display !== 'none' && chEl?.dataset.chain !== undefined) {
+            previewChain(modalProj, parsed, parseInt(chEl.dataset.chain, 10), chEl.querySelector('.cp-play') || chEl);
+          } else $('btn-modal-play').click();
+          return;
+        }
         // Don't steal the arrows from an editor: the phrase grid, chain
         // steps and song grid all navigate with them. Project-to-project
         // nav only applies when nothing editable has focus.
@@ -7892,10 +10593,8 @@ const UI = (() => {
     const usbStatus = (msg, connected) => {
       $('usb-status').textContent = msg;
       $('btn-usb-refresh').disabled = !connected;
-      $('btn-usb-png').disabled = !connected;
-      $('btn-usb-full').disabled = !connected;
-      $('btn-usb-popout').disabled = !connected;
       $('btn-usb-input').disabled = !connected;
+      Mirror.invalidate();
       $('btn-usb-connect').textContent = connected ? 'DISCONNECT' : 'CONNECT USB';
       if (!connected && usbInput) toggleUsbInput();
     };
@@ -7933,32 +10632,20 @@ const UI = (() => {
     $('btn-usb-connect').addEventListener('click', () =>
       USB.isConnected() ? USB.disconnect() : USB.connect(usbStatus));
     $('btn-usb-refresh').addEventListener('click', () => USB.requestRefresh());
-    $('btn-usb-png').addEventListener('click', () => USB.snapshotPng());
+    $('btn-usb-png').addEventListener('click', () => Mirror.snapshotPng());
     $('btn-usb-full').addEventListener('click', () => {
       if (document.fullscreenElement) document.exitFullscreen();
       else $('usb-stage').requestFullscreen?.().catch(() => {});
     });
-    let popWin = null, popRaf = 0;
-    $('btn-usb-popout').addEventListener('click', () => {
-      if (popWin && !popWin.closed) { popWin.focus(); return; }
-      popWin = window.open('', 'pt-mirror', 'width=800,height=620');
-      if (!popWin) return;
-      popWin.document.title = 'picoTracker mirror';
-      popWin.document.body.style.cssText = 'margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh';
-      const pc = popWin.document.createElement('canvas');
-      pc.width = 960; pc.height = 720;
-      pc.style.cssText = 'max-width:100vw;max-height:100vh;aspect-ratio:4/3;image-rendering:pixelated';
-      popWin.document.body.appendChild(pc);
-      const pctx = pc.getContext('2d');
-      const src = $('usb-canvas');
-      cancelAnimationFrame(popRaf);
-      const blit = () => {
-        if (!popWin || popWin.closed) return;
-        pctx.drawImage(src, 0, 0);
-        popRaf = requestAnimationFrame(blit);
-      };
-      blit();
+    $('btn-usb-popout').addEventListener('click', () => Mirror.popOut());
+    $('btn-usb-fx').addEventListener('click', () => {
+      const panel = $('fx-panel');
+      const hide = panel.style.display !== 'none';
+      panel.style.display = hide ? 'none' : 'flex';
+      $('btn-usb-fx').classList.toggle('on', !hide);
     });
+    $('btn-usb-fx').classList.add('on');
+    Mirror.init();
 
     // PWA: register the service worker when served over http(s); the
     // file:// case (opening index.html directly) skips it silently.

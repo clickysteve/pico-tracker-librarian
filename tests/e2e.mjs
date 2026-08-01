@@ -30,7 +30,12 @@ const closeProjectModal = async () => {
 };
 
 const errors = [];
-const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
+// --enable-unsafe-swiftshader gives headless Chromium a software WebGL
+// stack, which the mirror's output effects need. Real browsers use the GPU.
+const browser = await chromium.launch({
+  ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+  args: ['--enable-unsafe-swiftshader'],
+});
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 // The app now confirms destructive/unsaved-work actions; accept them all.
 page.on('dialog', d => d.accept());
@@ -114,15 +119,19 @@ await page.evaluate(() => {
   window.__pushBytes(out);
 });
 await page.waitForTimeout(300);
+// USB now paints into an offscreen source canvas; Mirror owns whatever is
+// on screen, so the glyph check reads the source directly.
 const usb = await page.evaluate(() => {
-  const c = document.getElementById('usb-canvas');
+  const c = USB.sourceCanvas();
   const d = c.getContext('2d').getImageData(0, 0, c.width, 300).data;
   let lit = 0;
   for (let i = 0; i < d.length; i += 16) if (d[i] > 60 || d[i+2] > 60) lit++;
-  return { lit, refreshSent: window.__writes.some(w => w[0] === 0xFE && w[1] === 0x02) };
+  return { lit, refreshSent: window.__writes.some(w => w[0] === 0xFE && w[1] === 0x02),
+           w: c.width, h: c.height };
 });
 check('usb: refresh request sent on connect', usb.refreshSent);
 check('usb: glyphs rendered on canvas', usb.lit > 100);
+check('usb: source canvas is the full device screen at 3x', usb.w === 960 && usb.h === 720);
 
 // ── 6. remote input is disabled (device reacted to the opcode) ──
 check('input: button hidden pending firmware agreement', await page.evaluate(() =>
@@ -194,6 +203,12 @@ await page.keyboard.press('Enter');       // choose the highlighted entry
 await page.waitForTimeout(250);
 check('editor: dirty bar appears', await page.evaluate(() => !!document.getElementById('pv-save-bar')));
 await page.click('#btn-save-edits');
+await page.waitForTimeout(400);
+check('save preview: opens before writing', await page.evaluate(() =>
+  document.getElementById('save-preview').classList.contains('open')));
+check('save preview: lists what will change', await page.evaluate(() =>
+  /Phrases|Song grid|Chains/.test(document.getElementById('savep-body').textContent)));
+await page.click('#btn-savep-go');
 await page.waitForTimeout(2000);
 // reopen the same project fresh and confirm the edit persisted in the (in-memory) card
 const firstProj = await page.evaluate(() => document.querySelector('.proj-item')?.dataset.proj);
@@ -250,18 +265,52 @@ await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
 await page.waitForTimeout(250);
 check('chain: step list is editable', await page.evaluate(() =>
   document.querySelectorAll('.pv-cstep [data-f="phrase"][tabindex="0"]').length === 16));
-// the phrase column is a pick list; transpose stays free-text (it's a number)
+// Chain cells behave like song-grid cells: click selects, Enter (or typing)
+// opens the picker, Delete clears. Clicking must NOT open the picker.
 await page.evaluate(() => {
   const c = document.querySelector('.pv-cstep [data-f="phrase"]');
   c.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 });
 await page.waitForTimeout(250);
-check('chain: phrase column opens a pick list', await page.evaluate(() => !!document.querySelector('.pick')));
+check('chain: clicking a phrase cell selects it rather than opening the picker',
+  await page.evaluate(() => !document.querySelector('.pick') &&
+    document.activeElement?.dataset?.f === 'phrase'));
+// Delete clears the value in place
+const hadPhrase = await page.evaluate(() =>
+  document.querySelector('.pv-cstep [data-f="phrase"]').textContent.trim());
+await page.evaluate(() => document.activeElement.dispatchEvent(
+  new KeyboardEvent('keydown', { key: 'Delete', bubbles: true })));
+await page.waitForTimeout(300);
+check('chain: Delete clears a phrase cell without opening the picker',
+  hadPhrase !== '--' && await page.evaluate(() =>
+    document.querySelector('.pv-cstep [data-f="phrase"]').textContent.trim() === '--'));
+// Enter opens the picker
+await page.evaluate(() => {
+  const c = document.querySelector('.pv-cstep [data-f="phrase"]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+});
+await page.waitForTimeout(250);
+check('chain: Enter opens the pick list', await page.evaluate(() => !!document.querySelector('.pick')));
 await page.keyboard.press('Escape');          // dismiss the picker, not the project
 await page.waitForTimeout(150);
+// put the phrase back so later assertions still have one
+await page.evaluate(hp => {
+  const c = document.querySelector('.pv-cstep [data-f="phrase"]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  setTimeout(() => {
+    const f = document.querySelector('.pick-filter');
+    if (f) { f.value = hp; f.dispatchEvent(new Event('input', { bubbles: true })); }
+  }, 60);
+}, hadPhrase);
+await page.waitForTimeout(300);
+await page.keyboard.press('Enter');
+await page.waitForTimeout(300);
 await page.evaluate(() => {
   const c = document.querySelector('.pv-cstep [data-f="transpose"]');
-  c.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 });
 await page.waitForTimeout(200);
 await page.evaluate(() => { const i = document.querySelector('.pv-cstep .pe-edit'); if (i) i.value = '-5'; });
@@ -273,6 +322,8 @@ check('chain: transpose shows the new value', await page.evaluate(() =>
   document.querySelector('.pv-cstep [data-f="transpose"]')?.textContent.trim() === '-5'));
 // save and confirm it survived the write + reparse
 await page.click('#btn-save-edits');
+await page.waitForTimeout(400);
+await page.click('#btn-savep-go');
 await page.waitForTimeout(2500);
 check('arrangement: save cleared the dirty bar', await page.evaluate(() =>
   !document.getElementById('pv-save-bar')));
@@ -590,6 +641,148 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(1200);
 
+// ── 7a4. v0.9.8 feature sweep ───────────────────────────
+// the discard above reloaded the project onto the Overview tab
+await page.click('#btn-modal-patterns');
+await page.waitForTimeout(500);
+// jump to any chain/phrase without touching the arrangement
+await page.click('#btn-pv-jump');
+await page.waitForTimeout(250);
+check('jump: opens a chain/phrase picker', await page.evaluate(() => !!document.querySelector('.pick')));
+check('jump: offers slots that are not in the song', await page.evaluate(() =>
+  [...document.querySelectorAll('.pick-group')].some(g => g.textContent === 'Empty')));
+await page.evaluate(() => {
+  const f = document.querySelector('.pick-filter');
+  f.value = 'p 7F';
+  f.dispatchEvent(new Event('input', { bubbles: true }));
+});
+await page.waitForTimeout(200);
+await page.keyboard.press('Enter');
+await page.waitForTimeout(350);
+check('jump: reaching an unplaced phrase opens the editor', await page.evaluate(() =>
+  document.getElementById('pv-phrase-detail')?.dataset.phrase === '127'));
+
+// phrase block selection + selection-scoped transpose
+await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
+await page.waitForTimeout(250);
+await page.evaluate(() => document.querySelector('.pv-cstep .cgo:not(.off)')?.click());
+await page.waitForTimeout(300);
+check('phrase: usage is stated in the header', await page.evaluate(() =>
+  /used|not referenced|shared/.test(document.querySelector('#pv-phrase-detail .usage-note')?.textContent || '')));
+check('phrase: breadcrumb back to the chain', await page.evaluate(() =>
+  !!document.querySelector('#pv-phrase-detail .pe-crumb a')));
+check('phrase: selection block marks cells', await page.evaluate(async () => {
+  const c = document.querySelector('.pe-row[data-step="0"] .pe-c[data-col="0"]');
+  c.focus();
+  c.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 80));
+  return document.querySelectorAll('.pe-c.sel').length === 2;
+}));
+check('phrase: clone button offered', await page.evaluate(() => !!document.getElementById('btn-ph-clone')));
+
+// tables and grooves
+await page.click('#btn-modal-tables');
+await page.waitForTimeout(450);
+check('tables: the tab renders a table grid', await page.evaluate(() =>
+  document.querySelectorAll('#modal-tables-section .tg-row').length === 16));
+check('tables: groove steps are editable', await page.evaluate(() =>
+  document.querySelectorAll('#modal-tables-section .tg-gs[tabindex="0"]').length >= 16));
+await page.evaluate(() => {
+  const g = document.querySelector('#modal-tables-section .tg-gs');
+  g.focus();
+  g.dispatchEvent(new KeyboardEvent('keydown', { key: '8', bubbles: true }));
+});
+await page.waitForTimeout(250);
+await page.evaluate(() => {
+  const i = document.querySelector('#modal-tables-section .pe-edit');
+  if (i) { i.value = '8'; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); }
+});
+await page.waitForTimeout(300);
+check('tables: editing a groove step marks the project dirty', await page.evaluate(() =>
+  (document.getElementById('pv-save-bar')?.textContent || '').includes('groove')));
+await page.click('#btn-modal-patterns');
+await page.waitForTimeout(300);
+
+// transport controls
+check('transport: loop and scrub controls present', await page.evaluate(() =>
+  !!document.getElementById('tr-loop') && !!document.getElementById('tr-barwrap')));
+// render buttons
+check('render: WAV and stems offered', await page.evaluate(() =>
+  !!document.getElementById('btn-modal-wav') && !!document.getElementById('btn-modal-stems')));
+// new project button
+check('new project: offered on the projects toolbar', await page.evaluate(() =>
+  !!document.getElementById('btn-new-project')));
+// undo is shared across panes
+check('undo: redo button offered in the phrase editor', await page.evaluate(() =>
+  !!document.getElementById('btn-ph-redo')));
+// auto-advance toggle
+check('advance: toggle and edit-step control present', await page.evaluate(() =>
+  !!document.getElementById('btn-ph-adv') && !!document.getElementById('ph-step')));
+
+// ── 7a5. review-fix regressions ─────────────────────────
+// Undo must cover tables: a table edit followed by Ctrl+Z used to pop a
+// snapshot that predated it and silently revert an unrelated phrase edit.
+await page.click('#btn-modal-tables');
+await page.waitForTimeout(400);
+const tableUndo = await page.evaluate(async () => {
+  const cell = document.querySelector('#modal-tables-section .tg-c.tg-par[tabindex="0"]');
+  if (!cell) return { skipped: true };
+  const before = cell.textContent.trim();
+  cell.focus();
+  cell.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await new Promise(r => setTimeout(r, 120));
+  const inp = document.querySelector('#modal-tables-section .pe-edit');
+  if (!inp) return { skipped: true };
+  inp.value = '0ABC';
+  inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await new Promise(r => setTimeout(r, 250));
+  const after = document.querySelector('#modal-tables-section .tg-c.tg-par')?.textContent.trim();
+  const c2 = document.querySelector('#modal-tables-section .tg-c.tg-par[tabindex="0"]');
+  c2.focus();
+  c2.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 250));
+  const undone = document.querySelector('#modal-tables-section .tg-c.tg-par')?.textContent.trim();
+  return { before, after, undone };
+});
+if (!tableUndo.skipped) {
+  check('undo: a table edit is applied', tableUndo.after === '0ABC',
+    `got ${tableUndo.after}`);
+  check('undo: Ctrl+Z reverts the table edit itself',
+    tableUndo.undone === tableUndo.before, `${tableUndo.undone} vs ${tableUndo.before}`);
+}
+// Groove edits must reach the playback timeline, not just the display.
+const grooveEffect = await page.evaluate(async () => {
+  const before = document.getElementById('modal-meta')?.textContent || '';
+  const g = document.querySelector('#modal-tables-section .tg-gs');
+  if (!g) return { skipped: true };
+  g.focus();
+  g.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true }));
+  await new Promise(r => setTimeout(r, 120));
+  const i = document.querySelector('#modal-tables-section .pe-edit');
+  if (!i) return { skipped: true };
+  i.value = '24';                       // much slower than the default 6
+  i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await new Promise(r => setTimeout(r, 300));
+  return { before };
+});
+if (!grooveEffect.skipped) {
+  check('groove: the edit shows in the groove editor', await page.evaluate(() =>
+    document.querySelector('#modal-tables-section .tg-gs')?.textContent.trim() === '24'));
+  check('groove: the project is marked dirty', await page.evaluate(() =>
+    (document.getElementById('pv-save-bar')?.textContent || '').includes('groove')));
+  // undo it so later assertions are not thrown off
+  await page.evaluate(() => {
+    const g = document.querySelector('#modal-tables-section .tg-gs');
+    g.focus();
+    g.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));
+  });
+  await page.waitForTimeout(300);
+  check('groove: Ctrl+Z reverts the groove edit', await page.evaluate(() =>
+    document.querySelector('#modal-tables-section .tg-gs')?.textContent.trim() !== '24'));
+}
+await page.click('#btn-modal-patterns');
+await page.waitForTimeout(400);
+
 // ── 7b. sliced playback uses the wav's own sample rate ──
 // Must run BEFORE the slicer test below, which overwrites Night Bass's
 // markers with 8 equal divisions.
@@ -795,6 +988,47 @@ await page.waitForTimeout(1200);
 check('trash: permanent delete removes the file', await page.evaluate(() =>
   document.querySelectorAll('.btn-trash-restore').length === 0));
 
+// ── 8d. creating a project on the card ──────────────────
+// prompt() drives it, so stub the answers before clicking.
+await closeProjectModal();
+await page.click('.tab-btn[data-tab="projects"]');
+await page.waitForTimeout(300);
+const beforeCount = await page.evaluate(() => document.querySelectorAll('.proj-item').length);
+await page.evaluate(() => {
+  const answers = ['E2E NEW', '128'];
+  let i = 0;
+  window.prompt = () => answers[i++];
+});
+await page.click('#btn-new-project');
+await page.waitForTimeout(3000);
+await closeProjectModal();
+await page.waitForTimeout(400);
+await page.click('.tab-btn[data-tab="projects"]');
+await page.waitForTimeout(400);
+check('new project: appears in the list after creation', await page.evaluate(b =>
+  document.querySelectorAll('.proj-item').length === b + 1, beforeCount));
+check('new project: carries the tempo it was given', await page.evaluate(() => {
+  const row = [...document.querySelectorAll('.proj-item')].find(r => r.textContent.includes('E2E NEW'));
+  return !!row && row.textContent.includes('128');
+}));
+// and it must be immediately editable rather than a dead empty grid
+await page.evaluate(() => {
+  const row = [...document.querySelectorAll('.proj-item')].find(r => r.textContent.includes('E2E NEW'));
+  row?.querySelector('.proj-row')?.click();        // expand first: .btn-det-open lives in the detail
+});
+await page.waitForTimeout(400);
+await page.evaluate(() => {
+  const row = [...document.querySelectorAll('.proj-item')].find(r => r.textContent.includes('E2E NEW'));
+  row?.querySelector('.btn-det-open')?.click();
+});
+await page.waitForTimeout(900);
+await page.evaluate(() => document.getElementById('btn-modal-patterns').click());
+await page.waitForTimeout(500);
+check('new project: its empty grid is editable', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cell.empty[data-row][tabindex="0"]').length > 0));
+await closeProjectModal();
+await page.waitForTimeout(300);
+
 // ── 9. warm reopen of a (mock) real card reads no wav content ──
 await page.evaluate(() => {
   function mkFile(name, content, mtime = 1700000000000) {
@@ -866,6 +1100,196 @@ await page.click('#btn-open');
 await page.waitForTimeout(1500);
 const warmMsg = await page.evaluate(() => document.getElementById('cache-msg').textContent);
 check('warm reopen reads 0 sample heads', warmMsg.includes('0 samples read'));
+
+// ── 30. USB mirror output effects ──────────────────────
+await page.click('.tab-btn[data-tab="device"]');
+await page.waitForTimeout(300);
+const FXPRESETS = await page.evaluate(() => FX.PRESETS.length);
+
+const fxBase = await page.evaluate(() => ({
+  hasGl:   Mirror.hasEffects(),
+  cards:   document.querySelectorAll('.fx-card').length,
+  defs:    FX.DEFS.length,
+  presets: document.querySelectorAll('#fx-preset option').length,
+  outputs: document.querySelectorAll('#fx-output option').length,
+}));
+check('fx: WebGL renderer came up', fxBase.hasGl);
+check('fx: one card per effect definition', fxBase.cards === fxBase.defs && fxBase.cards === 19);
+check('fx: preset list has every preset plus Custom', fxBase.presets === FXPRESETS + 1);
+check('fx: output list is populated', fxBase.outputs === 4);
+
+// Every preset must render without raising a GL error, and must actually
+// change the picture — a preset that silently does nothing is a bug.
+const fxShots = await page.evaluate(async () => {
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const shot = () => {
+    const px = new Uint8Array(cv.width * cv.height * 4);
+    gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let sum = 0, n = 0, sig = '';
+    for (let i = 0; i < px.length; i += 4096) { sum += px[i] + px[i+1] + px[i+2]; n++; sig += px[i] + ','; }
+    return { avg: sum / n, sig, err: gl.getError() };
+  };
+  const out = {};
+  for (const pre of FX.PRESETS) {
+    const st = Mirror.getState();
+    const next = FX.presetState(pre.id);
+    st.enabled = next.enabled; st.params = next.params; st.preset = next.preset;
+    st.on = pre.id !== 'off';
+    Mirror.syncUI(); Mirror.invalidate();
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    out[pre.id] = shot();
+  }
+  return out;
+});
+check('fx: no GL errors across every preset',
+  Object.values(fxShots).every(s => s.err === 0));
+check('fx: every preset renders something',
+  Object.values(fxShots).every(s => s.avg > 1));
+check('fx: every preset looks different from Off',
+  Object.entries(fxShots).filter(([id]) => id !== 'off')
+    .every(([, s]) => s.sig !== fxShots.off.sig));
+check('fx: no two presets render identically',
+  new Set(Object.values(fxShots).map(s => s.sig)).size === Object.keys(fxShots).length);
+
+// Output size drives the real canvas the recorder and OBS see.
+await page.evaluate(() => { Mirror.getState().on = true; Mirror.syncUI(); });
+await page.selectOption('#fx-output', '1280x720');
+await page.waitForTimeout(200);
+check('fx: output size changes the canvas', await page.evaluate(() => {
+  const c = document.getElementById('usb-canvas');
+  return c.width === 1280 && c.height === 720;
+}));
+check('fx: a 16:9 output pillarboxes rather than stretching', await page.evaluate(() => {
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const px = new Uint8Array(cv.width * cv.height * 4);
+  gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  // A column 8px from the left edge must be background; the middle must not be.
+  const at = (x, y) => { const i = (y * cv.width + x) * 4; return px[i] + px[i+1] + px[i+2]; };
+  let edge = 0, mid = 0;
+  for (let y = 0; y < cv.height; y += 4) { edge += at(8, y); mid += at(cv.width >> 1, y); }
+  return edge === 0 && mid > 0;
+}));
+// Regression: the bloom prepass works on the un-curved, un-letterboxed
+// source, so it has to be masked to the content or a heavy glow paints a
+// blurred ghost of the screen across the bars and the bezel.
+check('fx: glow does not spill into the letterbox bars', await page.evaluate(async () => {
+  const st = Mirror.getState();
+  const next = FX.presetState('off');
+  st.enabled = next.enabled; st.params = next.params;
+  st.enabled.bloom = true;
+  st.params.bloom.intensity = 150; st.params.bloom.radius = 300;
+  st.on = true; st.preset = 'custom';
+  Mirror.syncUI(); Mirror.invalidate();
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const px = new Uint8Array(cv.width * cv.height * 4);
+  gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  const contentX = Math.round((cv.width - cv.height * 4 / 3) / 2);   // left edge of the picture
+  const at = (x, y) => { const i = (y * cv.width + x) * 4; return px[i] + px[i+1] + px[i+2]; };
+  let bar = 0, inside = 0;
+  for (let y = 0; y < cv.height; y += 4) {
+    bar    += at(contentX - 6, y);          // just outside the picture
+    inside += at(contentX + 6, y);          // just inside it
+  }
+  return bar === 0 && inside > 0;
+}));
+
+check('fx: Fill 100% overscans instead, filling the frame edge to edge', await page.evaluate(async () => {
+  Mirror.getState().zoom = 100; Mirror.syncUI(); Mirror.invalidate();
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const px = new Uint8Array(cv.width * cv.height * 4);
+  gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  const at = (x, y) => { const i = (y * cv.width + x) * 4; return px[i] + px[i+1] + px[i+2]; };
+  let edge = 0;
+  for (let y = 0; y < cv.height; y += 4) edge += at(8, y);
+  Mirror.getState().zoom = 0; Mirror.syncUI(); Mirror.invalidate();
+  return edge > 0;
+}));
+await page.selectOption('#fx-output', '960x720');
+
+// Toggling any control drops the preset to Custom and is written through
+// to localStorage, so a look survives a reload.
+await page.evaluate(() => { document.querySelector('.fx-card[data-fx="noise"] .fx-en').click(); });
+await page.waitForTimeout(150);
+const fxPersist = await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem('ptlib-fx-v1') || '{}');
+  return { preset: document.getElementById('fx-preset').value, stored: raw.enabled && raw.enabled.noise,
+           card: document.querySelector('.fx-card[data-fx="noise"]').classList.contains('on') };
+});
+check('fx: toggling an effect drops the preset to Custom', fxPersist.preset === 'custom');
+check('fx: the change is stored for next time', fxPersist.stored === true);
+check('fx: the card shows its parameters once enabled', fxPersist.card);
+
+check('fx: parameters are visible only while the effect is on', await page.evaluate(() => {
+  const on  = document.querySelector('.fx-card[data-fx="noise"] .fx-params');
+  const off = document.querySelector('.fx-card[data-fx="warp"] .fx-params');
+  return getComputedStyle(on).display !== 'none' && getComputedStyle(off).display === 'none';
+}));
+
+// The whole feature is display-side: driving every preset and every
+// control must never put a byte on the wire. The only frames the mirror
+// is allowed to send are the FULL_REFRESH requests from section 5.
+check('fx: nothing beyond a refresh request was ever sent to the device', await page.evaluate(() =>
+  Array.isArray(window.__writes) && window.__writes.length > 0 &&
+  window.__writes.every(w => w[0] === 0xFE && w[1] === 0x02)));
+
+// A corrupt or hand-edited settings blob must not be able to break the mirror.
+await page.evaluate(() => localStorage.setItem('ptlib-fx-v1', JSON.stringify({
+  on: true, output: 'not-a-size', bg: 'javascript:alert(1)', zoom: 9e9, preset: 42,
+  enabled: { noise: 1, nosuchthing: true },
+  params: { noise: { amount: 1e9, type: 'nope' }, nosuchthing: { x: 1 } },
+})));
+await page.reload();
+await page.waitForTimeout(600);
+await page.click('#btn-usb-only');
+await page.waitForTimeout(400);
+const fxSafe = await page.evaluate(() => {
+  const st = Mirror.getState();
+  const cv = document.getElementById('usb-canvas');
+  return { output: st.output, bg: st.bg, zoom: st.zoom, amount: st.params.noise.amount,
+           type: st.params.noise.type, unknown: 'nosuchthing' in st.params,
+           w: cv.width, h: cv.height, gl: Mirror.hasEffects() };
+});
+check('fx: a bad output size falls back to the default', fxSafe.output === '960x720');
+check('fx: a non-colour background is rejected', fxSafe.bg === '#000000');
+check('fx: an absurd fill value is clamped', fxSafe.zoom === 100);
+check('fx: an out-of-range slider value is clamped to its own maximum', fxSafe.amount === 100);
+check('fx: an invalid option falls back to the default', fxSafe.type === 'film');
+check('fx: unknown effects in stored settings are dropped', !fxSafe.unknown);
+check('fx: the mirror still renders after a corrupt settings blob',
+  fxSafe.gl && fxSafe.w === 960 && fxSafe.h === 720);
+
+// Nothing is connected on a fresh load, so what is on the source canvas
+// now is the stand-in screen — that is what lets a look be dialled in
+// before the hardware is plugged in.
+check('fx: a stand-in screen is painted with no device connected', await page.evaluate(() => {
+  const c = USB.sourceCanvas();
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  const band = (r0, r1) => {                       // device rows -> lit pixels
+    let lit = 0;
+    for (let y = r0 * 30; y < r1 * 30; y++)
+      for (let x = 0; x < c.width; x += 3) {
+        const i = (y * c.width + x) * 4;
+        if (d[i] > 60 || d[i+1] > 60 || d[i+2] > 60) lit++;
+      }
+    return lit;
+  };
+  return !USB.isConnected() && band(0, 1) > 40 && band(4, 14) > 200 && band(21, 22) > 40;
+}));
+
+// Reset clears the lot.
+await page.click('#fx-reset');
+await page.waitForTimeout(150);
+check('fx: reset turns every effect off', await page.evaluate(() => {
+  const st = Mirror.getState();
+  return !st.on && !Object.values(st.enabled).some(Boolean) &&
+         document.querySelectorAll('.fx-card.on').length === 0;
+}));
 
 check('zero console errors across the whole run', errors.length === 0);
 if (errors.length) console.error(errors);

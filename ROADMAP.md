@@ -7,20 +7,14 @@ until then, however substantial a round turns out to be.
 
 ## Next
 
-- **Transpose a selected block** — selection, copy, paste and clear landed
-  in 0.9.6; nudging every chain number in a selection up or down is the
-  obvious next operation on it.
 - **Card access over USB** — blocked on firmware (issues #1430 mass
   storage / #1432 data protocol); the librarian will work while the device
   is connected the day either lands.
-- **Note entry from a computer keyboard** — a piano layout (`z`/`s`/`x` as
-  C/C#/D) for the phrase editor, so melodies can be typed rather than
-  picked note by note. Worth it only if people actually write in the
-  browser rather than on the device.
 - **Delete from the sample browser** — the Trash tab (0.9.6) handles
   restore and permanent delete for files already trashed; trashing
   directly from the sample browser and preview flows would save a trip
   through Problems.
+- **Waveform view + trim** in the sample browser.
 
 ## Playback fidelity
 
@@ -49,13 +43,15 @@ actually audible rather than theoretical:
 
 ## Ideas
 
-- Per-chain colours are stored in the browser; consider a sidecar file on
-  the card so they travel with it.
-- Waveform view + trim in the sample browser.
-- Render a project to wav in the browser (the offline render harness in
-  `tests/audio.test.mjs` already proves this is possible).
-- Table editing — tables parse and display but aren't editable.
-- Groove editing.
+- **Shareable effect looks.** The mirror's effect settings live in one
+  browser. Export and import of that blob would let people trade presets,
+  and would make a look survive moving machines.
+- **Effects over a render.** The same shader chain could run over a
+  project render as well as the live screen, so a video and its audio
+  could come out of one pass.
+- **A visualiser source.** The mirror's output canvas is already a capture
+  surface; driving it from the song player rather than the device would
+  give a no-hardware video source.
 
 ## Done
 
@@ -63,6 +59,9 @@ Kept short, as a record of what feedback rounds resolved: arrangement
 editing (song grid + chains), block selection, the trash browser with
 restore and permanent delete, phrase step insert/delete, pick-lists in
 place of typing hex, the transport bar and live playback position, the
-slicer's waveform zoom, setlist ordering, the macOS junk-file filter, and
-the playback fixes in 0.9.1 (slice/loop sample-rate units, output
-clipping, dropped slice-0 notes). See `CHANGELOG.md` for the detail.
+slicer's waveform zoom, setlist ordering, the macOS junk-file filter, the
+playback fixes in 0.9.1 (slice/loop sample-rate units, output clipping,
+dropped slice-0 notes), render to WAV and stems, table and groove editing,
+chain-colour sidecars, note entry from a computer keyboard, and the
+mirror's output effects with recording and capture-ready output sizes in
+0.9.9. See `CHANGELOG.md` for the detail.
