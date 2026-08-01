@@ -1245,6 +1245,114 @@ check('map: the SVG export is self-contained and carries the notes', await page.
 await closeProjectModal();
 await page.waitForTimeout(300);
 
+// ── 28y. play-from-row and the active-cell marker ──────
+// Section 9 swapped in a one-project mock card; play-from-row needs a
+// song with content past row 0, so bring the demo card back and use
+// NIGHTDRIVE by name.
+await closeProjectModal();
+await page.waitForTimeout(200);
+await page.reload();
+await page.waitForTimeout(700);
+await page.click('#btn-demo');
+await page.waitForTimeout(2500);
+await page.click('.tab-btn[data-tab="projects"]');
+await page.waitForTimeout(300);
+await page.evaluate(() => {
+  const row = [...document.querySelectorAll('.proj-item')].find(r => /NIGHT/.test(r.textContent));
+  if (row && !row.querySelector('.btn-det-open')) row.querySelector('.proj-row').click();
+});
+await page.waitForTimeout(300);
+await page.evaluate(() => {
+  const row = [...document.querySelectorAll('.proj-item')].find(r => /NIGHT/.test(r.textContent));
+  row?.querySelector('.btn-det-open')?.click();
+});
+await page.waitForTimeout(900);
+await page.click('#btn-modal-patterns');
+await page.waitForTimeout(400);
+
+// Play from a mid-song row: the transport must say "from row", and the
+// timeline in the player must be the FULL song, not one row of it.
+await page.evaluate(() => document.querySelector('.pv-rowplay[data-row="1"]')?.click());
+// Sample decode can take a moment under a loaded test run.
+await page.waitForFunction(() => SongPlayer.isPlaying(), null, { timeout: 10000 }).catch(() => {});
+await page.waitForTimeout(200);
+const fromRow = await page.evaluate(() => ({
+  playing: SongPlayer.isPlaying(),
+  title: document.getElementById('tr-title')?.textContent || '',
+}));
+check('row play: starts playback from that row', fromRow.playing && /from row 01/.test(fromRow.title));
+check('row play: the timeline is the whole song, not one row', await page.evaluate(() =>
+  !!SongPlayer.timeline() && SongPlayer.timeline().marks.some(mk => mk.row > 1)));
+await page.evaluate(() => SongPlayer.stop());
+await page.waitForTimeout(300);
+
+// A spare row past the end declines rather than restarting from the top.
+await page.evaluate(() => {
+  const plays = [...document.querySelectorAll('.pv-rowplay')];
+  plays[plays.length - 1].click();
+});
+await page.waitForTimeout(500);
+check('row play: an empty tail row declines instead of restarting from 00', await page.evaluate(() =>
+  !SongPlayer.isPlaying() &&
+  /Nothing plays at or after/.test(document.getElementById('cache-msg')?.textContent || '')));
+
+// The active cell is marked, along with its row and column labels, and
+// the marker survives the related-chain highlight.
+await page.evaluate(() => {
+  const c = document.querySelectorAll('.pv-cell.chain')[1];
+  c.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  c.focus();
+  c.click();
+});
+await page.waitForTimeout(300);
+check('grid: exactly one cell carries the active marker', await page.evaluate(() =>
+  document.querySelectorAll('.pv-cell.cur:not(.rlbl):not(.clbl)').length === 1));
+check('grid: the marker sits on the focused cell, even inside the chain highlight', await page.evaluate(() => {
+  const cur = document.querySelector('.pv-cell.cur:not(.rlbl):not(.clbl)');
+  return cur && cur.classList.contains('hi') &&
+         document.querySelectorAll('.pv-cell.hi').length >= 2;
+}));
+check('grid: the row and column labels light up with it', await page.evaluate(() => {
+  const cur = document.querySelector('.pv-cell.cur:not(.rlbl):not(.clbl)');
+  return document.querySelector(`.pv-cell.rlbl.cur[data-rl="${cur.dataset.row}"]`) &&
+         document.querySelector(`.pv-cell.clbl.cur[data-cl="${cur.dataset.ch}"]`);
+}));
+check('grid: arrows move the marker with the cursor', await page.evaluate(async () => {
+  const cur = document.querySelector('.pv-cell.cur:not(.rlbl):not(.clbl)');
+  const r = +cur.dataset.row;
+  cur.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  await new Promise(res => setTimeout(res, 150));
+  const now = document.querySelector('.pv-cell.cur:not(.rlbl):not(.clbl)');
+  return now && +now.dataset.row === r + 1 &&
+         document.querySelectorAll('.pv-cell.cur:not(.rlbl):not(.clbl)').length === 1;
+}));
+await closeProjectModal();
+await page.waitForTimeout(300);
+
+// The reload above wiped the fake serial device from section 5, which the
+// fx write-safety check depends on. Reinstall it and reconnect.
+await page.evaluate(() => {
+  window.__writes = [];
+  const fakePort = {
+    readable: new ReadableStream({ start(c) { window.__pushBytes = b => c.enqueue(new Uint8Array(b)); } }),
+    writable: new WritableStream({ write(chunk) { window.__writes.push([...chunk]); } }),
+    open: async () => {}, close: async () => {},
+  };
+  Object.defineProperty(navigator, 'serial', { value: { requestPort: async () => fakePort }, configurable: true });
+});
+await page.click('.tab-btn[data-tab="device"]');
+await page.waitForTimeout(200);
+await page.click('#btn-usb-connect');
+await page.waitForTimeout(400);
+await page.evaluate(() => USB.disconnect());
+await page.waitForTimeout(200);
+// The connect cleared the screen waiting for frames the fake device never
+// sends; the preset sweep later needs real content, so repaint the demo.
+await page.evaluate(() => { USB.setDemo(); Mirror.invalidate(); });
+await page.waitForTimeout(200);
+await page.click('.tab-btn[data-tab="projects"]');
+await page.waitForTimeout(250);
+
 // ── 29a. generative phrase tools ───────────────────────
 await closeProjectModal();
 await page.waitForTimeout(200);

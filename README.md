@@ -45,7 +45,7 @@ Cards that have been near a Mac collect AppleDouble junk (`._kick.wav`, `.DS_Sto
 ### Arrange and edit
 
 - **Pattern editor** — the song grid at full size, with an ordered chain list down the left bucketed by number group (usage counts, colours, per-chain preview, hover-to-highlight), and chain and phrase panels beside the grid rather than under it.
-  Click any cell to choose the chain that sits there from a filterable list of the chains this song already uses, the ones defined but unplaced, and free slots; type a value that isn't listed and it's offered too, so all of `00`–`FE` is reachable. Arrow keys walk the grid and **shift+arrows or shift+click select a block**, which then copies, pastes or clears as a unit (`⌘/Ctrl+C/V`, `Del`, `⌘/Ctrl+A` for everything, `Esc` to deselect). Whole rows also copy and paste from the gutter, and `⌘/Ctrl+Z` undoes arrangement changes. Spare rows sit past the end of the song so an arrangement can be extended, with **+ more rows** for as far as the geometry allows.
+  Click any cell to choose the chain that sits there from a filterable list of the chains this song already uses, the ones defined but unplaced, and free slots; type a value that isn't listed and it's offered too, so all of `00`–`FE` is reachable. Arrow keys walk the grid — the active cell carries a high-contrast marker with its row and channel labels lit, and the gutter ▶ plays the song from that row to the end — and **shift+arrows or shift+click select a block**, which then copies, pastes or clears as a unit (`⌘/Ctrl+C/V`, `Del`, `⌘/Ctrl+A` for everything, `Esc` to deselect). Whole rows also copy and paste from the gutter, and `⌘/Ctrl+Z` undoes arrangement changes. Spare rows sit past the end of the song so an arrangement can be extended, with **+ more rows** for as far as the geometry allows.
   Chain colours come from the chain number: the high nibble picks a hue family so the `00`s, `10`s and `20`s each read as a group, while lightness strides within a group to keep neighbours apart. Pick your own per chain, or reset.
 - **Chain editor** — open any chain and edit its 16 steps in place: which phrase plays at each step, chosen from the project's phrases with a note count each, and a per-step transpose. Beat-marked every four. **Clone** copies a chain to an empty slot and repoints the grid cells that used it.
 - **Reach anything** — **⤳ Go to…** opens any chain or phrase, whether or not it appears in the song, so ideas can be sketched without editing the arrangement first.
@@ -122,7 +122,7 @@ Tests are zero-dependency Node scripts that extract modules straight out of `ind
 node tests/parser.test.mjs   # 171 unit tests: formats, MIDI timing, slice/loop units, round-trips, generators, scales, audio analysis
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
 node tests/audio.test.mjs    # renders the mix and a WAV export offline: no clipping, correct slice offsets, valid stems
-node tests/e2e.mjs           # 279 browser checks (needs: npm i -D playwright)
+node tests/e2e.mjs           # 286 browser checks (needs: npm i -D playwright)
 ```
 
 The parser tests run round-trip checks against real Advance project files when they're present locally; those files are not in this repository.

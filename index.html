@@ -655,6 +655,15 @@
     .pv-cstep .cgo.off:hover { background:none; }
     .pv-cell.sel { background:var(--accent-dim); box-shadow:inset 0 0 0 1px var(--accent-brd); }
     .pv-cell.sel.empty { color:var(--accent); }
+    /* The ACTIVE cell. Persistent (a class, not just :focus, so it
+       survives the focus moving into a picker), and readable against
+       every other state — including .hi, whose solid accent background
+       swallowed the old 1px accent outline entirely. */
+    .pv-cell.cur { outline:2px solid var(--text); outline-offset:-2px;
+      position:relative; z-index:2; box-shadow:0 0 0 2px rgba(238,241,242,.22); }
+    .pv-cell.chain.hi.cur { outline-color:#081c2c; }
+    .pv-cell.rlbl.cur, .pv-cell.clbl.cur { color:var(--accent); font-weight:700;
+      outline:none; box-shadow:none; }
     #pv-selinfo { color:var(--accent); margin-left:8px; font-weight:600; }
     .pv-cell.empty { cursor:pointer; }
     .pv-cell.empty:hover { background:var(--accent-dim); color:var(--accent); }
@@ -1100,7 +1109,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.12 Alpha</span>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.13 Alpha</span>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -7555,16 +7564,16 @@ const UI = (() => {
     const shownRows = Math.min(maxRows, last + 1 + pvSpareRows);
     let grid = `<div class="pv-grid" style="grid-template-columns:52px repeat(${CH+1},var(--pvw,44px))">`;
     grid += `<div class="pv-cell clbl"></div><div class="pv-cell clbl"></div>`;
-    for (let t = 0; t < CH; t++) grid += `<div class="pv-cell clbl">C${t+1}</div>`;
+    for (let t = 0; t < CH; t++) grid += `<div class="pv-cell clbl" data-cl="${t}">C${t+1}</div>`;
     for (let r = 0; r < shownRows; r++) {
       const spare = r > last;
       grid += `<div class="pv-gutter${spare ? ' spare' : ''}">
-        <span class="pv-rowplay" data-row="${r}" title="Play song row ${PT.hx2(r)} (all channels)">▶</span>
+        <span class="pv-rowplay" data-row="${r}" title="Play from row ${PT.hx2(r)} to the end">▶</span>
         <span class="pv-rowcopy" data-row="${r}" title="Copy row ${PT.hx2(r)}">⧉</span>
         <span class="pv-rowpaste" data-row="${r}" title="Insert the copied row here — this row and everything below move down">⤓</span>
         <span class="pv-rowclear" data-row="${r}" title="Clear row ${PT.hx2(r)} (all channels)">✕</span>
       </div>`;
-      grid += `<div class="pv-cell rlbl${spare ? ' spare' : ''}">${PT.hx2(r)}</div>`;
+      grid += `<div class="pv-cell rlbl${spare ? ' spare' : ''}" data-rl="${r}">${PT.hx2(r)}</div>`;
       for (let t = 0; t < CH; t++) {
         const c = PT.gridCell(parsed, r, t);
         grid += c === PT.EMPTY
@@ -7720,9 +7729,19 @@ const UI = (() => {
     // and it stops a stray click throwing a popover in your face.
     host.querySelectorAll('.pv-cell.empty').forEach(cell =>
       cell.addEventListener('click', () => cell.focus()));
+    // Mark the active cell and its row/column labels. Driven off pvFocus
+    // rather than :focus so the marker holds while a picker is open.
+    const paintCur = () => {
+      host.querySelectorAll('.pv-cell.cur').forEach(c => c.classList.remove('cur'));
+      if (!pvFocus) return;
+      host.querySelector(`.pv-cell[data-row="${pvFocus.r}"][data-ch="${pvFocus.t}"]`)?.classList.add('cur');
+      host.querySelector(`.pv-cell.rlbl[data-rl="${pvFocus.r}"]`)?.classList.add('cur');
+      host.querySelector(`.pv-cell.clbl[data-cl="${pvFocus.t}"]`)?.classList.add('cur');
+    };
     const focusGrid = (r, t) => {
       pvFocus = { r, t };
       host.querySelector(`.pv-cell[data-row="${r}"][data-ch="${t}"]`)?.focus();
+      paintCur();
     };
     // ── Block selection ──────────────────────────────────
     const selBox = () => {
@@ -7784,7 +7803,11 @@ const UI = (() => {
       cell.addEventListener('mousedown', ev => {
         const r = parseInt(cell.dataset.row, 10), t = parseInt(cell.dataset.ch, 10);
         if (ev.shiftKey && pvFocus) { ev.preventDefault(); extendSel(r, t); }
-        else { pvFocus = { r, t }; clearSel(); }
+        else { pvFocus = { r, t }; clearSel(); paintCur(); }
+      });
+      cell.addEventListener('focus', () => {
+        pvFocus = { r: parseInt(cell.dataset.row, 10), t: parseInt(cell.dataset.ch, 10) };
+        paintCur();
       });
       cell.addEventListener('dblclick', e => { e.stopPropagation(); editGridCell(cell); });
       cell.addEventListener('keydown', ev => {
@@ -7829,6 +7852,7 @@ const UI = (() => {
     // restore selection and focus across the wholesale re-render
     paintSel();
     if (pvFocus) host.querySelector(`.pv-cell[data-row="${pvFocus.r}"][data-ch="${pvFocus.t}"]`)?.focus();
+    paintCur();
     host.querySelectorAll('.pv-chainrow input[type=color]').forEach(inp =>
       inp.addEventListener('change', async () => {
         chainColors[`${p.dirName}:${inp.dataset.chain}`] = inp.value;
@@ -7947,14 +7971,31 @@ const UI = (() => {
     if (SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
     const host = el.closest('#modal-pattern-section');
     host?.querySelectorAll('.pv-rowplay.playing').forEach(x => x.classList.remove('playing'));
+    // Play FROM here, not just this row: the full song timeline, seeked
+    // to where this row starts. Rows are not uniform in time (grooves),
+    // so the start comes from the timeline's own marks — the earliest
+    // mark on this row, or on the next row that has one if this row is
+    // empty on every channel.
+    const tl = PT.buildEventTimeline(parsed, {});
+    let at = null;
+    if (tl && tl.marks) {
+      for (const m of tl.marks) if (m.row === row) { at = m.time; break; }   // marks are time-sorted
+      if (at === null) for (const m of tl.marks) if (m.row > row) { at = m.time; break; }
+    }
+    if (at === null) {
+      // Nothing plays at or after this row (a spare row past the end);
+      // starting from the top here would be a surprise, so decline.
+      setCacheBar(`Nothing plays at or after row ${PT.hx2(row)}.`, false);
+      return;
+    }
     el.textContent = '…';
     el.classList.add('playing');
     SongPlayer.play(sd, p, parsed, transportProgress,
       () => { el.textContent = '▶'; el.classList.remove('playing'); hideTransport(); },
-      { songRow: row })
+      { startAt: at })
       .then(ok => {
         el.textContent = ok ? '■' : '▶';
-        if (ok) showTransport(`${p.name} — row ${PT.hx2(row)}`, 'song row, all channels');
+        if (ok) showTransport(`${p.name} — from row ${PT.hx2(row)}`, 'playing to the end');
         else el.classList.remove('playing');
       });
   }

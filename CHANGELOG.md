@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.9.13 — play from here, and an unmissable cursor
+
+Two pieces of real-device feedback.
+
+**Row ▶ plays from that row to the end.** The gutter play button used to
+loop one row in isolation; now it starts the full song from that row —
+the whole timeline, seeked to where the row begins (rows are not uniform
+in time once grooves are involved, so the start comes from the
+timeline's own marks). The transport says "from row 07" and the scrub
+bar covers the whole song. A spare row past the end of the arrangement
+declines with a message rather than surprising you by restarting from
+the top.
+
+**The active cell is marked.** The focused cell in the song grid used to
+carry a 1px accent outline that vanished entirely inside the
+related-chain highlight, which paints the same accent as a solid
+background. The active cell now carries a persistent high-contrast
+marker (a class, not just `:focus`, so it holds while a picker is open),
+readable against the chain highlight, block selection and playhead — and
+its row number and channel header light up with it, so you always know
+the coordinates of where you are.
+
 ## v0.9.12 — six new effects, seven new presets, dice, fonts and shareable looks
 
 **Six new effects**, bringing the chain to twenty-five:
