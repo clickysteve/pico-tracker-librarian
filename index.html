@@ -1100,7 +1100,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.11 Alpha</span>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.12 Alpha</span>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -1394,8 +1394,13 @@
             <label class="fx-mini" title="0% fits the 4:3 screen inside the frame; 100% fills the frame and crops the sides">Fill <input type="range" id="fx-zoom" min="0" max="100" step="1"><span id="fx-zoom-v" class="fx-pval"></span></label>
             <label class="fx-mini" title="Colour of the letterbox bars and the bezel">Bars <input type="color" id="fx-bg" value="#000000"></label>
             <label class="fx-mini" title="The header text on the stand-in screen. Blank removes it. A connected device draws its own screen, so this only affects the demo.">Text <input type="text" id="fx-demo-text" class="search" maxlength="27" placeholder="PT LIBRARIAN" style="width:110px;padding:3px 7px;font-size:11px"></label>
+            <label class="fx-mini" title="The face the mirror draws text with — the device's own bitmap font, or one built from a font your system already has. The special glyphs (meters, note icons) always use the device face.">Font <select id="fx-font"></select></label>
             <span class="fx-sep"></span>
             <button class="btn ghost sm" id="fx-record">● Record</button>
+            <button class="btn ghost sm" id="fx-random" title="Roll a random look — curated, so it stays watchable. Roll again until something sticks.">🎲 Random</button>
+            <button class="btn ghost sm" id="fx-export" title="Save this look (effects, routings, output settings) as a small file to share or keep">⇩ Look</button>
+            <button class="btn ghost sm" id="fx-import" title="Load a look from a file">⇪ Look</button>
+            <input type="file" id="fx-import-file" accept=".json,application/json" style="display:none">
             <button class="btn ghost sm" id="fx-reset" title="Turn every effect off and restore defaults">Reset</button>
             <span class="stat-chip" id="fx-fps" style="margin-left:auto"></span>
           </div>
@@ -4341,6 +4346,29 @@ const FX = (() => {
     { id:'dither', label:'Posterise / dither', react:'levels', hint:'Ordered Bayer dithering down to a few tones per channel.', params:[
       { key:'levels', label:'Tones', def:4, min:2, max:12, step:1, fmt:v=>v===2?'2 (1-bit)':`${v}` },
     ]},
+    { id:'trails', label:'Phosphor trails', react:'decay', hint:'What moved a moment ago is still faintly there, like a slow long-persistence tube.', params:[
+      { key:'decay', label:'Persistence', def:60, min:5, max:97, step:1, fmt:v=>`${v}%` },
+      { key:'colour', type:'seg', label:'Trail colour', def:'source', opts:[['source','Source'],['green','Green'],['amber','Amber'],['blue','Blue']] },
+    ]},
+    { id:'pixelate', label:'Pixelate', react:'size', hint:'Mosaic the picture down to fat blocks.', params:[
+      { key:'size', label:'Block size', def:25, min:2, max:100, step:1, fmt:v=>`${v}` },
+    ]},
+    { id:'huecycle', label:'Hue cycle', react:'shift', hint:'Rotate every colour around the wheel. With Speed up, a slow rainbow.', params:[
+      { key:'shift', label:'Hue shift', def:0, min:0, max:360, step:1, fmt:v=>`${v}°` },
+      { key:'speed', label:'Speed', def:20, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Still' },
+    ]},
+    { id:'kaleido', label:'Kaleidoscope', react:'blend', hint:'Fold the picture onto itself.', params:[
+      { key:'mode', type:'seg', label:'Fold', def:'h', opts:[['h','Left⇄right'],['v','Top⇄bottom'],['quad','Four-way']] },
+      { key:'blend', label:'Mix', def:100, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'rollbar', label:'Refresh bar', react:'intensity', hint:'The bright band a camera sees crawling up a CRT.', params:[
+      { key:'intensity', label:'Brightness', def:35, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'width', label:'Band height', def:30, min:5, max:80, step:1, fmt:v=>`${v}%` },
+      { key:'speed', label:'Speed', def:25, min:1, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'invert', label:'Invert / solarise', react:'amount', hint:'Negative at full, solarised part-way.', params:[
+      { key:'amount', label:'Amount', def:100, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
   ];
 
   // Applied in this order regardless of the order the user toggles them.
@@ -4371,11 +4399,15 @@ const FX = (() => {
   // A positive depth pushes the parameter towards its maximum, negative
   // towards its minimum, so an effect can duck on a beat as well as
   // swell on one. The user's own value is always the resting point.
-  function modulate(params, react, levels) {
+  function modulate(params, react, levels, enabled) {
     if (!react || !levels) return params;
     let out = params;
     for (const d of DEFS) {
       if (!d.react) continue;
+      // A route on a disabled effect would modulate parameters the
+      // renderer forces to zero anyway — skip it, including the per-frame
+      // copy it would otherwise cost.
+      if (enabled && !enabled[d.id]) continue;
       const routes = react[d.id];
       if (!Array.isArray(routes) || !routes.length) continue;
       for (const cfg of routes) {
@@ -4450,7 +4482,98 @@ const FX = (() => {
       bloom:{intensity:35,radius:60}, grade:{brightness:118,contrast:112,saturation:106,gamma:92},
       vignette:{falloff:22} },
       r:{ bloom:{src:'level',depth:50} } },
+    { id:'scope', label:'Oscilloscope', on:['tint','trails','bloom','vignette','grid'], p:{
+      tint:{colour:'green',amount:95}, trails:{decay:88,colour:'green'},
+      bloom:{intensity:70,radius:110,colour:'green'}, vignette:{falloff:55}, grid:{opacity:14,weight:1} },
+      r:{ bloom:{src:'level',depth:55}, trails:{src:'hit',depth:-40} } },
+    { id:'rainbow', label:'Rainbow drift', on:['huecycle','bloom','scanlines'], p:{
+      huecycle:{shift:0,speed:35}, bloom:{intensity:60,radius:90},
+      scanlines:{variant:'fine',mix:45} },
+      r:{ huecycle:{src:'low',depth:60}, bloom:{src:'level',depth:45} } },
+    { id:'broadcast', label:'Broadcast', on:['curve','rollbar','interlace','noise','grade','vignette'], p:{
+      curve:{amount:25,corner:12,spec:18}, rollbar:{intensity:40,width:35,speed:22},
+      interlace:{intensity:35}, noise:{amount:16,type:'bands'},
+      grade:{brightness:105,contrast:108,saturation:115,gamma:100}, vignette:{falloff:30} },
+      r:{ rollbar:{src:'level',depth:35} } },
+    { id:'mosaic', label:'Mosaic', on:['pixelate','dither','grid'], p:{
+      pixelate:{size:20}, dither:{levels:5}, grid:{opacity:35,weight:1} },
+      r:{ pixelate:{src:'low',depth:50} } },
+    { id:'negative', label:'Negative', on:['invert','scanlines','vignette','grade'], p:{
+      invert:{amount:100}, scanlines:{variant:'medium',mix:50}, vignette:{falloff:45},
+      grade:{brightness:96,contrast:110,saturation:90,gamma:104} },
+      r:{ invert:{src:'hit',depth:-70} } },
+    { id:'kaleido', label:'Kaleidoscope', on:['kaleido','huecycle','planes','bloom'], p:{
+      kaleido:{mode:'quad',blend:100}, huecycle:{shift:0,speed:18},
+      planes:{shift:35,scatter:30}, bloom:{intensity:50,radius:80} },
+      r:{ kaleido:{src:'level',depth:-45}, planes:{src:'high',depth:50} } },
+    { id:'seance', label:'Séance', on:['trails','ghost','tint','noise','vignette'], p:{
+      trails:{decay:93,colour:'blue'}, ghost:{offset:70,fade:75},
+      tint:{colour:'blue',amount:70}, noise:{amount:14,type:'film'}, vignette:{falloff:60} },
+      r:{ trails:{src:'level',depth:30}, ghost:{src:'mid',depth:40} } },
   ];
+
+  // A random look, deterministic in the rand() it is handed so tests can
+  // pin it down. Curated pools rather than a uniform roll over all 25
+  // effects: one texture, a colour treatment or two, some motion, some
+  // shape, some sparkle — the same instincts as the hand-made presets,
+  // with the destructive extremes kept off the table.
+  function randomLook(rand) {
+    const pickN = (arr, n) => {
+      const a = arr.slice();
+      const out = [];
+      while (out.length < n && a.length) out.push(a.splice(Math.floor(rand() * a.length) % a.length, 1)[0]);
+      return out;
+    };
+    const chosen = new Set([
+      ...pickN(['scanlines', 'lcd', 'grid', 'dot', 'pixelate'], rand() < 0.85 ? 1 : 0),
+      ...pickN(['tint', 'huecycle', 'invert', 'chswap', 'grade'], 1 + (rand() < 0.35 ? 1 : 0)),
+      ...pickN(['jitter', 'glitch', 'warp', 'rollbar', 'interlace', 'noise', 'trails', 'ghost'],
+               1 + (rand() < 0.5 ? 1 : 0)),
+      ...pickN(['curve', 'vignette', 'kaleido'], rand() < 0.7 ? 1 : 0),
+      ...pickN(['bloom', 'rgbshift', 'planes', 'dither'], 1 + (rand() < 0.4 ? 1 : 0)),
+    ]);
+    const params = defaults();
+    const enabled = {};
+    for (const d of DEFS) enabled[d.id] = chosen.has(d.id);
+    // Ranges that keep the picture readable however the dice land.
+    const LIMIT = {
+      'noise.amount': [5, 40], 'glitch.density': [5, 45], 'glitch.shift': [10, 60],
+      'jitter.amount': [5, 45], 'pixelate.size': [4, 40], 'trails.decay': [40, 92],
+      'invert.amount': [35, 100], 'warp.amplitude': [3, 30], 'dither.levels': [3, 10],
+      'grade.brightness': [85, 125], 'grade.contrast': [85, 125], 'grade.saturation': [60, 180],
+      'grade.gamma': [80, 125], 'vignette.falloff': [15, 70], 'curve.amount': [10, 60],
+      'bloom.intensity': [25, 95], 'rollbar.intensity': [15, 60], 'rgbshift.shiftH': [10, 120],
+      'ghost.fade': [55, 90], 'interlace.intensity': [10, 60], 'lcd.bleed': [0, 40],
+    };
+    for (const d of DEFS) {
+      if (!enabled[d.id]) continue;
+      for (const par of d.params) {
+        if (par.type === 'seg') {
+          const opts = par.opts.map(o => o[0]);
+          params[d.id][par.key] = opts[Math.floor(rand() * opts.length) % opts.length];
+          continue;
+        }
+        const [lo, hi] = LIMIT[`${d.id}.${par.key}`]
+          || [par.min + (par.max - par.min) * 0.15, par.min + (par.max - par.min) * 0.75];
+        const v = lo + rand() * (hi - lo);
+        params[d.id][par.key] = Math.round(Math.min(par.max, Math.max(par.min, v)) / par.step) * par.step;
+      }
+    }
+    if (enabled.chswap && params.chswap.mode === 'rgb') params.chswap.mode = 'rbg';
+    // A route or two on whatever landed, so a random look moves with the
+    // music the moment audio is on.
+    const react = blankReact();
+    const reactable = [...chosen].filter(id => REACT_TARGET[id]);
+    for (const id of pickN(reactable, Math.min(reactable.length, 1 + (rand() < 0.5 ? 1 : 0)))) {
+      const srcs = ['low', 'mid', 'high', 'level', 'hit'];
+      react[id].push({
+        src: srcs[Math.floor(rand() * srcs.length) % srcs.length],
+        depth: Math.round(30 + rand() * 60) * (rand() < 0.25 ? -1 : 1),
+        param: REACT_TARGET[id],
+      });
+    }
+    return { enabled, params, react };
+  }
 
   function presetState(id) {
     const pre = PRESETS.find(p => p.id === id) || PRESETS[0];
@@ -4556,6 +4679,12 @@ uniform vec2  uInter;          // intensity, flip
 uniform vec2  uNoise;          // amount, type (0 film,1 static,2 bands)
 uniform vec2  uVig;            // falloff, shape
 uniform float uDither;         // levels, 0 = off
+uniform vec2  uPix;            // block w, block h in content UV (0 = off)
+uniform vec2  uKal;            // mode (0 off, 1 h, 2 v, 3 quad), mix
+uniform vec3  uRoll;           // intensity, band height, phase 0..1
+uniform float uInv;            // invert amount
+uniform sampler2D uTrail;
+uniform vec4  uTrailC;         // rgb tint, decay (0 = off)
 
 const float TAU = 6.28318530718;
 
@@ -4632,7 +4761,29 @@ void main() {
     }
   }
 
+  if (uKal.x > 0.5) {
+    // The amount slides the mirror axis in from the edge rather than
+    // lerping coordinates — a coordinate lerp collapses half the picture
+    // to one repeated line at 50%. At full amount the axis sits at the
+    // centre, the classic fold; part-way, a mirrored band creeps in.
+    float ax = 1.0 - uKal.y * 0.5;
+    if (uKal.x < 1.5) {
+      if (q.x > ax) q.x = max(0.0, 2.0 * ax - q.x);
+    } else if (uKal.x < 2.5) {
+      if (q.y > ax) q.y = max(0.0, 2.0 * ax - q.y);
+    } else {
+      if (q.x > ax) q.x = max(0.0, 2.0 * ax - q.x);
+      if (q.y > ax) q.y = max(0.0, 2.0 * ax - q.y);
+    }
+  }
+
   bool oob = q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0 || corner > 0.5;
+
+  // After the bounds test, and with the block centre clamped inside the
+  // content: a partial last block must resample the picture's edge, not
+  // fall out of bounds and paint a strip of the bars colour.
+  if (uPix.x > 0.0)
+    q = clamp((floor(q / uPix) + 0.5) * uPix, 0.5 * uPix, vec2(1.0) - 0.5 * uPix);
 
   vec3 col = uBg;
   if (!oob) {
@@ -4675,6 +4826,8 @@ void main() {
     col *= uGrade.x;
     col = mix(vec3(lum(col)), col, uGrade.z);
     col = clamp(col, 0.0, 1.0);
+
+    if (uInv > 0.0) col = mix(col, vec3(1.0) - col, uInv);
 
     // ── Masks ────────────────────────────────────────────
     // All of these are measured in DEVICE pixels off q, not in output
@@ -4762,6 +4915,17 @@ void main() {
       col *= 1.0 - smoothstep(inner, outer, rr) * (0.30 + uVig.x * 0.68);
     }
 
+    if (uRoll.x > 0.0) {
+      // The band crawls DOWN the picture the way it does on camera; q.y
+      // is 0 at the top of the content after the flip, so subtract.
+      float centre = 1.0 - uRoll.z;
+      float d = abs(q.y - centre);
+      d = min(d, 1.0 - d);                      // wrap so it re-enters smoothly
+      float band = smoothstep(uRoll.y, 0.0, d);
+      col += vec3(uRoll.x * 0.5 * band);
+      col *= 1.0 - uRoll.x * 0.18;              // dim the rest a touch, like exposure
+    }
+
     if (uCurve.z > 0.0) {
       // Glass glare — a soft highlight across the upper third of the
       // picture. c.y is +1 at the top, since vUv.y is 0 at the bottom.
@@ -4770,6 +4934,13 @@ void main() {
     }
 
     col = clamp(col, 0.0, 1.0);
+
+    // Trails sample LAST FRAME'S finished output, so everything above —
+    // glow, masks, colour — persists, not just the raw screen.
+    if (uTrailC.w > 0.0) {
+      vec3 prev = texture2D(uTrail, p).rgb * uTrailC.rgb * uTrailC.w;
+      col = max(col, prev);
+    }
 
     if (uDither > 1.5) {
       // levels tones means levels-1 steps between black and white.
@@ -4852,6 +5023,16 @@ void main() {
     }
     const srcTex = makeTex(gl.NEAREST);
 
+    // The trails feedback texture holds last frame's finished output.
+    // Seeded 1x1 black so the first frame with trails on samples
+    // something defined rather than driver garbage.
+    const trailTex = makeTex(gl.LINEAR);
+    gl.bindTexture(gl.TEXTURE_2D, trailTex);
+    // RGB, not RGBA: the context is alpha:false, and copyTexImage2D from
+    // an opaque drawing buffer into an RGBA texture is INVALID_OPERATION.
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE,
+      new Uint8Array([0, 0, 0]));
+
     // Two half-resolution ping-pong targets for the bloom blur.
     let bloomW = 0, bloomH = 0;
     const bTex = [makeTex(gl.LINEAR), makeTex(gl.LINEAR)];
@@ -4884,6 +5065,7 @@ void main() {
     sizeBloom(6, 6);
 
     let srcW = 0, srcH = 0, everUploaded = false;
+    let trailW = 0, trailH = 0, trailWas = false;
 
     function render(srcCanvas, st, time, upload) {
       const out = OUTPUTS.find(o => o.id === st.output) || OUTPUTS[0];
@@ -4893,7 +5075,7 @@ void main() {
       const on = id => !!(st.on && st.enabled[id]);
       // Audio modulation sits between the user's settings and the GPU:
       // the sliders stay where they were put and the picture moves.
-      const live = st.react && st.levels ? modulate(st.params, st.react, st.levels) : st.params;
+      const live = st.react && st.levels ? modulate(st.params, st.react, st.levels, st.enabled) : st.params;
       const P = id => live[id] || {};
 
       // Content rect: fit the 4:3 source inside the output, centred.
@@ -5029,9 +5211,29 @@ void main() {
         (gh.fade ?? 70) / 100);
 
       const map = CH_MAPS[P('chswap').mode] || CH_MAPS.rgb;
-      const m = [0,0,0, 0,0,0, 0,0,0];
+      let m = [0,0,0, 0,0,0, 0,0,0];
       if (on('chswap')) { m[map[0] * 3 + 0] = 1; m[map[1] * 3 + 1] = 1; m[map[2] * 3 + 2] = 1; }
       else { m[0] = 1; m[4] = 1; m[8] = 1; }
+      // Hue rotation rides in the same matrix, composed on the CPU: the
+      // shader pays nothing for it. Standard luminance-preserving hue
+      // rotate (the SVG feColorMatrix one).
+      if (on('huecycle')) {
+        const hc = P('huecycle');
+        const deg = (hc.shift ?? 0) + wrap(time * (hc.speed ?? 0) / 100 * 40, 360);
+        const a = deg * Math.PI / 180, cA = Math.cos(a), sA = Math.sin(a);
+        // Column-major, out[row] = sum(col) arr[col*3+row] * in[col].
+        const H = [
+          0.213 + cA * 0.787 - sA * 0.213, 0.213 - cA * 0.213 + sA * 0.143, 0.213 - cA * 0.213 - sA * 0.787,
+          0.715 - cA * 0.715 - sA * 0.715, 0.715 + cA * 0.285 + sA * 0.140, 0.715 - cA * 0.715 + sA * 0.715,
+          0.072 - cA * 0.072 + sA * 0.928, 0.072 - cA * 0.072 - sA * 0.283, 0.072 + cA * 0.928 + sA * 0.072,
+        ];
+        const mm = new Array(9).fill(0);
+        for (let i = 0; i < 3; i++)              // row of the result
+          for (let j = 0; j < 3; j++)            // column of the result
+            for (let k = 0; k < 3; k++)
+              mm[j * 3 + i] += H[k * 3 + i] * m[j * 3 + k];
+        m = mm;
+      }
       gl.uniformMatrix3fv(u(progMain, 'uChMat'), false, new Float32Array(m));
 
       const gr = P('grade');
@@ -5087,7 +5289,55 @@ void main() {
 
       gl.uniform1f(u(progMain, 'uDither'), on('dither') ? (P('dither').levels ?? 4) : 0);
 
+      // ── This round's effects ─────────────────────────────
+      const px2 = P('pixelate');
+      const blocks = 1 + Math.round((px2.size ?? 25) / 100 * 31);   // 1..32 device px
+      gl.uniform2f(u(progMain, 'uPix'),
+        on('pixelate') ? blocks / DEV_W : 0,
+        on('pixelate') ? blocks / DEV_H : 0);
+
+      const kal = P('kaleido');
+      const kmode = { h: 1, v: 2, quad: 3 }[kal.mode] || 1;
+      gl.uniform2f(u(progMain, 'uKal'),
+        on('kaleido') ? kmode : 0, (kal.blend ?? 100) / 100);
+
+      const rb = P('rollbar');
+      gl.uniform3f(u(progMain, 'uRoll'),
+        on('rollbar') ? (rb.intensity ?? 0) / 100 : 0,
+        (rb.width ?? 30) / 100 * 0.25,
+        wrap(time * (0.05 + (rb.speed ?? 25) / 100 * 1.1), 1));
+
+      gl.uniform1f(u(progMain, 'uInv'), on('invert') ? (P('invert').amount ?? 0) / 100 : 0);
+
+      const tr = P('trails');
+      const trailsOn = on('trails') && (tr.decay ?? 0) > 0;
+      // Coming back on (or changing output size) must start from black:
+      // the texture otherwise still holds whatever was on screen when
+      // trails were last active, which flashes over the current picture.
+      if (trailsOn && (!trailWas || trailW !== out.w || trailH !== out.h)) {
+        gl.bindTexture(gl.TEXTURE_2D, trailTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE,
+          new Uint8Array([0, 0, 0]));
+        trailW = out.w; trailH = out.h;
+      }
+      trailWas = trailsOn;
+      const TRAIL_TINTS = { source: [1, 1, 1], green: [0.3, 1, 0.45], amber: [1, 0.7, 0.2], blue: [0.4, 0.7, 1] };
+      const tt = TRAIL_TINTS[tr.colour] || TRAIL_TINTS.source;
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, trailTex);
+      gl.uniform1i(u(progMain, 'uTrail'), 2);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.uniform4f(u(progMain, 'uTrailC'), tt[0], tt[1], tt[2],
+        trailsOn ? (tr.decay ?? 60) / 100 : 0);
+
       gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+      // Feed the finished frame back for next time. copyTexImage2D reads
+      // the drawing buffer, which preserveDrawingBuffer keeps alive.
+      if (trailsOn) {
+        gl.bindTexture(gl.TEXTURE_2D, trailTex);
+        gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGB, 0, 0, out.w, out.h, 0);
+      }
     }
 
     return { render, gl, dispose() { try { gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch {} } };
@@ -5100,7 +5350,7 @@ void main() {
   }
 
   return { DEFS, ORDER, PRESETS, OUTPUTS, REACT_TARGET, MAX_ROUTES, defaults, blankReact,
-           reactableParams, presetState, modulate, createRenderer,
+           reactableParams, presetState, randomLook, modulate, createRenderer,
            SRC_W, SRC_H, DEV_W, DEV_H, hexToRgb };
 })();
 
@@ -5115,13 +5365,70 @@ const USB = (() => {
   // three SETFONT indices render with this one. 224 glyphs x 10 rows of
   // 10-bit pixels, bit 0 = leftmost, base64 of little-endian uint16s.
   const FONT_B64 = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAMAAwADAAMAAwAAAAMAAAAAAAzADMAMwASAAAAAAAAAAAAAAAAADMAMwA/gHMAMwA/gHMAMwAAAAAADAA/AA2APwAsAGwAfwAMAAAAAAAAACGAcYAYAAwABgAjAGGAQAAAAB4AMwAzAB4ADwAZgHGALwBAAAAAIABwABgAAAAAAAAAAAAAAAAAAAAwABgADAAMAAwADAAYADAAAAAAAAMABgAMAAwADAAMAAYAAwAAAAAAAAAhADMAHgA/gF4AMwAhAAAAAAAAAAwADAAMAD+ATAAMAAwAAAAAAAAAAAAAAAAAAAAGAAYAAwAAAAAAAAAAAAAAAAA/gEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGAAYAAAAAAAAAYABwABgADAAGAAMAAYAAAAAAPwAhgHGAaYBlgGOAYYB/AAAAAAAcABgAGAAYABgAGAAYABgAAAAAAD+AIABgAH8AAYABgAGAP4BAAAAAP4AgAGAAfgAgAGAAYAB/gAAAAAAhgGGAYYB/gGAAYABgAGAAQAAAAD+AQYABgD+AIABgAGGAfwAAAAAAPwABgAGAP4AhgGGAYYB/AAAAAAA/gGAAYABgAGAAYABgAGAAQAAAAD8AIYBhgH8AIYBhgGGAfwAAAAAAPwAhgGGAYYB/AGAAYAB/AAAAAAAAAAAABgAGAAAABgAGAAAAAAAAAAAAAAAGAAYAAAAGAAYAAwAAAAAAGAAMAAYAAwADAAYADAAYAAAAAAAAAAAAPwBAAAAAPwBAAAAAAAAAAAYADAAYADAAMAAYAAwABgAAAAAAPwAhgGAAcAAYABgAAAAYAAAAAAA/ACGAbYBlgGWAfYBBgD8AAAAAAD8AIYBhgGGAf4BhgGGAYYBAAAAAP4AhgGGAf4AhgGGAYYB/gAAAAAA/ACGAQYABgAGAAYAhgH8AAAAAAD+AIYBhgGGAYYBhgGGAf4AAAAAAP4BBgAGAH4ABgAGAAYA/gEAAAAA/gEGAAYAfgAGAAYABgAGAAAAAAD8AIYBBgAGAOYBhgGGAfwAAAAAAIYBhgGGAf4BhgGGAYYBhgEAAAAA/gEwADAAMAAwADAAMAD+AQAAAADgAcAAwADAAMAAwADmAHwAAAAAAIYBxgBmAD4APgBmAMYAhgEAAAAABgAGAAYABgAGAAYABgD+AQAAAACGAc4B/gG2AYYBhgGGAYYBAAAAAIYBjgGeAb4B9gHmAcYBhgEAAAAA/ACGAYYBhgGGAYYBhgH8AAAAAAD+AIYBhgGGAf4ABgAGAAYAAAAAAPwAhgGGAYYBhgE2AWYA3AAAAAAA/gCGAYYBhgH+AIYBhgGGAQAAAAD8AIYBBgD8AIABgAGGAfwAAAAAAP4BMAAwADAAMAAwADAAMAAAAAAAhgGGAYYBhgGGAYYBhgH8AAAAAACGAYYBhgGGAYYBzAB4ADAAAAAAAIYBhgGGAYYBtgH+Ac4BhgEAAAAAhgGGAcwAeADMAIYBhgGGAQAAAACGAYYBhgHMAHgAMAAwADAAAAAAAP4BgAHAAHAAGAAMAAYA/gEAAAAA8AAwADAAMAAwADAAMADwAAAAAAACAAYADAAYADAAYADAAIABAAAAADwAMAAwADAAMAAwADAAPAAAAAAAMAB4AMwAhgECAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP4BAAAAAAYADAAYAAAAAAAAAAAAAAAAAAAAAAAAAPgAgAH8AYYBhgH8AQAAAAAGAAYA/gCGAYYBhgGGAf4AAAAAAAAAAAD8AIYBBgAGAIYB/AAAAAAAgAGAAfwBhgGGAYYBhgH8AQAAAAAAAAAA/ACGAf4BBgCGAfwAAAAAAPAAmAEYABgAfAAYABgAGAAAAAAAAAAAAPwBhgGGAYYB/AGAAfwAAAAGAAYA/gCGAYYBhgGGAYYBAAAAADAAAAA8ADAAMAAwADAA/AAAAAAAwAAAAPAAwADAAMAAwAB+AAAAAAAGAAYAhgHGAH4AxgCGAYYBAAAAADwAMAAwADAAMAAwADAA/AAAAAAAAAAAAP4AtgG2AYYBhgGGAQAAAAAAAAAA/gCGAYYBhgGGAYYBAAAAAAAAAAD8AIYBhgGGAYYB/AAAAAAAAAAAAP4AhgGGAYYB/gAGAAYAAAAAAAAA/AGGAYYBhgH8AYABgAEAAAAAAAD+AIYBBgAGAAYABgAAAAAAAAAAAPwABgD8AIABgAH+AAAAAAAMAAwAPgAMAAwADACMAfgAAAAAAAAAAACGAYYBhgGGAYYB/AAAAAAAAAAAAIYBhgGGAcwAeAAwAAAAAAAAAAAAhgGGAYYBtgG2AfwAAAAAAAAAAACGAcwAeAB4AMwAhgEAAAAAAAAAAIYBhgGGAfwBgAH+AAAA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QABAAEAATQJTAVEBUQFRAgAAAAAAAAAAAADjARQA4AAEAfMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAMAAwADgAHwAPAAAAAAAAAAAAAAAAAAAAAADAA+ADcAAwADAAMAD/A/8D/wP/A/8D/wP/A/8D/wP/AwAAAAAAAAAAAAD/A/8D/wP/A/8DHwAfAB8AHwAfAB8AHwAfAB8AHwDgA+AD4APgA+AD4APgA+AD4APgA/8D/wP/A/8D/wMAAAAAAAAAAAAAAAAAAAAAAAAAAAACgAPAA8AD4APgA8ADwAOAAwACAAAAAAAAAAAAAB8ADwAPAAcAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAEABwAPAA8AHwDwA/wD/gP+A/8D/wP/A/8D/wP/A/8D/wP/A/8D/wP/A/4D/gP8A/AD/wP/A/8D/wP/A/8D/wH/Af8APwA/AP8A/wH/Af8D/wP/A/8D/wP/A/8DAwADAAMAAwADAAMAAwADAP8D/wMPAA8ADwAPAA8ADwAPAA8A/wP/Az8APwA/AD8APwA/AD8APwD/A/8D/wD/AP8A/wD/AP8A/wD/AP8D/wMAAAAAAAAAAAAAAAAAAAAA/wMAAAAAEAA4AHwAEAAQAMYA/gAAAAAAAAAQABAAfAA4ABAAxgD+AAAAAAAAAAAAAAAAAAAAAAC2AbYBAAAAAPgAjAEGAwYDBgMCAwACAAAAAAAAgAHAAGAAYABgAGAAMQAfAAAAAAAAAAAAAAAAAoAD4AF4AB4AAAAAAOAB+AGeAYcBgQGAAYABgAEAAAAA/gGGAYYBhgGGAYYBhgGGAwAAAAD4ARgAGAAYABgAGAAYAB8AAAAAAAABgAPAA+ACcAA4ABwADgAAAAAAAAAAAAEBgwHHAe4AfAA4AAAAAABgAAwAAAMwAgYAwAACAJgBAAAAAIABBgAwAAEBAAAMAMMAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/A/4D/AP4A/AD4APAA4ADAAMAAv8D/wH/AH8APwAfAA8ABwADAAEAAAIAA4ADwAPgA/AD+AP8A/4D/wMBAAMABwAPAB8APwB/AP8A/wH/Aw==';
-  const FONT = (() => {
+  const BUILTIN_FONT = (() => {
     const bin = atob(FONT_B64);
     const rows = new Uint16Array(bin.length / 2);
     for (let i = 0; i < rows.length; i++)
       rows[i] = bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8);
     return rows; // glyph g row r = FONT[g*10 + r]; g 0-95 = ascii-0x20, 96+ = special-0x80
   })();
+  let FONT = BUILTIN_FONT;
+
+  // ── Alternative faces ──────────────────────────────────
+  // The firmware's other two fonts are not redistributable, so the
+  // switchable faces are built at runtime instead: each ASCII glyph is
+  // drawn into a 10×10 cell with a 2D canvas using a font family the
+  // system already has, thresholded into the same packed-bitmap format
+  // as the built-in face. The special-glyph page (note icons, meters,
+  // borders, 0x80+) always stays from the built-in font — those are
+  // picoTracker UI, not text.
+  const FONT_FACES = [
+    { id: 'device',     label: 'Device',     css: null },
+    { id: 'terminal',   label: 'Terminal',   css: 'bold 11px "Courier New", monospace' },
+    { id: 'typewriter', label: 'Typewriter', css: '11px "Courier New", monospace' },
+    { id: 'clean',      label: 'Clean',      css: 'bold 10px Arial, sans-serif' },
+    { id: 'serif',      label: 'Serif',      css: 'bold 10px Georgia, serif' },
+    { id: 'heavy',      label: 'Heavy',      css: '11px Impact, "Arial Black", sans-serif' },
+    { id: 'hand',       label: 'Hand',       css: 'bold 10px "Comic Sans MS", cursive' },
+  ];
+
+  function buildCanvasFont(css) {
+    const cv = Object.assign(document.createElement('canvas'), { width: 10, height: 10 });
+    const c = cv.getContext('2d', { willReadFrequently: true });
+    const out = BUILTIN_FONT.slice();          // keeps the special page intact
+    for (let g = 0; g < 96; g++) {
+      c.clearRect(0, 0, 10, 10);
+      c.font = css;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillStyle = '#fff';
+      c.fillText(String.fromCharCode(0x20 + g), 5, 5.5);
+      const d = c.getImageData(0, 0, 10, 10).data;
+      for (let y = 0; y < 10; y++) {
+        let bits = 0;
+        for (let x = 0; x < 10; x++)
+          if (d[(y * 10 + x) * 4 + 3] > 110) bits |= 1 << x;
+        out[g * 10 + y] = bits;
+      }
+    }
+    return out;
+  }
+
+  const fontCache = new Map();
+  function setFont(id) {
+    const face = FONT_FACES.find(f => f.id === id) || FONT_FACES[0];
+    if (!face.css) { FONT = BUILTIN_FONT; }
+    else {
+      if (!fontCache.has(face.id)) fontCache.set(face.id, buildCanvasFont(face.css));
+      FONT = fontCache.get(face.id);
+    }
+    try { localStorage.setItem('ptMirrorFont', face.id); } catch {}
+    // A connected device redraws cell by cell as frames arrive; ask it
+    // for the whole screen so the new face lands everywhere at once.
+    if (port) requestRefresh().catch(() => {});
+    else setDemo();
+  }
+  function currentFont() { return localStorage.getItem('ptMirrorFont') || 'device'; }
   function glyphIndex(ch) {
     if (ch >= 0x20 && ch <= 0x7F) return ch - 0x20;
     if (ch >= 0x80) return 96 + (ch - 0x80);
@@ -5358,7 +5665,8 @@ const USB = (() => {
 
   const isConnected = () => !!port;
   return { connect, disconnect, requestRefresh, isConnected, feed, setKeyBit,
-           releaseAllKeys, sourceCanvas, takeDirty, setDemo };
+           releaseAllKeys, sourceCanvas, takeDirty, setDemo,
+           FONT_FACES, setFont, currentFont };
 })();
 
 
@@ -5396,10 +5704,14 @@ const Mirror = (() => {
 
   // Merged defensively: a stale or hand-edited blob in localStorage
   // must never be able to stop the mirror from drawing.
-  function loadState() {
+  // With no argument, reads stored settings; handed a raw object (a look
+  // file), sanitises that instead — one funnel for both, and an import
+  // never round-trips through storage where a quota error could quietly
+  // re-load the old look while claiming success.
+  function loadState(rawOverride) {
     const st = blankState();
-    let raw = null;
-    try { raw = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch {}
+    let raw = rawOverride ?? null;
+    if (!raw) { try { raw = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch {} }
     if (!raw || typeof raw !== 'object') return st;
     const params = FX.defaults();
     for (const d of FX.DEFS) {
@@ -5542,7 +5854,9 @@ const Mirror = (() => {
     const reacting = state.on && state.audio.on && AudioReact.isRunning();
     if (reacting) { state.levels = AudioReact.sample(state.audio.gain / 100); paintMeters(); }
     else if (state.levels.level || state.levels.hit) { state.levels = { ...AudioReact.ZERO }; paintMeters(); }
-    const moving = (state.on && state.animate) || reacting;
+    // Trails are temporal by nature: they need frames to decay, whatever
+    // the Motion switch says.
+    const moving = (state.on && (state.animate || state.enabled.trails)) || reacting;
     // takeDirty() clears the flag, so read it exactly once per step.
     const dirty = USB.takeDirty();
     // captureStream only emits a frame when the canvas is drawn to, so a
@@ -5727,7 +6041,10 @@ const Mirror = (() => {
   }
 
   function lockOutputControls(lock) {
-    for (const id of ['fx-output', 'fx-zoom', 'fx-reset']) {
+    // fx-import is here because a look file carries an output size, and
+    // resizing the canvas mid-recording corrupts the stream — the exact
+    // thing this lock exists to prevent.
+    for (const id of ['fx-output', 'fx-zoom', 'fx-reset', 'fx-import']) {
       const el = $(id);
       if (el) el.disabled = lock;
     }
@@ -5832,6 +6149,65 @@ const Mirror = (() => {
       t.header = demoTxt.value;
       try { localStorage.setItem('ptMirrorText', JSON.stringify(t)); } catch {}
       if (!USB.isConnected()) { USB.setDemo(); invalidate(); }
+    });
+
+    // ── Font ──
+    const fontSel = $('fx-font');
+    fontSel.innerHTML = USB.FONT_FACES.map(f => `<option value="${f.id}">${f.label}</option>`).join('');
+    fontSel.value = USB.currentFont();
+    fontSel.addEventListener('change', () => {
+      USB.setFont(fontSel.value);
+      invalidate();
+    });
+
+    // ── Random look ──
+    $('fx-random').addEventListener('click', () => {
+      const look = FX.randomLook(Math.random);
+      state.enabled = look.enabled;
+      state.params = look.params;
+      // Wiring: keep existing routes only where the new look kept the
+      // effect on (they may be hand-made and are still meaningful), and
+      // take the random look's routes for effects that end up unwired.
+      // Routes on effects the roll disabled would drive nothing.
+      const merged = FX.blankReact();
+      for (const id in merged) {
+        if (look.enabled[id] && state.react[id] && state.react[id].length)
+          merged[id] = state.react[id];
+        else if (look.react[id] && look.react[id].length)
+          merged[id] = look.react[id];
+      }
+      state.react = merged;
+      state.on = true;
+      markCustom(); syncUI(); save(); invalidate();
+    });
+
+    // ── Export / import a look ──
+    $('fx-export').addEventListener('click', () => {
+      const { levels, audio, ...look } = state;
+      const blob = new Blob([JSON.stringify({ ptLook: 1, ...look }, null, 1)],
+        { type: 'application/json' });
+      download(blob, `pt-look-${(state.preset !== 'custom' ? state.preset + '-' : '')}${stamp()}.json`);
+    });
+    $('fx-import').addEventListener('click', () => $('fx-import-file').click());
+    $('fx-import-file').addEventListener('change', async e => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!f) return;
+      let raw = null;
+      try { raw = JSON.parse(await f.text()); } catch {}
+      if (!raw || typeof raw !== 'object' || raw.ptLook !== 1) {
+        setNote('That file is not a saved look.');
+        return;
+      }
+      // Same funnel as stored settings: the raw file goes through the one
+      // sanitiser, so a hand-edited or hostile look gets exactly the same
+      // scrutiny — and only the SANITISED result is persisted.
+      const keepAudio = state.audio;
+      state = loadState(raw);
+      state.audio = keepAudio;
+      state.on = raw.on !== false;
+      syncUI(); save(); invalidate();
+      setNote('');
     });
     $('fx-reset').addEventListener('click', () => {
       // Clears the look only. Output size, fill and bar colour are how
@@ -6107,7 +6483,7 @@ const Mirror = (() => {
     buildUI();
     refreshInputs().then(syncUI);
     syncUI();
-    USB.setDemo();          // something to look at before a device is plugged in
+    USB.setFont(USB.currentFont());   // also paints the demo screen          // something to look at before a device is plugged in
     started = performance.now();
     fpsAt = started;
     invalidate();

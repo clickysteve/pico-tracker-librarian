@@ -1,5 +1,72 @@
 # Changelog
 
+## v0.9.12 — six new effects, seven new presets, dice, fonts and shareable looks
+
+**Six new effects**, bringing the chain to twenty-five:
+
+- **Phosphor trails** — a real feedback buffer: last frame's *finished*
+  output (glow, masks and all) persists and fades, like a slow
+  long-persistence tube. Needs no Motion; trails are temporal by nature.
+- **Pixelate** — mosaic the picture down to fat blocks.
+- **Hue cycle** — rotate every colour around the wheel, with a speed for
+  a slow rainbow. Costs the shader nothing: the rotation rides in the
+  same matrix as the channel swap, composed on the CPU.
+- **Kaleidoscope** — fold the picture onto itself, left⇄right,
+  top⇄bottom or four-way, with the mirror axis sliding in from the edge
+  as the amount rises.
+- **Refresh bar** — the bright band a camera sees crawling up a CRT.
+- **Invert / solarise** — negative at full, solarised part-way.
+
+**Seven new presets**: Oscilloscope (green trails), Rainbow drift,
+Broadcast (refresh bar + interlace + band noise), Mosaic, Negative,
+Kaleidoscope and Séance (blue trails and ghosting). Seventeen total, all
+with audio wiring in place.
+
+**🎲 Random** rolls a curated look: one texture, a colour treatment,
+some motion, some shape, some sparkle — drawn from the same instincts as
+the hand-made presets, with the destructive extremes kept off the table,
+and a route or two wired so it moves with the music. Roll until
+something sticks; your own routings survive where the roll keeps the
+effect they drive.
+
+**Fonts.** The mirror can draw its text in faces other than the device's
+own: Terminal, Typewriter, Clean, Serif, Heavy and Hand, each built at
+runtime from fonts your system already has and packed into the same
+bitmap format as the built-in face. The special glyphs (meters, note
+icons, borders) always stay device-native — those are UI, not text. The
+firmware's other two fonts are not redistributable, which is exactly why
+these are generated rather than embedded.
+
+**Shareable looks.** ⇩ Look saves the whole effects state (effects,
+parameters, routings, output settings) as a small JSON file; ⇪ Look
+loads one, through exactly the same sanitiser as stored settings, so a
+hand-edited or hostile file gets the same scrutiny. Trade presets.
+
+**Found by review of the above, before shipping**
+- Importing a look mid-recording resized the canvas under the capture
+  track — the exact corruption the recording lock exists to prevent.
+  Import is now held while recording, like the other size controls.
+- The kaleidoscope's mix lerped sampling coordinates, which collapsed
+  half the picture to a single repeated line at 50%. It now slides the
+  mirror axis instead, which is continuous everywhere.
+- Pixelate could paint the last partial block row in the letterbox
+  colour: the block-centre resample ran before the bounds test and
+  stepped out of the picture. With Mosaic's bass-driven block size, the
+  strip flickered with the music.
+- The Random button kept preset-installed routings as if they were
+  yours, discarded the roll's own wiring, and could leave routes driving
+  effects the roll had just disabled — which the modulator then spent
+  per-frame allocations computing for parameters forced to zero. Routes
+  on disabled effects are now skipped outright.
+- Re-enabling trails flashed whatever was on screen when they were last
+  active; the feedback texture is now cleared on the way back on and on
+  output-size changes.
+- A failed import (storage quota) silently re-applied the previous look
+  while claiming success; the import path no longer round-trips through
+  storage at all.
+- Changing font with a device connected could leave an unhandled
+  promise rejection if the port died mid-refresh.
+
 ## v0.9.11 — the feedback round: drawer, routing, stems zip, grid manners
 
 Ten items of real-device feedback, all landed.

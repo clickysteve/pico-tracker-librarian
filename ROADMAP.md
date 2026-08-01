@@ -56,8 +56,6 @@ actually audible rather than theoretical:
   `PTLibrarian_Backups/<stamp>/`. Parsing those and diffing them with the
   Compare machinery would give per-project history and restore, turning
   the safety net into undo that survives closing the browser.
-- **Shareable effect looks.** The mirror's effect settings live in one
-  browser. Export and import of that blob would let people trade presets.
 - **Song maps in the setlist.** The annotated map is per project; a set's
   worth of them on one page would be the thing you actually take on stage.
 - **More generators.** Call-and-response, fills every N bars, and a
@@ -78,5 +76,7 @@ audio-reactive effects, scale lock, the phrase generators and the
 annotated song map in 0.9.10, and the 0.9.11 feedback round: the effects
 drawer, per-parameter audio routing, stems as one zip with render
 progress, insert-paste and row clears on the grids, the tables layout,
-MP4 recording and the editable mirror text. See `CHANGELOG.md` for the
-detail.
+MP4 recording and the editable mirror text; and 0.9.12's six new effects
+(trails, pixelate, hue cycle, kaleidoscope, refresh bar, invert), seven
+new presets, the random-look button, switchable mirror fonts and
+shareable look files. See `CHANGELOG.md` for the detail.

@@ -1378,6 +1378,59 @@ t('rng: deterministic, in range, and not obviously stuck', () => {
   ok(PT.rng(0)() !== PT.rng(1)(), 'a zero seed must still work');
 });
 
+// ── Random look ────────────────────────────────────────
+t('random: deterministic under a seeded rng, varies across seeds', () => {
+  const a = FX.randomLook(PT.rng(11)), b = FX.randomLook(PT.rng(11));
+  eq(JSON.stringify(a), JSON.stringify(b));
+  ok(JSON.stringify(a) !== JSON.stringify(FX.randomLook(PT.rng(12))));
+});
+t('random: always produces a look, never an empty or absurd one', () => {
+  for (let seed = 1; seed <= 60; seed++) {
+    const look = FX.randomLook(PT.rng(seed));
+    const on = Object.entries(look.enabled).filter(([, v]) => v).map(([k]) => k);
+    ok(on.length >= 2, `seed ${seed}: only ${on.length} effects`);
+    ok(on.length <= 8, `seed ${seed}: ${on.length} effects is soup`);
+  }
+});
+t('random: every parameter it writes is inside its own slider range and on its step', () => {
+  for (let seed = 1; seed <= 60; seed++) {
+    const look = FX.randomLook(PT.rng(seed));
+    for (const d of FX.DEFS)
+      for (const par of d.params) {
+        const v = look.params[d.id][par.key];
+        if (par.type === 'seg') { ok(par.opts.some(o => o[0] === v), `seed ${seed} ${d.id}.${par.key}`); continue; }
+        ok(v >= par.min && v <= par.max, `seed ${seed} ${d.id}.${par.key} = ${v}`);
+        const steps = (v - par.min) / par.step;
+        ok(Math.abs(steps - Math.round(steps)) < 1e-6, `seed ${seed} ${d.id}.${par.key} off-step ${v}`);
+      }
+  }
+});
+t('random: keeps the destructive extremes off the table', () => {
+  for (let seed = 1; seed <= 60; seed++) {
+    const look = FX.randomLook(PT.rng(seed));
+    if (look.enabled.noise) ok(look.params.noise.amount <= 40, `seed ${seed} noise ${look.params.noise.amount}`);
+    if (look.enabled.grade) {
+      ok(look.params.grade.brightness >= 85 && look.params.grade.brightness <= 125, `seed ${seed}`);
+    }
+    if (look.enabled.chswap) ok(look.params.chswap.mode !== 'rgb', `seed ${seed}: chswap doing nothing`);
+    if (look.enabled.trails) ok(look.params.trails.decay <= 92, `seed ${seed}: trails would never fade`);
+  }
+});
+t('random: any routes it wires are valid', () => {
+  const srcs = ['low', 'mid', 'high', 'level', 'hit'];
+  for (let seed = 1; seed <= 60; seed++) {
+    const look = FX.randomLook(PT.rng(seed));
+    for (const [id, routes] of Object.entries(look.react)) {
+      for (const r of routes) {
+        ok(FX.REACT_TARGET[id], `seed ${seed}: route on unreactable ${id}`);
+        ok(look.enabled[id], `seed ${seed}: route on a disabled effect`);
+        ok(srcs.includes(r.src) && r.depth >= -100 && r.depth <= 100 && r.param === FX.REACT_TARGET[id],
+           `seed ${seed}: bad route ${JSON.stringify(r)}`);
+      }
+    }
+  }
+});
+
 // ── Scale helpers ──────────────────────────────────────
 t('scale: a named scale and root become a 12-note mask', () => {
   const m = PT.scaleMask('A', 'Nat. Minor');
@@ -1641,6 +1694,16 @@ t('FX: modulate ignores an unknown source or parameter rather than producing NaN
     route('bloom', { src: 'level', depth: 100, param: 'colour' }), { level: 1 });
   eq(out.bloom.colour, 'none', 'a segmented parameter cannot be driven');
   ok(!Object.values(out.bloom).some(v => Number.isNaN(v)));
+});
+t('FX: modulate skips routes on effects the enabled map turns off', () => {
+  const p = FX.defaults();
+  const wiring = route('bloom', { src: 'level', depth: 100 });
+  const off = FX.modulate(p, wiring, { level: 1 }, { bloom: false });
+  ok(off === p, 'a disabled effect must cost nothing, not even a copy');
+  const on = FX.modulate(p, wiring, { level: 1 }, { bloom: true });
+  ok(on.bloom.intensity > p.bloom.intensity);
+  // No enabled map at all keeps the old behaviour.
+  ok(FX.modulate(p, wiring, { level: 1 }).bloom.intensity > p.bloom.intensity);
 });
 t('FX: the old single-object wiring is simply skipped, not misread', () => {
   const p = FX.defaults();

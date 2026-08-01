@@ -1594,8 +1594,8 @@ const fxBase = await page.evaluate(() => ({
   outputs: document.querySelectorAll('#fx-output option').length,
 }));
 check('fx: WebGL renderer came up', fxBase.hasGl);
-check('fx: one card per effect definition', fxBase.cards === fxBase.defs && fxBase.cards === 19);
-check('fx: preset list has every preset plus Custom', fxBase.presets === FXPRESETS + 1);
+check('fx: one card per effect definition', fxBase.cards === fxBase.defs && fxBase.cards === 25);
+check('fx: preset list has every preset plus Custom', fxBase.presets === FXPRESETS + 1 && FXPRESETS === 17);
 check('fx: output list is populated', fxBase.outputs === 4);
 
 // Every preset must render without raising a GL error, and must actually
@@ -1765,7 +1765,7 @@ check('fx: a stand-in screen is painted with no device connected', await page.ev
 // ── 31. audio-reactive effects ─────────────────────────
 check('fx: a react row for every effect that can be driven', await page.evaluate(() =>
   document.querySelectorAll('.fx-react').length === FX.DEFS.filter(d => d.react).length &&
-  document.querySelectorAll('.fx-react').length === 18));
+  document.querySelectorAll('.fx-react').length === 24));
 check('fx: react rows are hidden until audio-reactive is switched on', await page.evaluate(() =>
   getComputedStyle(document.querySelector('.fx-react')).display === 'none'));
 
@@ -2153,9 +2153,186 @@ check('stems: the button returns to its idle label', await page.evaluate(() =>
 await closeProjectModal();
 await page.waitForTimeout(300);
 
-// Regressions found by review of this round.
+// ── 33. randomise, fonts, looks, trails ─────────────────
 await page.click('.tab-btn[data-tab="device"]');
 await page.waitForTimeout(300);
+
+check('random: the button produces a live look every time', await page.evaluate(async () => {
+  for (let i = 0; i < 10; i++) {
+    document.getElementById('fx-random').click();
+    await new Promise(r => setTimeout(r, 80));
+    const st = Mirror.getState();
+    if (!st.on || !Object.values(st.enabled).some(Boolean)) return false;
+    if (document.getElementById('fx-preset').value !== 'custom') return false;
+    for (const d of FX.DEFS)
+      for (const par of d.params) {
+        const v = st.params[d.id][par.key];
+        if (par.type !== 'seg' && (v < par.min || v > par.max)) return false;
+      }
+  }
+  return true;
+}));
+check('random: two rolls differ', await page.evaluate(async () => {
+  document.getElementById('fx-random').click();
+  await new Promise(r => setTimeout(r, 80));
+  const a = JSON.stringify([Mirror.getState().enabled, Mirror.getState().params]);
+  for (let i = 0; i < 6; i++) {
+    document.getElementById('fx-random').click();
+    await new Promise(r => setTimeout(r, 80));
+    if (JSON.stringify([Mirror.getState().enabled, Mirror.getState().params]) !== a) return true;
+  }
+  return false;
+}));
+
+// New presets all render without GL errors and distinctly.
+const newPresets = await page.evaluate(async () => {
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const sigs = {};
+  for (const id of ['scope', 'rainbow', 'broadcast', 'mosaic', 'negative', 'kaleido', 'seance']) {
+    const st = Mirror.getState();
+    const next = FX.presetState(id);
+    st.enabled = next.enabled; st.params = next.params; st.react = next.react;
+    st.on = true; st.preset = next.preset;
+    Mirror.syncUI(); Mirror.invalidate();
+    await new Promise(r => setTimeout(r, 200));
+    const px = new Uint8Array(cv.width * cv.height * 4);
+    gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let sig = '', sum = 0;
+    for (let i = 0; i < px.length; i += 4096) { sig += px[i] + ','; sum += px[i] + px[i+1] + px[i+2]; }
+    sigs[id] = { sig, sum, err: gl.getError() };
+  }
+  return sigs;
+});
+check('presets: the seven new ones render clean',
+  Object.values(newPresets).every(v => v.err === 0 && v.sum > 0));
+check('presets: no two of the new ones are identical',
+  new Set(Object.values(newPresets).map(v => v.sig)).size === 7);
+
+// Trails: a bright frame lingers, then fades.
+check('trails: the previous frame persists and decays', await page.evaluate(async () => {
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const avg = () => {
+    const px = new Uint8Array(cv.width * cv.height * 4);
+    gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let sum = 0, n = 0;
+    for (let i = 0; i < px.length; i += 4096) { sum += px[i] + px[i+1] + px[i+2]; n++; }
+    return sum / n / 3;
+  };
+  const st = Mirror.getState();
+  const next = FX.presetState('off');
+  st.enabled = next.enabled; st.params = next.params; st.react = FX.blankReact();
+  st.on = true; st.enabled.trails = true; st.params.trails.decay = 90;
+  st.enabled.invert = true;
+  const frame = async () => { Mirror.invalidate(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); };
+  Mirror.syncUI(); await frame(); await frame();
+  st.enabled.invert = false;
+  Mirror.syncUI(); await frame();
+  const lingering = avg();
+  for (let i = 0; i < 90; i++) await frame();
+  const faded = avg();
+  st.enabled.trails = false;
+  Mirror.syncUI(); await frame();
+  const base = avg();
+  return lingering > base * 3 && Math.abs(faded - base) < 3;
+}));
+
+// Fonts.
+check('fonts: the picker lists the device face first', await page.evaluate(() => {
+  const sel = document.getElementById('fx-font');
+  return sel.options.length === USB.FONT_FACES.length && sel.options[0].value === 'device';
+}));
+check('fonts: switching face redraws the stand-in with different glyphs', await page.evaluate(async () => {
+  const sig = () => {
+    const c = USB.sourceCanvas();
+    const d = c.getContext('2d').getImageData(0, 0, c.width, 240).data;
+    let s2 = '';
+    for (let i = 0; i < d.length; i += 8192) s2 += d[i] + ',';
+    return s2;
+  };
+  USB.setFont('device');
+  await new Promise(r => setTimeout(r, 80));
+  const a = sig();
+  USB.setFont('clean');
+  await new Promise(r => setTimeout(r, 80));
+  const b = sig();
+  USB.setFont('device');
+  return a !== b;
+}));
+check('fonts: the choice is remembered', await page.evaluate(() => {
+  USB.setFont('serif');
+  const kept = localStorage.getItem('ptMirrorFont') === 'serif';
+  USB.setFont('device');
+  return kept;
+}));
+
+// Export / import a look.
+const lookFile = await page.evaluate(async () => {
+  const st = Mirror.getState();
+  const next = FX.presetState('scope');
+  st.enabled = next.enabled; st.params = next.params; st.react = next.react;
+  st.on = true; st.preset = 'scope';
+  Mirror.syncUI();
+  let captured = null;
+  const real = URL.createObjectURL;
+  URL.createObjectURL = b => { captured = b; return 'blob:x'; };
+  const click = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = () => {};
+  document.getElementById('fx-export').click();
+  await new Promise(r => setTimeout(r, 200));
+  URL.createObjectURL = real;
+  HTMLAnchorElement.prototype.click = click;
+  return captured ? await captured.text() : null;
+});
+check('look: export produces a labelled JSON file', !!lookFile && JSON.parse(lookFile).ptLook === 1 &&
+  JSON.parse(lookFile).enabled.trails === true && !('audio' in JSON.parse(lookFile)));
+check('look: import round-trips through the sanitiser', await page.evaluate(async txt => {
+  // Reset to nothing, then import the exported look.
+  document.getElementById('fx-reset').click();
+  await new Promise(r => setTimeout(r, 100));
+  const file = new File([txt], 'look.json', { type: 'application/json' });
+  const input = document.getElementById('fx-import-file');
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 300));
+  const st = Mirror.getState();
+  return st.on && st.enabled.trails && st.enabled.tint &&
+         st.params.tint.colour === 'green' && st.react.bloom.length === 1;
+}, lookFile));
+check('look: import is held while recording, like the other size controls', await page.evaluate(async () => {
+  // A look file carries an output size; applying one mid-recording would
+  // resize the canvas under the capture track.
+  const real = MediaRecorder.isTypeSupported.bind(MediaRecorder);
+  MediaRecorder.isTypeSupported = m => m.startsWith('video/webm');
+  try {
+    Mirror.toggleRecord();
+    await new Promise(r => setTimeout(r, 350));
+    if (!Mirror.isRecording()) return false;
+    const held = document.getElementById('fx-import').disabled &&
+                 document.getElementById('fx-output').disabled;
+    Mirror.toggleRecord();
+    await new Promise(r => setTimeout(r, 350));
+    return held && !document.getElementById('fx-import').disabled;
+  } finally { MediaRecorder.isTypeSupported = real; }
+}));
+check('look: a hostile file is rejected politely', await page.evaluate(async () => {
+  const file = new File(['{"evil":true}'], 'x.json', { type: 'application/json' });
+  const input = document.getElementById('fx-import-file');
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  input.files = dt.files;
+  const before = JSON.stringify(Mirror.getState().enabled);
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 250));
+  return JSON.stringify(Mirror.getState().enabled) === before &&
+         /not a saved look/.test(document.getElementById('fx-note').textContent);
+}));
+
+// Regressions found by review of this round.
+
 check('drawer: never covers the toolbar at narrow widths', await page.evaluate(async () => {
   // The toolbar holds the only button that closes the drawer, so the
   // drawer overlaying it would lock the user out of their own tab.
