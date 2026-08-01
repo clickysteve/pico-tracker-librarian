@@ -1,6 +1,6 @@
 // Unit tests for the PT picoTracker XML parser.
 // Run: node tests/parser.test.mjs
-import { PT, FX } from './extract.mjs';
+import { PT, FX, AudioReact } from './extract.mjs';
 
 let pass = 0, fail = 0;
 function t(name, fn) {
@@ -1221,6 +1221,398 @@ t('FX: hexToRgb normalises and survives junk', () => {
   eq(FX.hexToRgb('#f00'), [1, 0, 0], 'short form');
   eq(FX.hexToRgb(''), [0, 0, 0], 'empty falls back to black');
   eq(FX.hexToRgb('not a colour'), [0, 0, 0]);
+});
+
+// ── Generators ─────────────────────────────────────────
+const show = a => a.map(v => v ? 'x' : '.').join('');
+t('euclid: spreads hits as evenly as the step count allows', () => {
+  eq(show(PT.euclid(3, 8)), 'x..x..x.', 'tresillo');
+  eq(show(PT.euclid(4, 16)), 'x...x...x...x...');
+  eq(show(PT.euclid(1, 4)), 'x...');
+});
+t('euclid: rotation 0 always puts a hit on the downbeat', () => {
+  // Otherwise the default settings clear step 00, which is exactly where
+  // the kick was, and the "clear the rest" option then blanks it.
+  for (let steps = 1; steps <= 32; steps++)
+    for (let hits = 1; hits <= steps; hits++)
+      ok(PT.euclid(hits, steps)[0], `E(${hits},${steps}) missed the downbeat`);
+});
+t('euclid: the gaps between hits never differ by more than one', () => {
+  for (const [h, st] of [[3, 8], [5, 8], [5, 16], [7, 16], [9, 16], [4, 9]]) {
+    const at = PT.euclid(h, st).map((v, i) => v ? i : -1).filter(i => i >= 0);
+    const gaps = at.map((v, i) => (i ? v - at[i - 1] : v + st - at[at.length - 1]));
+    ok(Math.max(...gaps) - Math.min(...gaps) <= 1,
+       `E(${h},${st}) gaps ${gaps.join(',')} are not even`);
+  }
+});
+t('euclid: hit count always comes out right', () => {
+  for (let steps = 1; steps <= 32; steps++)
+    for (let hits = 0; hits <= steps; hits++)
+      eq(PT.euclid(hits, steps).filter(Boolean).length, hits, `${hits} of ${steps}`);
+});
+t('euclid: rotation moves the figure without changing it', () => {
+  const base = PT.euclid(5, 16);
+  for (let r = 0; r < 16; r++) {
+    const rot = PT.euclid(5, 16, r);
+    eq(rot.length, 16);
+    eq(rot.filter(Boolean).length, 5, `rotation ${r} changed the hit count`);
+  }
+  eq(show(PT.euclid(3, 8, 8)), show(PT.euclid(3, 8)), 'a full turn is no turn');
+  eq(show(PT.euclid(3, 8, -1)), show(PT.euclid(3, 8, 7)), 'negative rotation wraps');
+});
+t('euclid: nonsense input is clamped rather than throwing', () => {
+  eq(PT.euclid(0, 8).filter(Boolean).length, 0);
+  eq(PT.euclid(99, 8).filter(Boolean).length, 8, 'more hits than steps fills it');
+  eq(PT.euclid(-4, 8).filter(Boolean).length, 0);
+  eq(PT.euclid(2, 0).length, 1, 'zero steps still returns something');
+  eq(PT.euclid(2, 1e9).length, 256, 'and a silly step count is capped');
+});
+
+t('arp: walks the chord in the pattern asked for', () => {
+  const min7 = PT.CHORDS.find(c => c.n === 'min7').iv;
+  eq(PT.arpSequence(57, min7, 'up', 1, 4), [57, 60, 64, 67]);
+  eq(PT.arpSequence(57, min7, 'down', 1, 4), [67, 64, 60, 57]);
+  eq(PT.arpSequence(57, min7, 'up', 2, 8), [57, 60, 64, 67, 69, 72, 76, 79]);
+  eq(PT.arpSequence(57, min7, 'up', 1, 6), [57, 60, 64, 67, 57, 60], 'it repeats');
+  const ud = PT.arpSequence(57, min7, 'updown', 1, 6);
+  eq(ud, [57, 60, 64, 67, 64, 60], 'up then back without repeating the ends');
+});
+t('arp: stays inside the note range and copes with edge input', () => {
+  const maj = PT.CHORDS.find(c => c.n === 'maj').iv;
+  for (const seq of [PT.arpSequence(115, maj, 'up', 4, 16), PT.arpSequence(0, maj, 'down', 4, 16)])
+    for (const v of seq) ok(v >= 0 && v <= 119, `note ${v} out of range`);
+  eq(PT.arpSequence(60, maj, 'up', 1, 0), []);
+  eq(PT.arpSequence(60, [], 'up', 1, 4).length, 4, 'no intervals means the root alone');
+  eq(PT.arpSequence(60, null, 'up', 1, 4), [60, 60, 60, 60]);
+});
+t('arp: random is random but reproducible', () => {
+  const maj = PT.CHORDS.find(c => c.n === 'maj').iv;
+  const a = PT.arpSequence(60, maj, 'random', 2, 16, 42);
+  const b = PT.arpSequence(60, maj, 'random', 2, 16, 42);
+  eq(a, b, 'the same seed must give the same phrase');
+  ok(JSON.stringify(a) !== JSON.stringify(PT.arpSequence(60, maj, 'random', 2, 16, 43)),
+     'a different seed should not');
+  const pool = new Set(PT.arpSequence(60, maj, 'up', 2, 6));
+  for (const v of a) ok(pool.has(v), `${v} is not in the chord`);
+});
+t('arp: every chord in the table is usable', () => {
+  for (const c of PT.CHORDS) {
+    ok(c.iv.length >= 2, `${c.n} needs at least two notes`);
+    eq(c.iv[0], 0, `${c.n} should start on the root`);
+    const seq = PT.arpSequence(60, c.iv, 'up', 1, c.iv.length);
+    eq(seq.length, c.iv.length, c.n);
+  }
+});
+
+t('vary: 100% similarity changes nothing', () => {
+  const src = [57, PT.EMPTY, 60, PT.NOTE_OFF, 64, PT.EMPTY, 67, PT.EMPTY];
+  eq(PT.varyNotes(src, 100, 1, null), src);
+});
+t('vary: the same seed always gives the same result', () => {
+  const src = [57, PT.EMPTY, 60, PT.EMPTY, 64, PT.EMPTY, 67, PT.EMPTY];
+  eq(PT.varyNotes(src, 50, 9, null), PT.varyNotes(src, 50, 9, null));
+  ok(JSON.stringify(PT.varyNotes(src, 50, 9, null)) !== JSON.stringify(PT.varyNotes(src, 50, 10, null)),
+     'a different seed should differ');
+});
+t('vary: lower similarity changes more', () => {
+  const src = new Array(16).fill(0).map((_, i) => 60 + (i % 5));
+  const diff = sim => PT.varyNotes(src, sim, 3, null).filter((v, i) => v !== src[i]).length;
+  ok(diff(90) < diff(20), `90% changed ${diff(90)}, 20% changed ${diff(20)}`);
+});
+t('vary: never leaves the note range, and never invents a note-off', () => {
+  const src = [0, 119, 60, PT.NOTE_OFF, PT.EMPTY, 1, 118, 60];
+  for (let seed = 1; seed < 40; seed++) {
+    const out = PT.varyNotes(src, 10, seed, null);
+    eq(out.length, src.length);
+    for (const v of out)
+      ok(v === PT.EMPTY || v === PT.NOTE_OFF || (v >= 0 && v <= 119), `bad note ${v} at seed ${seed}`);
+    eq(out[3], PT.NOTE_OFF, 'an explicit note-off is left alone');
+  }
+});
+t('vary: with a mask, everything it writes stays in the key', () => {
+  const mask = PT.scaleMask('A', 'Nat. Minor');
+  const src = [57, 59, 60, 62, 64, 65, 67, PT.EMPTY];
+  for (let seed = 1; seed < 40; seed++) {
+    const out = PT.varyNotes(src, 25, seed, mask);
+    for (const v of out) ok(PT.inScale(v, mask), `${v} left the key at seed ${seed}`);
+  }
+});
+t('vary: does not mutate the notes it was handed', () => {
+  const src = [57, PT.EMPTY, 60, PT.EMPTY];
+  const before = src.slice();
+  PT.varyNotes(src, 10, 5, null);
+  eq(src, before);
+});
+
+t('humanise: writes a level for notes and nothing for gaps', () => {
+  const src = [60, PT.EMPTY, 64, PT.NOTE_OFF, 67];
+  const v = PT.humaniseVols(src, { seed: 1 });
+  eq(v.length, src.length);
+  eq(v[1], null, 'no note, no level');
+  eq(v[3], null, 'note-off is not a note');
+  for (const x of [v[0], v[2], v[4]]) ok(x >= 0 && x <= 255, `level ${x} out of range`);
+});
+t('humanise: accents land on the beat', () => {
+  const src = new Array(16).fill(60);
+  const v = PT.humaniseVols(src, { base: 0x40, spread: 0, accent: 0x30, accentEvery: 4, seed: 1 });
+  for (let i = 0; i < 16; i++) eq(v[i], i % 4 === 0 ? 0x70 : 0x40, `step ${i}`);
+});
+t('humanise: stays in range at the extremes', () => {
+  const src = new Array(16).fill(60);
+  for (const opts of [{ base: 255, spread: 127, accent: 127 }, { base: 0, spread: 127, accent: 0 }])
+    for (const x of PT.humaniseVols(src, { ...opts, seed: 2 }))
+      ok(x >= 0 && x <= 255, `level ${x} from ${JSON.stringify(opts)}`);
+});
+t('humanise: the same seed gives the same levels', () => {
+  const src = new Array(16).fill(60);
+  eq(PT.humaniseVols(src, { seed: 8 }), PT.humaniseVols(src, { seed: 8 }));
+});
+t('rng: deterministic, in range, and not obviously stuck', () => {
+  const a = PT.rng(1234), b = PT.rng(1234);
+  const seq = Array.from({ length: 200 }, () => a());
+  eq(seq, Array.from({ length: 200 }, () => b()));
+  for (const v of seq) ok(v >= 0 && v < 1, `out of range: ${v}`);
+  ok(new Set(seq).size > 190, 'too many repeats');
+  const mean = seq.reduce((s, v) => s + v, 0) / seq.length;
+  ok(mean > 0.4 && mean < 0.6, `mean ${mean}`);
+  ok(PT.rng(0)() !== PT.rng(1)(), 'a zero seed must still work');
+});
+
+// ── Scale helpers ──────────────────────────────────────
+t('scale: a named scale and root become a 12-note mask', () => {
+  const m = PT.scaleMask('A', 'Nat. Minor');
+  eq(m.map((v, i) => v ? PT.NOTE_NAMES[i] : null).filter(Boolean), ['C','D','E','F','G','A','B']);
+  const c = PT.scaleMask('C', 'Major');
+  eq(c.map((v, i) => v ? PT.NOTE_NAMES[i] : null).filter(Boolean), ['C','D','E','F','G','A','B']);
+});
+t('scale: chromatic and unknown names mean no constraint', () => {
+  eq(PT.scaleMask('C', 'None (Chromatic)'), null);
+  eq(PT.scaleMask('C', 'Chromatic'), null);
+  eq(PT.scaleMask('C', ''), null);
+  eq(PT.scaleMask('C', null), null);
+  eq(PT.scaleMask('C', 'Bebop Klezmer'), null, 'a scale we do not know is not a constraint');
+  eq(PT.scaleMask('H', 'Major'), null, 'nor is a root we cannot read');
+});
+t('scale: the firmware writes a padded root, which still has to parse', () => {
+  ok(PT.scaleMask('A ', 'Dorian'), 'trailing space from the project file');
+  const p = PT.projectScale({ scale: 'Dorian', scaleRoot: 'A ' });
+  eq(p.root, 'A'); eq(p.name, 'Dorian');
+  eq(PT.projectScale({ scale: 'None (Chromatic)', scaleRoot: 'C ' }), null);
+  eq(PT.projectScale(null), null);
+});
+t('scale: inScale leaves empty and note-off alone', () => {
+  const m = PT.scaleMask('C', 'Major');
+  ok(PT.inScale(PT.EMPTY, m));
+  ok(PT.inScale(PT.NOTE_OFF, m));
+  ok(PT.inScale(60, m), 'C is in C major');
+  ok(!PT.inScale(61, m), 'C# is not');
+  ok(PT.inScale(61, null), 'no mask means everything is in scale');
+});
+t('scale: snapping moves a note to the nearest one in the key', () => {
+  const m = PT.scaleMask('C', 'Major');
+  eq(PT.snapToScale(61, m, 0), 60, 'C# down to C');
+  eq(PT.snapToScale(61, m, 1), 62, 'forced upward to D');
+  eq(PT.snapToScale(61, m, -1), 60);
+  eq(PT.snapToScale(60, m, 0), 60, 'already in scale, left alone');
+  eq(PT.snapToScale(PT.EMPTY, m, 0), PT.EMPTY);
+  eq(PT.snapToScale(PT.NOTE_OFF, m, 0), PT.NOTE_OFF);
+  eq(PT.snapToScale(61, null, 0), 61, 'no mask, no change');
+});
+t('scale: snapping never leaves the note range', () => {
+  const m = PT.scaleMask('C', 'Major');
+  for (const v of [0, 1, 118, 119]) {
+    const out = PT.snapToScale(v, m, 0);
+    ok(out >= 0 && out <= 119, `${v} -> ${out}`);
+  }
+  ok(PT.snapToScale(119, m, 1) <= 119, 'forced up at the top of the range');
+  ok(PT.snapToScale(0, m, -1) >= 0, 'forced down at the bottom');
+});
+t('scale: transposing by degree walks the scale, not the semitones', () => {
+  const m = PT.scaleMask('A', 'Nat. Minor');   // A B C D E F G
+  const A = 57;
+  eq(PT.noteStr(PT.transposeInScale(A, m, 1)), PT.noteStr(59), 'A up one degree is B');
+  eq(PT.noteStr(PT.transposeInScale(A, m, 2)), PT.noteStr(60), 'then C');
+  eq(PT.transposeInScale(A, m, -1), 55, 'and down one degree is G');
+  eq(PT.transposeInScale(A, m, 7), A + 12, 'seven degrees is an octave');
+  eq(PT.transposeInScale(A, m, 0), A);
+  eq(PT.transposeInScale(A, null, 3), A, 'no mask, no move');
+  eq(PT.transposeInScale(PT.NOTE_OFF, m, 3), PT.NOTE_OFF);
+});
+t('scale: a degree transpose of an out-of-scale note lands in the scale', () => {
+  const m = PT.scaleMask('C', 'Major');
+  ok(PT.inScale(PT.transposeInScale(61, m, 1), m), 'C# up a degree');
+  ok(PT.inScale(PT.transposeInScale(61, m, -1), m), 'C# down a degree');
+});
+t('scale: degree transpose stays inside the note range', () => {
+  const m = PT.scaleMask('C', 'Major');
+  ok(PT.transposeInScale(119, m, 20) <= 119);
+  ok(PT.transposeInScale(0, m, -20) >= 0);
+});
+t('scale: every scale in the table produces a usable mask', () => {
+  for (const sc of PT.SCALES)
+    for (const root of PT.NOTE_NAMES) {
+      const m = PT.scaleMask(root, sc.n);
+      ok(m && m.filter(Boolean).length === new Set(sc.iv).size,
+         `${root} ${sc.n} produced ${m ? m.filter(Boolean).length : 'null'}`);
+      // Snapping must terminate and stay in range for every note.
+      for (let v = 0; v <= 119; v++) {
+        const out = PT.snapToScale(v, m, 0);
+        ok(out >= 0 && out <= 119 && m[out % 12], `${root} ${sc.n}: ${v} -> ${out}`);
+      }
+    }
+});
+
+// ── Audio-reactive analysis and modulation ─────────────
+const noteBins = (loud) => {                 // synthetic byte FFT
+  const f = new Uint8Array(1024).fill(0);
+  for (const [fromHz, toHz, v] of loud) {
+    const lo = Math.round(fromHz / 24000 * 1024), hi = Math.round(toHz / 24000 * 1024);
+    for (let i = lo; i <= hi && i < 1024; i++) f[i] = v;
+  }
+  return f;
+};
+const wave = (amp) => {
+  const t = new Uint8Array(2048);
+  for (let i = 0; i < t.length; i++) t[i] = 128 + Math.round(amp * 127 * Math.sin(i / 8));
+  return t;
+};
+const settle = (freq, time, gain = 1, n = 40) => {
+  const env = AudioReact.blankEnv();
+  let out;
+  for (let i = 0; i < n; i++) out = AudioReact.analyse(freq, time, 48000, env, gain);
+  return out;
+};
+
+t('audio: silence reads as silence on every source', () => {
+  const out = settle(noteBins([]), new Uint8Array(2048).fill(128));
+  for (const k of ['low', 'mid', 'high', 'level', 'hit']) ok(out[k] < 0.001, `${k} = ${out[k]}`);
+});
+t('audio: energy lands in the band it belongs to', () => {
+  const bass = settle(noteBins([[25, 160, 240]]), wave(0.5));
+  ok(bass.low > 0.8, `low ${bass.low}`);
+  ok(bass.high < 0.05, `high leaked: ${bass.high}`);
+  const treble = settle(noteBins([[2000, 10000, 240]]), wave(0.5));
+  ok(treble.high > 0.8, `high ${treble.high}`);
+  ok(treble.low < 0.05, `low leaked: ${treble.low}`);
+});
+t('audio: analyse never returns anything outside 0..1', () => {
+  for (const gain of [0.1, 1, 4, 400]) {
+    const out = settle(noteBins([[20, 12000, 255]]), wave(1), gain);
+    for (const k of ['low', 'mid', 'high', 'level', 'hit'])
+      ok(out[k] >= 0 && out[k] <= 1, `${k} = ${out[k]} at gain ${gain}`);
+  }
+});
+t('audio: a bass hit fires the transient, and it decays once the hit passes', () => {
+  const env = AudioReact.blankEnv();
+  const quiet = noteBins([[25, 160, 10]]), loud = noteBins([[25, 160, 250]]);
+  for (let i = 0; i < 40; i++) AudioReact.analyse(quiet, wave(0.1), 48000, env, 1);
+  const before = env.hit;
+  const hit = AudioReact.analyse(loud, wave(0.9), 48000, env, 1);
+  ok(before < 0.2, `should be settled first, was ${before}`);
+  ok(hit.hit > 0.9, `transient did not fire: ${hit.hit}`);
+  // A kick is loud for a moment and then gone; the pulse has to fall away
+  // with it or every effect wired to it stays latched on.
+  let after = hit.hit;
+  for (let i = 0; i < 12; i++) after = AudioReact.analyse(quiet, wave(0.1), 48000, env, 1).hit;
+  ok(after < 0.3, `transient never decayed: ${after}`);
+});
+t('audio: a four-to-the-floor pattern fires once per kick', () => {
+  const env = AudioReact.blankEnv();
+  const quiet = noteBins([[25, 160, 10]]), loud = noteBins([[25, 160, 250]]);
+  for (let i = 0; i < 40; i++) AudioReact.analyse(quiet, wave(0.1), 48000, env, 1);
+  let peaks = 0, prev = 0;
+  for (let beat = 0; beat < 6; beat++) {
+    const on = AudioReact.analyse(loud, wave(0.9), 48000, env, 1).hit;
+    if (on > 0.9 && prev < 0.4) peaks++;
+    prev = on;
+    for (let i = 0; i < 10; i++) prev = AudioReact.analyse(quiet, wave(0.1), 48000, env, 1).hit;
+  }
+  eq(peaks, 6, 'every kick should register');
+});
+t('audio: a steady tone does not keep firing the transient', () => {
+  const env = AudioReact.blankEnv();
+  const steady = noteBins([[25, 160, 200]]);
+  for (let i = 0; i < 60; i++) AudioReact.analyse(steady, wave(0.6), 48000, env, 1);
+  ok(env.hit < 0.2, `steady tone reads as a beat: ${env.hit}`);
+});
+t('audio: analyse survives empty and mismatched buffers', () => {
+  const env = AudioReact.blankEnv();
+  eq(AudioReact.analyse(null, null, 48000, env, 1), AudioReact.ZERO);
+  eq(AudioReact.analyse(new Uint8Array(0), new Uint8Array(0), 48000, env, 1), AudioReact.ZERO);
+  const out = AudioReact.analyse(new Uint8Array(4).fill(200), new Uint8Array(4).fill(200), 0, env, 1);
+  for (const k of ['low', 'mid', 'high', 'level']) ok(isFinite(out[k]), `${k} not finite`);
+});
+
+t('FX: every react target names a real, non-segmented parameter', () => {
+  for (const d of FX.DEFS) {
+    if (!d.react) continue;
+    const par = d.params.find(p => p.key === d.react);
+    ok(par, `${d.id} reacts on missing param ${d.react}`);
+    ok(par.type !== 'seg', `${d.id} cannot react on a segmented control`);
+  }
+  eq(Object.keys(FX.REACT_TARGET).length, FX.DEFS.filter(d => d.react).length);
+  ok(!FX.REACT_TARGET.chswap, 'a channel permutation has no "more"');
+});
+t('FX: blankReact covers every reactable effect and nothing else', () => {
+  const r = FX.blankReact();
+  eq(Object.keys(r).sort(), FX.DEFS.filter(d => d.react).map(d => d.id).sort());
+  for (const id in r) eq(r[id].src, 'off');
+});
+t('FX: modulate is a no-op with no wiring or no audio', () => {
+  const p = FX.defaults();
+  ok(FX.modulate(p, FX.blankReact(), { low: 1, mid: 1, high: 1, level: 1, hit: 1 }) === p,
+     'unwired must not even allocate');
+  ok(FX.modulate(p, null, { level: 1 }) === p);
+  ok(FX.modulate(p, FX.blankReact(), null) === p);
+});
+t('FX: a positive depth pushes towards the maximum, negative towards the minimum', () => {
+  const par = FX.DEFS.find(d => d.id === 'bloom').params.find(p => p.key === 'intensity');
+  const base = FX.defaults().bloom.intensity;
+  const up = FX.modulate(FX.defaults(), { bloom: { src: 'level', depth: 100 } }, { level: 1 });
+  eq(up.bloom.intensity, par.max);
+  const down = FX.modulate(FX.defaults(), { bloom: { src: 'level', depth: -100 } }, { level: 1 });
+  eq(down.bloom.intensity, par.min);
+  const half = FX.modulate(FX.defaults(), { bloom: { src: 'level', depth: 50 } }, { level: 1 });
+  eq(half.bloom.intensity, base + 0.5 * (par.max - base));
+});
+t('FX: the slider value is the resting point, restored when the audio stops', () => {
+  const p = FX.defaults();
+  const wiring = { bloom: { src: 'level', depth: 100 } };
+  eq(FX.modulate(p, wiring, { level: 0 }).bloom.intensity, p.bloom.intensity);
+});
+t('FX: modulate never leaves a parameter outside its own range', () => {
+  for (const d of FX.DEFS) {
+    if (!d.react) continue;
+    const par = d.params.find(x => x.key === d.react);
+    for (const depth of [-100, -37, 37, 100])
+      for (const lvl of [0, 0.5, 1]) {
+        const out = FX.modulate(FX.defaults(), { [d.id]: { src: 'level', depth } }, { level: lvl });
+        const v = out[d.id][d.react];
+        ok(v >= par.min && v <= par.max, `${d.id}.${d.react} = ${v} outside ${par.min}..${par.max}`);
+      }
+  }
+});
+t('FX: modulate does not mutate the settings it was handed', () => {
+  const p = FX.defaults();
+  const before = JSON.stringify(p);
+  FX.modulate(p, { bloom: { src: 'level', depth: 100 } }, { level: 1 });
+  eq(JSON.stringify(p), before, 'the user\'s own sliders must not move');
+});
+t('FX: modulate ignores an unknown source rather than producing NaN', () => {
+  const out = FX.modulate(FX.defaults(), { bloom: { src: 'nope', depth: 100 } }, { level: 1 });
+  eq(out.bloom.intensity, FX.defaults().bloom.intensity);
+});
+t('FX: presets only wire real effects to real sources', () => {
+  const srcs = AudioReact.SOURCES.map(x => x[0]);
+  for (const pre of FX.PRESETS) {
+    for (const id in (pre.r || {})) {
+      ok(FX.REACT_TARGET[id], `${pre.id} wires ${id}, which cannot react`);
+      ok(srcs.includes(pre.r[id].src), `${pre.id}.${id} uses unknown source ${pre.r[id].src}`);
+      const dep = pre.r[id].depth;
+      ok(dep >= -100 && dep <= 100, `${pre.id}.${id} depth ${dep} out of range`);
+      ok(pre.on.includes(id), `${pre.id} wires ${id} but never switches it on`);
+    }
+  }
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

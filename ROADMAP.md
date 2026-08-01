@@ -15,6 +15,9 @@ until then, however substantial a round turns out to be.
   directly from the sample browser and preview flows would save a trip
   through Problems.
 - **Waveform view + trim** in the sample browser.
+- **MIDI clock out** was considered and dropped: the MIDI export already
+  covers the case people hit, and clock out only helps if the browser
+  preview is the master, which it will not be with hardware in the room.
 
 ## Playback fidelity
 
@@ -43,15 +46,22 @@ actually audible rather than theoretical:
 
 ## Ideas
 
+- **Video render.** The pieces are now all in place: the player knows every
+  event to the sample, the effects take a modulation input, and the output
+  canvas is already a capture surface. Driving the effects from the
+  player's own timeline rather than from a microphone would turn a project
+  file into a finished music video with perfectly locked audio, rendered
+  offline the same way stems are.
+- **Version history from the backups.** Every write already lands in
+  `PTLibrarian_Backups/<stamp>/`. Parsing those and diffing them with the
+  Compare machinery would give per-project history and restore, turning
+  the safety net into undo that survives closing the browser.
 - **Shareable effect looks.** The mirror's effect settings live in one
-  browser. Export and import of that blob would let people trade presets,
-  and would make a look survive moving machines.
-- **Effects over a render.** The same shader chain could run over a
-  project render as well as the live screen, so a video and its audio
-  could come out of one pass.
-- **A visualiser source.** The mirror's output canvas is already a capture
-  surface; driving it from the song player rather than the device would
-  give a no-hardware video source.
+  browser. Export and import of that blob would let people trade presets.
+- **Song maps in the setlist.** The annotated map is per project; a set's
+  worth of them on one page would be the thing you actually take on stage.
+- **More generators.** Call-and-response, fills every N bars, and a
+  "make this phrase into a chain of variations" pass.
 
 ## Done
 
@@ -62,6 +72,7 @@ place of typing hex, the transport bar and live playback position, the
 slicer's waveform zoom, setlist ordering, the macOS junk-file filter, the
 playback fixes in 0.9.1 (slice/loop sample-rate units, output clipping,
 dropped slice-0 notes), render to WAV and stems, table and groove editing,
-chain-colour sidecars, note entry from a computer keyboard, and the
-mirror's output effects with recording and capture-ready output sizes in
-0.9.9. See `CHANGELOG.md` for the detail.
+chain-colour sidecars, note entry from a computer keyboard, the mirror's
+output effects with recording and capture-ready output sizes in 0.9.9, and
+audio-reactive effects, scale lock, the phrase generators and the
+annotated song map in 0.9.10. See `CHANGELOG.md` for the detail.

@@ -1,5 +1,88 @@
 # Changelog
 
+## v0.9.10 — audio-reactive effects, scale lock, generators, annotated song map
+
+**Audio-reactive effects.** The mirror's effects can now be driven from a
+live audio input. Pick the interface the picoTracker (or your mixer) is
+plugged into and the picture follows what you are actually hearing: there
+is no sync problem because it is the real signal, a frame or two behind,
+which is invisible for visuals. Bass, mids, highs, overall level and a
+transient pulse are each available as a source; every effect that has a
+meaningful "more" can be wired to one, with a depth from −100% to +100%
+so it can duck on a beat as well as swell on one. Your sliders stay
+exactly where you put them and the modulation rides on top. Presets come
+with sensible wiring already in place. Nothing is ever routed to the
+speakers, and no audio device is opened without a click.
+
+**Scale lock.** The phrase editor knows what key a project is in, from
+the project's own setting, from a scale you choose for it, or from the
+notes themselves. Out-of-key notes are flagged whether or not the lock is
+on. With it on, the note pick-list only offers notes in the key, typed
+and piano entry snap, and `+1`/`−1` move by scale degree rather than by
+semitone (octaves stay octaves). A one-click **Fix** moves every stray
+note to the nearest one in the key, offered only when the scale is
+something you or the project stated rather than something we guessed.
+A scale chosen here belongs to that project, not to the browser.
+
+**Generators.** A preview-then-apply modal that writes real phrase data:
+Euclidean rhythms with rotation, arpeggios over twelve chord shapes in
+four patterns, variations of what is already there with a similarity dial
+and a reroll, and a humanise pass that writes `VOL` with an accent on the
+beat and a seeded spread. Everything is seeded, so the same settings
+always give the same phrase and a result you liked can be reached again.
+The preview shows before and after for all sixteen steps, nothing is
+written until you press Apply, and one undo takes the whole thing back.
+A block selection narrows the scope.
+
+**Annotated song map.** A new tab in the project workspace draws the
+arrangement wide, with named section bands you drag out over the rows and
+notes you pin to a row — "Intro", "drop", "repeat x2". Exports as PNG or
+SVG for a setlist or a rehearsal sheet, and saves to
+`PTLibrarian_map.json` on the card so a marked-up map travels with the
+project instead of living in one browser.
+
+**Also:** the mirror is now pinned to the top of the Device tab and the
+effects panel scrolls under it, so opening the panel can no longer push
+the thing you are looking at off the screen.
+
+**Found by review of the above, before shipping**
+- Escape and the arrow keys closed or navigated the project modal out
+  from under an open generator. Apply then wrote into a project the app
+  had already let go of: it reported writing the bars and silently
+  discarded them, or flagged a *different* project as having unsaved
+  edits it never had.
+- Song-map annotations were keyed by project directory name and never
+  cleared when a different card was opened. Directory names collide
+  across cards routinely, so one press of "Save to card" could overwrite
+  another card's annotations with the previous card's.
+- The Euclidean generator marked the last step of each group rather than
+  the first, so every pattern came out rotated by one and the default
+  settings cleared the downbeat — exactly where the kick was.
+- Unsaved song-map annotations did not count as unsaved work, so closing
+  the tab threw them away with no prompt.
+- Opening the map tab clamped every section and note to the current song
+  length and kept the clamped values. Shortening an arrangement (or
+  undoing through an empty grid) collapsed the whole markup onto one row
+  for good. The stored values are now left alone and only the drawing is
+  clamped, with a note when something sits past the end.
+- A scale chosen in one project governed note entry in every other
+  project and every later session, including offering to rewrite notes
+  into a key that project was never in.
+- The humanise preview only ever rendered FX 1, so writing into FX 2
+  looked like it was about to destroy whatever FX 1 held — and could
+  disable Apply while there were real changes to make.
+- The variation preview claimed the instrument column was being cleared
+  on notes it emptied, which Apply did not do.
+- Every generator slider was click-only: each `input` rebuilt the form
+  and destroyed the element the drag was captured on.
+- The generator's chosen instrument survived between projects, so it
+  could write an instrument id that does not exist in the project you
+  are in, or silently fall back to `00`.
+- Drag-to-create-a-section stopped working while a label field had focus.
+- A block selection that excluded the columns a generator writes to was
+  silently widened; it is now called out.
+- A no-op Apply, and a no-op scale Fix, cleared the redo stack.
+
 ## v0.9.9 — output effects for the screen mirror
 
 The USB mirror can now be run through a chain of GPU effects and captured,

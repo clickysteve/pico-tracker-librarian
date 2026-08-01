@@ -926,8 +926,73 @@
     #usb-stage:fullscreen { border:none; border-radius:0; }
     /* object-fit does the letterboxing: clamping both width and height
        would drop the aspect ratio and stretch the 16:9 output sizes. */
-    #usb-stage:fullscreen canvas { width:100vw; height:100vh; max-width:none;
-      max-height:none; object-fit:contain; }
+    #usb-stage:fullscreen canvas, #tab-device.fx-open #usb-stage:fullscreen canvas {
+      width:100vw; height:100vh; max-width:none; max-height:none; object-fit:contain; }
+
+    /* The mirror is pinned to the top of the Device tab and the effects
+       panel scrolls underneath it, so opening the panel can never push
+       the thing you are looking at off the screen. */
+    #usb-sticky { position:sticky; top:0; z-index:6; width:100%; padding:16px 0 12px;
+      background:var(--bg); display:flex; flex-direction:column; align-items:center;
+      border-bottom:1px solid transparent; transition:border-color .15s; }
+    #usb-sticky.stuck { border-bottom-color:var(--border); }
+    #usb-canvas { max-height:56vh; }
+    /* Leave room for the panel when it is open. */
+    #tab-device.fx-open #usb-canvas { max-height:40vh; }
+    #usb-stage:fullscreen { max-height:none; }
+
+    /* SONG MAP */
+    .map-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:12px 16px 8px; }
+    .map-hint { font-size:11px; color:var(--muted); flex:1; min-width:180px; }
+    .map-wrap { padding:0 16px; overflow-x:auto; }
+    .map-wrap svg { display:block; min-width:640px; }
+    .map-sec, .map-note { cursor:pointer; }
+    .map-sec:hover rect, .map-note:hover text { opacity:.85; }
+    .map-edit { padding:8px 16px 0; }
+    .map-edit-box { display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+      background:var(--surface); border:1px solid var(--accent-brd); border-radius:8px; padding:9px 11px; }
+    .map-in { flex:1; min-width:160px; }
+    .map-num { width:66px; }
+    .map-l { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:5px; }
+    .map-sw { display:flex; gap:3px; }
+    .map-c { width:19px; height:19px; border-radius:4px; border:1px solid var(--border2); cursor:pointer; padding:0; }
+    .map-c.on { outline:2px solid var(--text); outline-offset:1px; }
+    .map-legend { font-size:11px; color:var(--muted); padding:10px 16px 16px; }
+
+    /* GENERATE (phrase generators) */
+    .gen-body { display:flex; gap:0; min-height:0; flex:1; }
+    .gen-left { flex:1; min-width:0; padding:14px 16px; display:flex; flex-direction:column; gap:12px;
+      overflow-y:auto; }
+    .gen-right { width:270px; flex-shrink:0; border-left:1px solid var(--border);
+      display:flex; flex-direction:column; min-height:0; background:var(--bg); }
+    .gen-tabs { display:flex; gap:5px; flex-wrap:wrap; }
+    .gen-tab.on { background:var(--accent); border-color:var(--accent); color:#08121a; font-weight:700; }
+    .gen-ctrls { display:flex; flex-direction:column; gap:8px; }
+    .gen-r { display:flex; align-items:center; gap:9px; font-size:12px; }
+    .gen-r > span:first-child { width:118px; flex-shrink:0; color:var(--muted); }
+    .gen-r input[type=range] { flex:1; min-width:0; accent-color:var(--accent); }
+    .gen-r select, .gen-r input[type=number] { background:var(--surface2); border:1px solid var(--border2);
+      color:var(--text); padding:4px 7px; font-size:11px; border-radius:5px; outline:none; }
+    .gen-r select:focus, .gen-r input:focus { border-color:var(--accent); }
+    .gen-rv { width:66px; text-align:right; font-family:monospace; font-size:11px; flex-shrink:0; }
+    .gen-hint { font-size:11px; color:var(--muted); line-height:1.55; }
+    .gen-scope { font-size:11px; color:var(--muted); border-top:1px solid var(--border); padding-top:10px; }
+    .gen-pat { display:flex; flex-wrap:wrap; gap:2px; margin-top:4px; }
+    .gen-pat i { width:13px; height:13px; border-radius:3px; background:var(--surface2);
+      border:1px solid var(--border2); }
+    .gen-pat i.hit { background:var(--accent); border-color:var(--accent); }
+    .gen-pat i.beat { border-color:var(--muted); }
+    .gen-prev-head, .gen-prow { display:grid; grid-template-columns:26px 1fr 1fr; gap:6px;
+      padding:2px 12px; font-family:monospace; font-size:11px; }
+    .gen-prev-head { padding-top:9px; padding-bottom:6px; color:var(--muted); font-size:10px;
+      border-bottom:1px solid var(--border); text-transform:uppercase; letter-spacing:.5px; }
+    .gen-prev { overflow-y:auto; padding:6px 0 10px; flex:1; }
+    .gen-prow span:first-child { color:var(--muted); }
+    .gen-prow.beat { background:rgba(255,255,255,.03); }
+    .gen-prow .old { color:var(--muted); }
+    .gen-prow .new { color:var(--text); }
+    .gen-prow.chg .new { color:var(--c-found); font-weight:700; }
+    .gen-prow.gone .new { color:var(--c-miss); }
 
     /* OUTPUT EFFECTS (USB mirror) */
     .fx-panel { width:100%; max-width:1100px; display:flex; flex-direction:column; gap:10px; }
@@ -967,6 +1032,25 @@
     .fx-panel.fx-dim .fx-grid { opacity:.45; }
     .fx-note { font-size:11px; color:var(--warn); min-height:0; }
     .fx-panel input:disabled, .fx-panel button:disabled { opacity:.5; cursor:not-allowed; }
+    /* Out-of-scale notes are flagged whether or not the lock is on: knowing
+       is useful even when you meant it. */
+    .pe-c.pe-out { color:var(--warn) !important; }
+    .pe-c.pe-out::after { content:'·'; margin-left:2px; color:var(--warn); }
+    #fx-audio-dev { max-width:230px; }
+    #fx-audio-gain { width:74px; }
+    .fx-meters { display:flex; gap:8px; align-items:flex-end; }
+    .fx-meter { display:flex; flex-direction:column; align-items:center; gap:3px; width:34px; }
+    .fx-meter i { display:block; width:100%; height:8px; border-radius:3px; background:var(--surface2);
+      border:1px solid var(--border2); position:relative; overflow:hidden; }
+    .fx-meter i::after { content:''; position:absolute; inset:0 auto 0 0; width:var(--w,0%);
+      background:var(--accent); transition:width .05s linear; }
+    .fx-meter-hit i::after { background:var(--warn); }
+    .fx-meter b { font-size:9px; color:var(--muted); font-weight:500; letter-spacing:.3px; }
+    .fx-react { border-top:1px dashed var(--border2); margin-top:4px; padding-top:5px; }
+    .fx-react select { background:var(--surface2); border:1px solid var(--border2); color:var(--text);
+      font-size:10px; padding:1px 4px; border-radius:4px; outline:none; }
+    .fx-react.wired .fx-plab { color:var(--accent); }
+    .fx-panel:not(.fx-reacting) .fx-react { display:none; }
     .no-results { color:var(--muted); padding:36px; text-align:center; }
   </style>
 </head>
@@ -974,7 +1058,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.9 Alpha</span>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.10 Alpha</span>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -1225,9 +1309,11 @@
         <button class="btn ghost sm" id="btn-usb-fx" title="Show or hide the output effects">✨ Effects</button>
         <span class="stat-chip" id="usb-status" style="margin-left:auto">Not connected</span>
       </div>
-      <div class="scroll-area" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:16px">
-        <div id="usb-stage" style="display:flex;align-items:center;justify-content:center;background:#000;border:1px solid var(--border2);border-radius:8px;max-width:100%">
-          <canvas id="usb-canvas" width="960" height="720" style="max-width:100%;max-height:52vh;aspect-ratio:4/3;image-rendering:pixelated;display:block"></canvas>
+      <div class="scroll-area" id="usb-scroll" style="display:flex;align-items:center;flex-direction:column;gap:14px;padding:0 16px 16px">
+        <div id="usb-sticky">
+          <div id="usb-stage" style="display:flex;align-items:center;justify-content:center;background:#000;border:1px solid var(--border2);border-radius:8px;max-width:100%">
+            <canvas id="usb-canvas" width="960" height="720" style="max-width:100%;aspect-ratio:4/3;image-rendering:pixelated;display:block"></canvas>
+          </div>
         </div>
         <div id="usb-pad" style="display:none;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center">
           <div style="display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,34px);gap:4px;margin-right:14px">
@@ -1258,6 +1344,20 @@
             <button class="btn ghost sm" id="fx-record">● Record</button>
             <button class="btn ghost sm" id="fx-reset" title="Turn every effect off and restore defaults">Reset</button>
             <span class="stat-chip" id="fx-fps" style="margin-left:auto"></span>
+          </div>
+          <div class="fx-top" id="fx-audio-bar">
+            <label class="fx-master" title="Drive the effects from an audio input, so the picture moves with what you are hearing"><input type="checkbox" id="fx-react-on"> AUDIO REACTIVE</label>
+            <select id="fx-audio-dev" title="Which input the picoTracker (or your mixer) is plugged into"></select>
+            <button class="btn ghost sm" id="fx-audio-connect" title="Ask the browser for permission and open this input">Enable input</button>
+            <label class="fx-mini" title="How hard the incoming level pushes the effects">Sensitivity <input type="range" id="fx-audio-gain" min="10" max="400" step="5"><span id="fx-audio-gain-v" class="fx-pval"></span></label>
+            <div class="fx-meters" id="fx-meters" aria-hidden="true">
+              <span class="fx-meter" data-src="low"><i></i><b>bass</b></span>
+              <span class="fx-meter" data-src="mid"><i></i><b>mid</b></span>
+              <span class="fx-meter" data-src="high"><i></i><b>high</b></span>
+              <span class="fx-meter" data-src="level"><i></i><b>level</b></span>
+              <span class="fx-meter fx-meter-hit" data-src="hit"><i></i><b>hit</b></span>
+            </div>
+            <span class="stat-chip" id="fx-audio-status" style="margin-left:auto">Not connected</span>
           </div>
           <div class="fx-grid" id="fx-grid"></div>
           <div class="fx-note" id="fx-note"></div>
@@ -1322,6 +1422,7 @@
       <button class="modal-tab active" id="btn-modal-overview">Overview</button>
       <button class="modal-tab" id="btn-modal-patterns">Patterns</button>
       <button class="modal-tab" id="btn-modal-tables">Tables &amp; Grooves</button>
+      <button class="modal-tab" id="btn-modal-map">Song map</button>
     </div>
     <div class="proj-modal-body" id="modal-body"></div>
   </div>
@@ -1384,6 +1485,37 @@
 </div>
 
 <!-- Slice editor modal -->
+<div id="gen-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:170;display:none;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:10px;width:min(860px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px;font-weight:700;flex:1" id="gen-title">Generate</span>
+      <button class="btn ghost sm" id="btn-gen-close">✕</button>
+    </div>
+    <div class="gen-body">
+      <div class="gen-left">
+        <div class="gen-tabs" id="gen-tabs">
+          <button class="btn ghost sm gen-tab on" data-gen="euclid" title="Spread a number of hits as evenly as possible across the steps">Rhythm</button>
+          <button class="btn ghost sm gen-tab" data-gen="arp" title="Walk a chord across the steps">Arp / chord</button>
+          <button class="btn ghost sm gen-tab" data-gen="vary" title="Make a relative of what is already in the phrase">Variation</button>
+          <button class="btn ghost sm gen-tab" data-gen="human" title="Write VOL commands with an accent and a bit of spread">Humanise</button>
+        </div>
+        <div class="gen-ctrls" id="gen-ctrls"></div>
+        <div class="gen-scope" id="gen-scope"></div>
+      </div>
+      <div class="gen-right">
+        <div class="gen-prev-head"><span>#</span><span>before</span><span>after</span></div>
+        <div class="gen-prev" id="gen-preview"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border)">
+      <span id="gen-status" style="flex:1;font-size:11px;color:var(--muted)"></span>
+      <button class="btn ghost sm" id="btn-gen-reroll" title="Another go with a different seed">🎲 Reroll</button>
+      <button class="btn secondary" id="btn-gen-cancel">Cancel</button>
+      <button class="btn" id="btn-gen-apply">Apply</button>
+    </div>
+  </div>
+</div>
+
 <div id="slice-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:170;display:none;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--surface);border:1px solid var(--border2);border-radius:10px;width:min(980px,100%);display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)">
@@ -1614,6 +1746,7 @@ const PT = (() => {
 
   // ── FourCC command bytes (Types.h — values are frozen) ─
   const CMD_NONE = 0x2D;
+  const CMD_VOL = 0x45;          // the only command the generators write
   const COMMANDS = {
     0x00:'ARP', 0x02:'CSH', 0x04:'DLY', 0x14:'FCT', 0x16:'FLT', 0x19:'FRS',
     0x1A:'GRV', 0x1B:'HOP', 0x1D:'IRT', 0x1E:'KIL', 0x1F:'LEG', 0x24:'LOF',
@@ -1966,6 +2099,198 @@ const PT = (() => {
     {n:'Pentat. Maj', iv:[0,2,4,7,9]},
     {n:'Pentat. Min', iv:[0,3,5,7,10]},
   ];
+  // ── Generators ─────────────────────────────────────────
+  // Everything here is pure and seeded: the same inputs always give the
+  // same phrase, so a result can be previewed, applied, undone and
+  // reproduced, and the tests can assert on exact output.
+
+  // mulberry32 — small, fast, and good enough for musical randomness.
+  function rng(seed) {
+    // No `|| 1` fallback: mulberry32 is fine from zero, and coercing 0 to
+    // 1 would make two different seeds produce the same phrase.
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const CHORDS = [
+    { n: '5th',   iv: [0, 7] },
+    { n: 'maj',   iv: [0, 4, 7] },
+    { n: 'min',   iv: [0, 3, 7] },
+    { n: 'dim',   iv: [0, 3, 6] },
+    { n: 'aug',   iv: [0, 4, 8] },
+    { n: 'sus2',  iv: [0, 2, 7] },
+    { n: 'sus4',  iv: [0, 5, 7] },
+    { n: 'maj7',  iv: [0, 4, 7, 11] },
+    { n: 'min7',  iv: [0, 3, 7, 10] },
+    { n: 'dom7',  iv: [0, 4, 7, 10] },
+    { n: 'add9',  iv: [0, 4, 7, 14] },
+    { n: 'min9',  iv: [0, 3, 7, 10, 14] },
+  ];
+
+  const ARP_PATTERNS = ['up', 'down', 'updown', 'downup', 'random', 'chord'];
+
+  // Euclidean rhythm: spread `hits` as evenly as possible over `steps`.
+  // Rotation slides the whole figure, which is how you get the same
+  // pattern to start on the downbeat or on an offbeat.
+  function euclid(hits, steps, rotation = 0) {
+    steps = Math.max(1, Math.min(256, Math.floor(steps) || 1));
+    hits  = Math.max(0, Math.min(steps, Math.floor(hits) || 0));
+    const out = new Array(steps).fill(false);
+    if (!hits) return out;
+    // Mark the FIRST step of each group, not the last: E(3,8) has to be
+    // x..x..x. so that rotation 0 puts a hit on the downbeat. Marking the
+    // last step gives the same figure rotated by one, which quietly
+    // clears step 00 at the default settings.
+    for (let i = 0; i < steps; i++)
+      out[i] = i === 0 || Math.floor(i * hits / steps) !== Math.floor((i - 1) * hits / steps);
+    const r = ((Math.floor(rotation) % steps) + steps) % steps;
+    return r ? out.slice(steps - r).concat(out.slice(0, steps - r)) : out;
+  }
+
+  // The notes an arpeggio walks through, as a repeating sequence.
+  function arpSequence(root, intervals, pattern, octaves, count, seed = 1) {
+    const pool = [];
+    const oct = Math.max(1, Math.min(4, Math.floor(octaves) || 1));
+    // An empty interval list means the root on its own, not silence.
+    const ivs = (intervals && intervals.length) ? intervals : [0];
+    for (let o = 0; o < oct; o++)
+      for (const iv of ivs) {
+        const v = root + iv + o * 12;
+        if (v >= 0 && v <= 119) pool.push(v);
+      }
+    if (!pool.length || count <= 0) return [];
+    let seq;
+    if (pattern === 'down') seq = pool.slice().reverse();
+    else if (pattern === 'updown') seq = pool.concat(pool.slice(1, -1).reverse());
+    else if (pattern === 'downup') { const d = pool.slice().reverse(); seq = d.concat(d.slice(1, -1).reverse()); }
+    else seq = pool.slice();
+    if (!seq.length) seq = pool.slice();
+    const out = [];
+    if (pattern === 'random') {
+      const rnd = rng(seed);
+      for (let i = 0; i < count; i++) out.push(pool[Math.floor(rnd() * pool.length) % pool.length]);
+    } else {
+      for (let i = 0; i < count; i++) out.push(seq[i % seq.length]);
+    }
+    return out;
+  }
+
+  // A variation on a set of notes. similarity 100 returns the input
+  // untouched; lower values drop notes, move them by a step or two and
+  // fill gaps from what is already there, so the result still sounds
+  // like a relative of the original rather than a new phrase.
+  function varyNotes(notes, similarity, seed = 1, mask = null) {
+    const src = Array.from(notes);
+    const p = Math.min(1, Math.max(0, (100 - (similarity ?? 100)) / 100));
+    if (p <= 0) return src;
+    const rnd = rng(seed);
+    const live = [];
+    for (const v of src) if (v !== EMPTY && v !== NOTE_OFF) live.push(v);
+    const out = src.slice();
+    for (let i = 0; i < out.length; i++) {
+      const v = out[i];
+      if (v !== EMPTY && v !== NOTE_OFF) {
+        if (rnd() < p * 0.22) { out[i] = EMPTY; continue; }
+        if (rnd() < p * 0.75) {
+          const dist = 1 + Math.floor(rnd() * 2);
+          const dir = rnd() < 0.5 ? -1 : 1;
+          out[i] = mask ? transposeInScale(v, mask, dir * dist)
+                        : Math.min(119, Math.max(0, v + dir * dist));
+        }
+      } else if (v === EMPTY && live.length && rnd() < p * 0.18) {
+        const borrowed = live[Math.floor(rnd() * live.length) % live.length];
+        out[i] = mask ? snapToScale(borrowed, mask) : borrowed;
+      }
+    }
+    return out;
+  }
+
+  // Per-step VOL values for a run of notes: a base level, an accent on
+  // the beat, and a seeded spread either side. Returns null for steps
+  // that should be left alone.
+  function humaniseVols(notes, opts = {}) {
+    const base = Math.min(0xFF, Math.max(0, opts.base ?? 0x60));
+    const spread = Math.min(0xFF, Math.max(0, opts.spread ?? 0x20));
+    const accent = Math.min(0xFF, Math.max(0, opts.accent ?? 0x20));
+    const every = Math.max(1, Math.floor(opts.accentEvery ?? 4));
+    const rnd = rng(opts.seed ?? 1);
+    return Array.from(notes, (v, i) => {
+      if (v === EMPTY || v === NOTE_OFF) return null;
+      const jitter = spread ? Math.round((rnd() * 2 - 1) * spread) : 0;
+      const bump = (i % every === 0) ? accent : 0;
+      return Math.min(0xFF, Math.max(0, base + bump + jitter));
+    });
+  }
+
+  // ── Scale helpers ──────────────────────────────────────
+  // The project file stores a scale name and a root ("Dorian" / "A "),
+  // both free text written by the firmware, so everything here has to
+  // cope with a name that isn't in the table and with chromatic, which
+  // means "no constraint" rather than "all twelve are special".
+  function scaleMask(rootName, scaleName) {
+    if (!scaleName) return null;
+    const clean = String(scaleName).trim();
+    if (!clean || /^none\b/i.test(clean) || /chromatic/i.test(clean)) return null;
+    const def = SCALES.find(x => x.n.toLowerCase() === clean.toLowerCase());
+    if (!def) return null;
+    const root = NOTE_NAMES.indexOf(String(rootName ?? 'C').trim());
+    if (root < 0) return null;
+    const mask = new Array(12).fill(false);
+    for (const iv of def.iv) mask[(root + iv) % 12] = true;
+    return mask;
+  }
+
+  function projectScale(proj) {
+    if (!proj) return null;
+    const name = (proj.scale ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
+    const root = (proj.scaleRoot ?? 'C').trim() || 'C';
+    const mask = scaleMask(root, name);
+    return mask ? { root, name, mask } : null;
+  }
+
+  const inScale = (note, mask) =>
+    !mask || note === EMPTY || note === NOTE_OFF || !!mask[((note % 12) + 12) % 12];
+
+  // Nearest note in the scale. dir 0 searches both ways and prefers the
+  // lower one on a tie, which keeps a chord's shape when several notes
+  // are snapped at once; +1 and -1 search one way only.
+  function snapToScale(note, mask, dir = 0) {
+    if (!mask || note === EMPTY || note === NOTE_OFF) return note;
+    if (mask[((note % 12) + 12) % 12]) return note;
+    for (let d = 1; d <= 12; d++) {
+      const down = note - d, up = note + d;
+      if (dir <= 0 && down >= 0 && mask[((down % 12) + 12) % 12]) return down;
+      if (dir >= 0 && up <= 119 && mask[((up % 12) + 12) % 12]) return up;
+      // dir 0 checked down first above; check up at the same distance
+      if (dir === 0 && up <= 119 && mask[((up % 12) + 12) % 12]) return up;
+    }
+    return note;
+  }
+
+  // Move by scale degrees rather than semitones, so +1 on the third of a
+  // minor scale lands on the fourth and not on a note outside the key.
+  function transposeInScale(note, mask, steps) {
+    if (!mask || note === EMPTY || note === NOTE_OFF || !steps) return note;
+    let v = snapToScale(note, mask, steps > 0 ? 1 : -1);
+    const dir = steps > 0 ? 1 : -1;
+    for (let n = 0; n < Math.abs(steps); n++) {
+      let next = v;
+      for (let d = 1; d <= 12; d++) {
+        const cand = v + dir * d;
+        if (cand < 0 || cand > 119) break;
+        if (mask[((cand % 12) + 12) % 12]) { next = cand; break; }
+      }
+      if (next === v) break;             // ran out of range
+      v = next;
+    }
+    return v;
+  }
+
   function detectScales(proj) {
     const bins = new Array(12).fill(0);
     let total = 0;
@@ -2395,7 +2720,7 @@ const PT = (() => {
     const oneRow = !solo && opts.songRow != null;
     if (!solo && last < 0) return null;
     if (oneRow && (opts.songRow < 0 || opts.songRow > last)) return null;
-    const CMD_KIL = 0x1E, CMD_HOP = 0x1B, CMD_GRV = 0x1A, CMD_VOL = 0x45, CMD_PAN = 0x2A;
+    const CMD_KIL = 0x1E, CMD_HOP = 0x1B, CMD_GRV = 0x1A, CMD_PAN = 0x2A;
     const bpm = proj.tempo && proj.tempo > 0 ? proj.tempo : 120;
     const tickSec = 60 / (bpm * 24);       // 24 ticks per beat, default step = 6 ticks
     const grooveOf = g => {
@@ -2597,6 +2922,8 @@ const PT = (() => {
   return {
     parseXml, decodeHexBuffer, u16leFrom, buildPti, buildPtt, rewriteConfigTheme, defaultConfigXml,
     noteFromStr, encodeHexBuffer, rewriteSongSections, buildEventTimeline,
+    SCALES, NOTE_NAMES, scaleMask, projectScale, inScale, snapToScale, transposeInScale,
+    CHORDS, ARP_PATTERNS, rng, euclid, arpSequence, varyNotes, humaniseVols, CMD_VOL,
     sliceWindow, loopWindow, slicePadCount,
     rewriteGrooves, rewriteTable, buildEmptyProject, rebuildGrooveDigest,
     rewriteInstrumentSlices, rewriteInstrumentParams, detectOnsets, snapZeroCross,
@@ -3670,6 +3997,196 @@ const Demo = (() => {
 // colour (channel swap, grade, tint) → composite (bloom, scanlines,
 // LCD, grid, dots, interlace darkening, noise, vignette, dither).
 // ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// AUDIOREACT — drives the mirror's effects from live audio.
+//
+// The picoTracker's screen arrives over serial and its audio comes out
+// of its own jack, so there is nothing inside the browser tying the two
+// together. Rather than trying to infer the beat from the screen, this
+// listens to the real signal: pick the interface the device is plugged
+// into and the effects follow what you are actually hearing, a frame or
+// two behind, which is invisible for visuals. It is source-agnostic, so
+// a whole live set can drive it, not just the picoTracker.
+//
+// The analysis is split in two on purpose: analyse() is pure and gets
+// unit tested against synthetic spectra, and everything around it is
+// Web Audio plumbing that needs a real device.
+// ══════════════════════════════════════════════════════════
+const AudioReact = (() => {
+
+  // What an effect can be wired to. `hit` is a decaying transient pulse
+  // rather than a level, which is what you want for one-shot effects
+  // like a glitch tear firing on the kick.
+  const SOURCES = [
+    ['off',   'Off'],
+    ['low',   'Bass'],
+    ['mid',   'Mids'],
+    ['high',  'Highs'],
+    ['level', 'Level'],
+    ['hit',   'Transient'],
+  ];
+
+  const BANDS = { low: [25, 160], mid: [160, 2000], high: [2000, 10000] };
+  const ZERO = { low: 0, mid: 0, high: 0, level: 0, hit: 0 };
+
+  function blankEnv() {
+    return { low: 0, mid: 0, high: 0, level: 0, hit: 0, lowAvg: 0, peak: 0.05 };
+  }
+
+  // Attack fast, release slow: a meter that falls as quickly as it rises
+  // reads as flicker rather than as movement.
+  function slew(cur, target) {
+    return target > cur ? cur + (target - cur) * 0.55 : cur + (target - cur) * 0.12;
+  }
+
+  // freq: byte FFT magnitudes, time: byte waveform, both as the
+  // AnalyserNode hands them over. env is carried between calls and
+  // mutated; pass blankEnv() to start.
+  function analyse(freq, time, sampleRate, env, gain = 1) {
+    if (!freq || !freq.length || !time || !time.length) return { ...ZERO };
+    const bins = freq.length, nyquist = (sampleRate || 48000) / 2;
+    const binOf = hz => Math.max(0, Math.min(bins - 1, Math.round(hz / nyquist * bins)));
+    const band = ([a, b]) => {
+      const lo = binOf(a), hi = Math.max(lo, binOf(b));
+      let sum = 0;
+      for (let i = lo; i <= hi; i++) sum += freq[i];
+      return sum / (hi - lo + 1) / 255;
+    };
+
+    let sum = 0;
+    for (let i = 0; i < time.length; i++) {
+      const d = (time[i] - 128) / 128;
+      sum += d * d;
+    }
+    const rms = Math.sqrt(sum / time.length);
+
+    // Auto-gain against a slowly decaying running peak, so a quiet line
+    // level and a hot one both end up using the full range of the
+    // effects rather than needing the sensitivity slider re-set.
+    env.peak = Math.max(rms, env.peak * 0.9995, 0.01);
+    const level = Math.min(1, rms / env.peak * gain);
+
+    const raw = {
+      low:  Math.min(1, band(BANDS.low)  * gain),
+      mid:  Math.min(1, band(BANDS.mid)  * gain),
+      high: Math.min(1, band(BANDS.high) * gain),
+    };
+
+    // Transient: bass jumping well clear of its own moving average.
+    // Compared before the envelope, or the attack smoothing hides
+    // exactly the thing being detected.
+    const isHit = raw.low > env.lowAvg * 1.35 + 0.06;
+    env.lowAvg = env.lowAvg * 0.94 + raw.low * 0.06;
+    env.hit = isHit ? 1 : env.hit * 0.86;
+
+    env.low   = slew(env.low,   raw.low);
+    env.mid   = slew(env.mid,   raw.mid);
+    env.high  = slew(env.high,  raw.high);
+    env.level = slew(env.level, level);
+
+    return {
+      low: env.low, mid: env.mid, high: env.high,
+      level: env.level, hit: env.hit,
+    };
+  }
+
+  // ── Live input ──────────────────────────────────────────
+  let actx = null, stream = null, srcNode = null, analyser = null;
+  let freqBuf = null, timeBuf = null;
+  let env = blankEnv();
+  let levels = { ...ZERO };
+  let status = 'Not connected', running = false;
+  let onChange = () => {};
+
+  const isRunning = () => running;
+  const getStatus = () => status;
+  const getLevels = () => (running ? levels : ZERO);
+
+  function setStatus(msg) { status = msg; onChange(); }
+
+  async function listInputs() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+    try {
+      const all = await navigator.mediaDevices.enumerateDevices();
+      return all.filter(d => d.kind === 'audioinput')
+                .map((d, i) => ({ id: d.deviceId, label: d.label || `Input ${i + 1}` }));
+    } catch { return []; }
+  }
+
+  async function start(deviceId) {
+    if (running) stop();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus('This browser has no audio input support.');
+      return false;
+    }
+    try {
+      // Every processing option off: this is a line input carrying music,
+      // and echo cancellation or AGC would fight the analysis.
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+        },
+      });
+    } catch (e) {
+      stream = null;
+      setStatus(e && e.name === 'NotAllowedError'
+        ? 'Microphone permission was refused. Allow it for this site to use audio input.'
+        : 'Could not open that input: ' + ((e && e.message) || e));
+      return false;
+    }
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') await actx.resume();
+      srcNode = actx.createMediaStreamSource(stream);
+      analyser = actx.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.6;
+      srcNode.connect(analyser);       // deliberately not connected to the
+                                       // destination: this must never make sound
+      freqBuf = new Uint8Array(analyser.frequencyBinCount);
+      timeBuf = new Uint8Array(analyser.fftSize);
+    } catch (e) {
+      stop();
+      setStatus('Could not start audio analysis: ' + ((e && e.message) || e));
+      return false;
+    }
+    env = blankEnv();
+    levels = { ...ZERO };
+    running = true;
+    const track = stream.getAudioTracks()[0];
+    if (track) track.addEventListener('ended', () => { stop(); setStatus('The audio input disappeared.'); });
+    setStatus('Listening' + (track && track.label ? ' to ' + track.label : ''));
+    return true;
+  }
+
+  function stop() {
+    running = false;
+    levels = { ...ZERO };
+    try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch {}
+    try { if (srcNode) srcNode.disconnect(); } catch {}
+    try { if (actx) actx.close(); } catch {}
+    stream = null; srcNode = null; analyser = null; actx = null;
+    freqBuf = null; timeBuf = null;
+    setStatus('Not connected');
+  }
+
+  // Called once per rendered frame.
+  function sample(gain = 1) {
+    if (!running || !analyser) return ZERO;
+    analyser.getByteFrequencyData(freqBuf);
+    analyser.getByteTimeDomainData(timeBuf);
+    levels = analyse(freqBuf, timeBuf, actx ? actx.sampleRate : 48000, env, gain);
+    return levels;
+  }
+
+  function setOnChange(fn) { onChange = fn || (() => {}); }
+
+  return { SOURCES, BANDS, ZERO, blankEnv, analyse,
+           listInputs, start, stop, sample, setOnChange,
+           isRunning, getStatus, getLevels };
+})();
+
 const FX = (() => {
 
   // ── Effect definitions — the single source of truth for the UI,
@@ -3677,96 +4194,137 @@ const FX = (() => {
   // deliberately matches DMG Darkroom's FILTER_DEFS so parameters
   // mean the same thing in both apps.
   const DEFS = [
-    { id:'curve', label:'Screen curve', hint:'Barrel distortion and a glass highlight, like a tube monitor.', params:[
+    { id:'curve', label:'Screen curve', react:'amount', hint:'Barrel distortion and a glass highlight, like a tube monitor.', params:[
       { key:'amount', label:'Curvature',    def:35, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'corner', label:'Corner radius',def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'spec',   label:'Glass glare',  def:25, min:0, max:100, step:1, fmt:v=>`${v}%` },
     ]},
-    { id:'warp', label:'Wave warp', hint:'Rolling horizontal ripple, like a mistracked signal.', params:[
+    { id:'warp', label:'Wave warp', react:'amplitude', hint:'Rolling horizontal ripple, like a mistracked signal.', params:[
       { key:'amplitude', label:'Amplitude', def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'frequency', label:'Frequency', def:40, min:1, max:100, step:1, fmt:v=>`${v}%` },
       { key:'speed',     label:'Speed',     def:30, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Still' },
     ]},
-    { id:'jitter', label:'Scanline jitter', hint:'Random rows kicked sideways. Animates when Motion is on.', params:[
+    { id:'jitter', label:'Scanline jitter', react:'amount', hint:'Random rows kicked sideways. Animates when Motion is on.', params:[
       { key:'amount',    label:'Jitter amount', def:30, min:1, max:100, step:1, fmt:v=>`${v}%` },
       { key:'frequency', label:'Affected rows', def:35, min:1, max:100, step:1, fmt:v=>`${v}%` },
       { key:'rate',      label:'Rate',          def:40, min:1, max:100, step:1, fmt:v=>`${v}%` },
     ]},
-    { id:'glitch', label:'Block glitch', hint:'Horizontal bands torn sideways with wraparound.', params:[
+    { id:'glitch', label:'Block glitch', react:'shift', hint:'Horizontal bands torn sideways with wraparound.', params:[
       { key:'shift',   label:'Shift amount', def:35, min:1, max:100, step:1, fmt:v=>`${v}%` },
       { key:'density', label:'Tear chance', def:25, min:1, max:100, step:1, fmt:v=>`${v}%` },
       { key:'size',    label:'Band height',  def:20, min:1, max:100, step:1, fmt:v=>`${v}%` },
       { key:'rate',    label:'Rate',         def:25, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Still' },
     ]},
-    { id:'rgbshift', label:'RGB offset', hint:'Red and blue pulled apart from green. The classic chromatic-aberration look.', params:[
+    { id:'rgbshift', label:'RGB offset', react:'shiftH', hint:'Red and blue pulled apart from green. The classic chromatic-aberration look.', params:[
       { key:'shiftH', label:'Horizontal', def:60, min:0, max:400, step:1, fmt:v=>`${v}%` },
       { key:'shiftV', label:'Vertical',   def:0,  min:0, max:400, step:1, fmt:v=>`${v}%` },
       { key:'shiftR', label:'Radial',     def:0,  min:-400, max:400, step:1, fmt:v=>`${v}%` },
     ]},
-    { id:'planes', label:'RGB planes', hint:'Per-row channel split — the prism-strip signal-corruption look.', params:[
+    { id:'planes', label:'RGB planes', react:'shift', hint:'Per-row channel split — the prism-strip signal-corruption look.', params:[
       { key:'shift',   label:'Channel split', def:40, min:1, max:300, step:1, fmt:v=>`${v}%` },
       { key:'scatter', label:'Row scatter',   def:40, min:0, max:100, step:1, fmt:v=>`${v}%` },
     ]},
-    { id:'ghost', label:'VHS ghosting', hint:'Two dimmer echoes trailing to the right, like a worn tape.', params:[
+    { id:'ghost', label:'VHS ghosting', react:'offset', hint:'Two dimmer echoes trailing to the right, like a worn tape.', params:[
       { key:'offset', label:'Echo offset', def:50, min:1, max:150, step:1, fmt:v=>`${v}%` },
       { key:'fade',   label:'Echo fade',   def:70, min:1, max:100, step:1, fmt:v=>`${v}%` },
     ]},
     { id:'chswap', label:'Channel swap', hint:'Rearrange the red, green and blue channels.', params:[
       { key:'mode', type:'seg', label:'Mode', def:'rbg', opts:[['rgb','RGB'],['rbg','RBG'],['grb','GRB'],['gbr','GBR'],['brg','BRG'],['bgr','BGR']] },
     ]},
-    { id:'grade', label:'Colour grade', hint:'Brightness, contrast and saturation for the capture chain.', params:[
+    { id:'grade', label:'Colour grade', react:'brightness', hint:'Brightness, contrast and saturation for the capture chain.', params:[
       { key:'brightness', label:'Brightness', def:100, min:0, max:200, step:1, fmt:v=>`${v}%` },
       { key:'contrast',   label:'Contrast',   def:100, min:0, max:200, step:1, fmt:v=>`${v}%` },
       { key:'saturation', label:'Saturation', def:100, min:0, max:300, step:1, fmt:v=>`${v}%` },
       { key:'gamma',      label:'Gamma',      def:100, min:40, max:200, step:1, fmt:v=>(v/100).toFixed(2) },
     ]},
-    { id:'tint', label:'Phosphor tint', hint:'Recolour the whole picture through a single phosphor.', params:[
+    { id:'tint', label:'Phosphor tint', react:'amount', hint:'Recolour the whole picture through a single phosphor.', params:[
       { key:'colour', type:'seg', label:'Phosphor', def:'green', opts:[['green','Green'],['amber','Amber'],['blue','Blue'],['red','Red'],['white','White']] },
       { key:'amount', label:'Amount', def:80, min:0, max:100, step:1, fmt:v=>`${v}%` },
     ]},
-    { id:'bloom', label:'Phosphor glow', hint:'Bright pixels bleed outward. The single biggest win on a projector.', params:[
+    { id:'bloom', label:'Phosphor glow', react:'intensity', hint:'Bright pixels bleed outward. The single biggest win on a projector.', params:[
       { key:'intensity', label:'Intensity',   def:55, min:0, max:150, step:1, fmt:v=>`${v}%` },
       { key:'radius',    label:'Bloom radius',def:80, min:5, max:300, step:5, fmt:v=>`${v}%` },
       { key:'threshold', label:'Threshold',   def:25, min:0, max:90,  step:1, fmt:v=>v?`${v}%`:'Everything' },
       { key:'colour', type:'seg', label:'Glow colour', def:'none', opts:[['none','Source'],['green','Green'],['amber','Amber'],['blue','Blue']] },
     ]},
-    { id:'scanlines', label:'CRT scanlines', hint:'A dark gap between device pixel rows, measured on the picture so it follows the curve.', params:[
+    { id:'scanlines', label:'CRT scanlines', react:'mix', hint:'A dark gap between device pixel rows, measured on the picture so it follows the curve.', params:[
       { key:'variant', type:'seg', label:'Weight', def:'medium', opts:[['fine','Fine'],['medium','Medium'],['thick','Thick'],['wide','Wide']] },
       { key:'pitch', label:'Line pitch', def:1, min:1, max:4, step:1, fmt:v=>v===1?'Every row':`${v} rows` },
       { key:'mix',   label:'Depth',      def:70, min:0, max:100, step:1, fmt:v=>`${v}%` },
     ]},
-    { id:'lcd', label:'LCD panel', hint:'Sub-pixel tint columns and backlight bleed.', params:[
+    { id:'lcd', label:'LCD panel', react:'bleed', hint:'Sub-pixel tint columns and backlight bleed.', params:[
       { key:'subpixel', label:'Sub-pixel tint',  def:30, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'bleed',    label:'Backlight bleed', def:15, min:0, max:100, step:1, fmt:v=>`${v}%` },
     ]},
-    { id:'grid', label:'Pixel grid', hint:'A line on every device-pixel boundary.', params:[
+    { id:'grid', label:'Pixel grid', react:'opacity', hint:'A line on every device-pixel boundary.', params:[
       { key:'opacity', label:'Grid opacity', def:30, min:1, max:100, step:1, fmt:v=>`${v}%` },
       { key:'weight',  label:'Line weight',  def:1,  min:0.5, max:4, step:0.5, fmt:v=>`${v}px` },
     ]},
-    { id:'dot', label:'Dot matrix', hint:'Each device pixel becomes a round dot with gaps between.', params:[
+    { id:'dot', label:'Dot matrix', react:'halation', hint:'Each device pixel becomes a round dot with gaps between.', params:[
       { key:'radius',   label:'Dot size', def:44, min:15, max:80, step:1, fmt:v=>`${v}%` },
       { key:'depth',    label:'Gap darkness', def:80, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'halation', label:'Halation', def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
     ]},
-    { id:'interlace', label:'Interlace', hint:'Alternate field offset and darkening, like broadcast video.', params:[
+    { id:'interlace', label:'Interlace', react:'intensity', hint:'Alternate field offset and darkening, like broadcast video.', params:[
       { key:'intensity', label:'Intensity', def:50, min:1, max:100, step:1, fmt:v=>`${v}%` },
       { key:'flip',      label:'Field flip',def:1,  min:0, max:1,   step:1, fmt:v=>v?'Alternating':'Static' },
     ]},
-    { id:'noise', label:'Noise', hint:'Film grain, static or horizontal banding.', params:[
+    { id:'noise', label:'Noise', react:'amount', hint:'Film grain, static or horizontal banding.', params:[
       { key:'amount', label:'Amount', def:25, min:1, max:100, step:1, fmt:v=>`${v}%` },
       { key:'type', type:'seg', label:'Type', def:'film', opts:[['film','Film'],['static','Static'],['bands','Bands']] },
     ]},
-    { id:'vignette', label:'Vignette', hint:'Darkened edges, round through to square.', params:[
+    { id:'vignette', label:'Vignette', react:'falloff', hint:'Darkened edges, round through to square.', params:[
       { key:'falloff', label:'Intensity', def:45, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'shape',   label:'Shape',     def:0,  min:0, max:100, step:1, fmt:v=>v<=5?'Round':v>=95?'Square':`${v}%` },
     ]},
-    { id:'dither', label:'Posterise / dither', hint:'Ordered Bayer dithering down to a few tones per channel.', params:[
+    { id:'dither', label:'Posterise / dither', react:'levels', hint:'Ordered Bayer dithering down to a few tones per channel.', params:[
       { key:'levels', label:'Tones', def:4, min:2, max:12, step:1, fmt:v=>v===2?'2 (1-bit)':`${v}` },
     ]},
   ];
 
   // Applied in this order regardless of the order the user toggles them.
   const ORDER = DEFS.map(d => d.id);
+
+  // Every effect that can be driven by audio names one parameter as its
+  // react target — the one that reads as "more of this effect".
+  // Channel swap has none: there is no meaningful "more" of a permutation.
+  const REACT_TARGET = {};
+  for (const d of DEFS) if (d.react) REACT_TARGET[d.id] = d.react;
+
+  function blankReact() {
+    const out = {};
+    for (const d of DEFS) if (d.react) out[d.id] = { src: 'off', depth: 60 };
+    return out;
+  }
+
+  // Pure: given the user's parameter values, their react wiring and the
+  // current audio levels, return the values to actually render with.
+  // A positive depth pushes the parameter towards its maximum, negative
+  // towards its minimum, so an effect can duck on a beat as well as
+  // swell on one. The user's own value is always the resting point.
+  function modulate(params, react, levels) {
+    if (!react || !levels) return params;
+    let out = params;
+    for (const d of DEFS) {
+      if (!d.react) continue;
+      const cfg = react[d.id];
+      if (!cfg || !cfg.src || cfg.src === 'off' || !cfg.depth) continue;
+      const lvl = levels[cfg.src];
+      if (!(lvl > 0)) continue;
+      const par = d.params.find(x => x.key === d.react);
+      if (!par || par.type === 'seg') continue;
+      const base = params[d.id] ? params[d.id][d.react] : par.def;
+      if (typeof base !== 'number') continue;
+      const amount = Math.min(1, Math.abs(cfg.depth) / 100) * Math.min(1, Math.max(0, lvl));
+      const target = cfg.depth >= 0 ? par.max : par.min;
+      const value = Math.min(par.max, Math.max(par.min, base + amount * (target - base)));
+      // Copy lazily: with nothing wired up this returns the caller's own
+      // object and the render path allocates nothing per frame.
+      if (out === params) out = { ...params };
+      out[d.id] = { ...out[d.id], [d.react]: value };
+    }
+    return out;
+  }
 
   function defaults() {
     const out = {};
@@ -3784,30 +4342,38 @@ const FX = (() => {
     { id:'off',  label:'Off',       on:[], p:{} },
     { id:'crt',  label:'CRT monitor', on:['curve','bloom','scanlines','vignette','rgbshift'], p:{
       curve:{amount:30,corner:18,spec:22}, bloom:{intensity:50,radius:70},
-      scanlines:{variant:'medium',mix:65}, vignette:{falloff:40}, rgbshift:{shiftH:25} } },
+      scanlines:{variant:'medium',mix:65}, vignette:{falloff:40}, rgbshift:{shiftH:25} },
+      r:{ bloom:{src:'level',depth:45}, rgbshift:{src:'hit',depth:35} } },
     { id:'arcade', label:'Arcade tube', on:['curve','bloom','scanlines','vignette','grade'], p:{
       curve:{amount:40,corner:16,spec:28}, bloom:{intensity:75,radius:85},
       scanlines:{variant:'thick',mix:72}, vignette:{falloff:52},
-      grade:{brightness:112,contrast:106,saturation:110,gamma:96} } },
+      grade:{brightness:112,contrast:106,saturation:110,gamma:96} },
+      r:{ bloom:{src:'level',depth:55}, curve:{src:'hit',depth:25} } },
     { id:'vhs',  label:'VHS tape',   on:['ghost','rgbshift','jitter','noise','interlace','grade'], p:{
       ghost:{offset:65,fade:66}, rgbshift:{shiftH:110}, jitter:{amount:22,frequency:22,rate:35},
-      noise:{amount:22,type:'bands'}, interlace:{intensity:45}, grade:{brightness:104,contrast:92,saturation:120,gamma:100} } },
+      noise:{amount:22,type:'bands'}, interlace:{intensity:45}, grade:{brightness:104,contrast:92,saturation:120,gamma:100} },
+      r:{ jitter:{src:'hit',depth:70}, ghost:{src:'low',depth:40} } },
     { id:'lcd',  label:'Handheld LCD', on:['grid','lcd','grade'], p:{
       grid:{opacity:38,weight:1}, lcd:{subpixel:34,bleed:26}, grade:{brightness:104,contrast:96,saturation:88,gamma:100} } },
     { id:'dmd',  label:'Dot matrix', on:['dot','bloom','vignette'], p:{
-      dot:{radius:42,depth:86,halation:30}, bloom:{intensity:60,radius:55}, vignette:{falloff:35} } },
+      dot:{radius:42,depth:86,halation:30}, bloom:{intensity:60,radius:55}, vignette:{falloff:35} },
+      r:{ dot:{src:'level',depth:60}, bloom:{src:'hit',depth:40} } },
     { id:'green',label:'Green phosphor', on:['tint','bloom','scanlines','vignette'], p:{
       tint:{colour:'green',amount:92}, bloom:{intensity:80,radius:95,colour:'green'},
-      scanlines:{variant:'medium',mix:60}, vignette:{falloff:50} } },
+      scanlines:{variant:'medium',mix:60}, vignette:{falloff:50} },
+      r:{ bloom:{src:'level',depth:60} } },
     { id:'amber',label:'Amber phosphor', on:['tint','bloom','scanlines','vignette'], p:{
       tint:{colour:'amber',amount:92}, bloom:{intensity:80,radius:95,colour:'amber'},
-      scanlines:{variant:'fine',mix:55}, vignette:{falloff:50} } },
+      scanlines:{variant:'fine',mix:55}, vignette:{falloff:50} },
+      r:{ bloom:{src:'level',depth:60} } },
     { id:'glitch', label:'Glitch',   on:['glitch','planes','jitter','chswap','noise'], p:{
       glitch:{shift:45,density:35,size:22,rate:35}, planes:{shift:60,scatter:55},
-      jitter:{amount:40,frequency:30,rate:60}, chswap:{mode:'rbg'}, noise:{amount:30,type:'static'} } },
+      jitter:{amount:40,frequency:30,rate:60}, chswap:{mode:'rbg'}, noise:{amount:30,type:'static'} },
+      r:{ glitch:{src:'hit',depth:80}, planes:{src:'high',depth:55}, jitter:{src:'mid',depth:40} } },
     { id:'proj', label:'Projector',  on:['bloom','grade','vignette'], p:{
       bloom:{intensity:35,radius:60}, grade:{brightness:118,contrast:112,saturation:106,gamma:92},
-      vignette:{falloff:22} } },
+      vignette:{falloff:22} },
+      r:{ bloom:{src:'level',depth:50} } },
   ];
 
   function presetState(id) {
@@ -3816,7 +4382,9 @@ const FX = (() => {
     for (const k in pre.p) Object.assign(params[k], pre.p[k]);
     const enabled = {};
     for (const d of DEFS) enabled[d.id] = pre.on.includes(d.id);
-    return { preset: pre.id, enabled, params };
+    const react = blankReact();
+    for (const k in (pre.r || {})) Object.assign(react[k], pre.r[k]);
+    return { preset: pre.id, enabled, params, react };
   }
 
   // ── Output sizes ────────────────────────────────────────
@@ -4246,7 +4814,10 @@ void main() {
         canvas.width = out.w; canvas.height = out.h;
       }
       const on = id => !!(st.on && st.enabled[id]);
-      const P = id => st.params[id] || {};
+      // Audio modulation sits between the user's settings and the GPU:
+      // the sliders stay where they were put and the picture moves.
+      const live = st.react && st.levels ? modulate(st.params, st.react, st.levels) : st.params;
+      const P = id => live[id] || {};
 
       // Content rect: fit the 4:3 source inside the output, centred.
       // Zoom > 0 overscans, which is how you fill a 16:9 frame if you
@@ -4451,7 +5022,8 @@ void main() {
     return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
   }
 
-  return { DEFS, ORDER, PRESETS, OUTPUTS, defaults, presetState, createRenderer,
+  return { DEFS, ORDER, PRESETS, OUTPUTS, REACT_TARGET, defaults, blankReact,
+           presetState, modulate, createRenderer,
            SRC_W, SRC_H, DEV_W, DEV_H, hexToRgb };
 })();
 
@@ -4727,6 +5299,8 @@ const Mirror = (() => {
     const st = FX.presetState('off');
     st.on = false; st.animate = true;
     st.output = '960x720'; st.bg = '#000000'; st.zoom = 0;
+    st.audio = { deviceId: '', gain: 100, on: false };
+    st.levels = { ...AudioReact.ZERO };
     return st;
   }
 
@@ -4763,11 +5337,37 @@ const Mirror = (() => {
     if (typeof raw.bg === 'string' && /^#[0-9a-f]{6}$/i.test(raw.bg)) st.bg = raw.bg;
     st.zoom = Math.min(100, Math.max(0, Number(raw.zoom) || 0));
     st.preset = FX.PRESETS.some(x => x.id === raw.preset) ? raw.preset : 'custom';
+
+    // React wiring: an unknown source or a wild depth must not reach the
+    // modulator, and effects with no react target must not gain one.
+    const react = FX.blankReact();
+    const srcIds = AudioReact.SOURCES.map(x => x[0]);
+    for (const id in react) {
+      const got = raw.react && raw.react[id];
+      if (!got || typeof got !== 'object') continue;
+      if (srcIds.includes(got.src)) react[id].src = got.src;
+      const d = Number(got.depth);
+      if (isFinite(d)) react[id].depth = Math.min(100, Math.max(-100, Math.round(d)));
+    }
+    st.react = react;
+
+    const a = raw.audio && typeof raw.audio === 'object' ? raw.audio : {};
+    st.audio = {
+      deviceId: typeof a.deviceId === 'string' ? a.deviceId.slice(0, 200) : '',
+      gain: Math.min(400, Math.max(10, Number(a.gain) || 100)),
+      // Never auto-open the input on load: getUserMedia needs a gesture,
+      // and silently grabbing an audio device at page load would be rude.
+      on: false,
+    };
+    st.levels = { ...AudioReact.ZERO };
     return st;
   }
 
   function save() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
+    try {
+      const { levels, ...persist } = state;
+      localStorage.setItem(LS_KEY, JSON.stringify(persist));
+    } catch {}
   }
 
   // ── Drawing ─────────────────────────────────────────────
@@ -4837,7 +5437,12 @@ const Mirror = (() => {
     if (!wanted()) return;
     if (ts - lastStep < 6) return;
     lastStep = ts;
-    const moving = state.on && state.animate;
+    // Sample first: a live input is itself a reason to redraw, because
+    // the picture is moving even when the device screen is not.
+    const reacting = state.on && state.audio.on && AudioReact.isRunning();
+    if (reacting) { state.levels = AudioReact.sample(state.audio.gain / 100); paintMeters(); }
+    else if (state.levels.level || state.levels.hit) { state.levels = { ...AudioReact.ZERO }; paintMeters(); }
+    const moving = (state.on && state.animate) || reacting;
     // takeDirty() clears the flag, so read it exactly once per step.
     const dirty = USB.takeDirty();
     // captureStream only emits a frame when the canvas is drawn to, so a
@@ -4847,7 +5452,7 @@ const Mirror = (() => {
     if (!moving && !dirty && !needsDraw && !force) { reportFps(ts, false); return; }
     const upload = dirty || needsDraw;
     needsDraw = false;
-    draw(moving ? (ts - started) / 1000 : 0, upload);
+    draw(state.on && state.animate ? (ts - started) / 1000 : 0, upload);
     reportFps(ts, true);
   }
 
@@ -4925,6 +5530,7 @@ const Mirror = (() => {
     closePop();
     if (recorder) { try { recorder.stop(); } catch {} }
     releaseStream();
+    AudioReact.stop();
   });
 
   function recMime() {
@@ -5065,7 +5671,16 @@ const Mirror = (() => {
                    aria-describedby="val-${d.id}-${p.key}"
                    min="${p.min}" max="${p.max}" step="${p.step}">
             <span class="fx-pval" id="val-${d.id}-${p.key}" data-fx="${d.id}" data-key="${p.key}"></span>
-          </div>`).join('')}</div>
+          </div>`).join('')}${d.react ? `
+          <div class="fx-p fx-react" data-fx="${d.id}">
+            <span class="fx-plab">React</span>
+            <select class="fx-rsrc" data-fx="${d.id}" aria-label="${d.label}: audio source driving ${d.react}">${
+              AudioReact.SOURCES.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('')
+            }</select>
+            <input type="range" class="fx-rdepth" data-fx="${d.id}" min="-100" max="100" step="1"
+                   aria-label="${d.label}: how far the audio moves ${d.react}">
+            <span class="fx-pval fx-rval" data-fx="${d.id}"></span>
+          </div>` : ''}</div>
       </div>`).join('');
 
     // ── Events ──
@@ -5083,6 +5698,7 @@ const Mirror = (() => {
       const next = FX.presetState(e.target.value);
       state.enabled = next.enabled;
       state.params = next.params;
+      state.react = next.react;
       state.preset = next.preset;
       if (e.target.value !== 'off') state.on = true;
       syncUI(); save(); invalidate();
@@ -5104,7 +5720,8 @@ const Mirror = (() => {
       // Clears the look only. Output size, fill and bar colour are how
       // the stream is plumbed, not part of the look, and dropping them
       // would resize the canvas OBS is already capturing.
-      const keep = { output: state.output, bg: state.bg, zoom: state.zoom, animate: state.animate };
+      const keep = { output: state.output, bg: state.bg, zoom: state.zoom, animate: state.animate,
+                     audio: state.audio };
       state = Object.assign(blankState(), keep);
       syncUI(); save(); invalidate();
     });
@@ -5132,6 +5749,42 @@ const Mirror = (() => {
       markCustom(); syncUI(); save(); invalidate();
     });
 
+    // ── Audio reactive ──
+    $('fx-react-on').addEventListener('change', async e => {
+      state.audio.on = e.target.checked;
+      save(); syncUI(); invalidate();
+      if (state.audio.on && !AudioReact.isRunning()) await connectAudio();
+    });
+    $('fx-audio-connect').addEventListener('click', () => connectAudio());
+    $('fx-audio-dev').addEventListener('change', async e => {
+      state.audio.deviceId = e.target.value;
+      save();
+      if (AudioReact.isRunning()) await connectAudio();
+    });
+    $('fx-audio-gain').addEventListener('input', e => {
+      state.audio.gain = +e.target.value;
+      $('fx-audio-gain-v').textContent = state.audio.gain + '%';
+      save();
+    });
+    grid.addEventListener('change', e => {
+      const sel = e.target.closest('.fx-rsrc');
+      if (!sel) return;
+      state.react[sel.dataset.fx].src = sel.value;
+      markCustom(); syncUI(); save(); invalidate();
+    });
+    grid.addEventListener('input', e => {
+      const r = e.target.closest('.fx-rdepth');
+      if (!r) return;
+      state.react[r.dataset.fx].depth = +r.value;
+      paintReact(r.dataset.fx);
+      markCustom(); save(); invalidate();
+    });
+    AudioReact.setOnChange(() => {
+      const el = $('fx-audio-status');
+      if (el) el.textContent = AudioReact.getStatus();
+      syncUI();
+    });
+
     if (!renderer) {
       // The preset picker lives outside #fx-grid, so disable it too —
       // otherwise picking "CRT monitor" lights up five cards and ticks
@@ -5142,6 +5795,60 @@ const Mirror = (() => {
       pre.disabled = true;
       grid.querySelectorAll('input,button').forEach(el => { el.disabled = true; });
     }
+  }
+
+  async function refreshInputs() {
+    const sel = $('fx-audio-dev');
+    if (!sel) return;
+    const list = await AudioReact.listInputs();
+    // Before permission is granted the browser reports devices with blank
+    // labels, so say so rather than showing a list of empty rows.
+    sel.innerHTML = list.length
+      ? list.map(d => `<option value="${d.id}">${d.label.replace(/[<>]/g, '')}</option>`).join('')
+      : '<option value="">Default input</option>';
+    if (list.some(d => d.id === state.audio.deviceId)) sel.value = state.audio.deviceId;
+    else if (list.length) state.audio.deviceId = sel.value;
+  }
+
+  async function connectAudio() {
+    const ok = await AudioReact.start(state.audio.deviceId);
+    if (ok) {
+      state.audio.on = true;
+      // Labels only become readable once permission has been granted, so
+      // the list is worth rebuilding the moment it is.
+      await refreshInputs();
+      save();
+    } else {
+      state.audio.on = false;
+    }
+    syncUI();
+    invalidate();
+  }
+
+  function paintMeters() {
+    const box = $('fx-meters');
+    if (!box) return;
+    for (const el of box.querySelectorAll('.fx-meter')) {
+      const v = state.levels[el.dataset.src] || 0;
+      const bar = el.querySelector('i');
+      const pct = Math.round(Math.min(1, Math.max(0, v)) * 100) + '%';
+      if (bar.style.getPropertyValue('--w') !== pct) bar.style.setProperty('--w', pct);
+    }
+  }
+
+  function paintReact(fxId) {
+    const cfg = state.react[fxId];
+    const row = document.querySelector(`.fx-react[data-fx="${fxId}"]`);
+    if (!cfg || !row) return;
+    const wired = cfg.src && cfg.src !== 'off';
+    row.classList.toggle('wired', wired);
+    const val = row.querySelector('.fx-rval');
+    if (val) val.textContent = !wired ? '—'
+      : (cfg.depth > 0 ? '+' : '') + cfg.depth + '%';
+    const dep = row.querySelector('.fx-rdepth');
+    if (dep) { dep.value = cfg.depth; dep.disabled = !wired; }
+    const sel = row.querySelector('.fx-rsrc');
+    if (sel) sel.value = cfg.src;
   }
 
   function markCustom() {
@@ -5187,7 +5894,20 @@ const Mirror = (() => {
           paintValue(d.id, p.key);
         }
       }
+      if (d.react) paintReact(d.id);
     }
+    const reacting = !!state.audio.on;
+    $('fx-react-on').checked = reacting;
+    $('fx-panel').classList.toggle('fx-reacting', reacting);
+    $('fx-audio-gain').value = state.audio.gain;
+    $('fx-audio-gain-v').textContent = state.audio.gain + '%';
+    $('fx-audio-status').textContent = AudioReact.getStatus();
+    const live = AudioReact.isRunning();
+    $('fx-audio-connect').textContent = live ? 'Reconnect' : 'Enable input';
+    $('fx-audio-connect').disabled = !renderer;
+    $('fx-react-on').disabled = !renderer;
+    $('fx-meters').style.opacity = live && reacting ? '1' : '.35';
+    paintMeters();
     paintRecordBtn();
   }
 
@@ -5224,6 +5944,7 @@ const Mirror = (() => {
       invalidate();
     });
     buildUI();
+    refreshInputs().then(syncUI);
     syncUI();
     USB.setDemo();          // something to look at before a device is plugged in
     started = performance.now();
@@ -5616,7 +6337,9 @@ const UI = (() => {
       chainColors = cached.chainColors || {};
       afterScan(true, cached.savedAt);
     }
+    songMaps = {}; mapDirty.clear(); mapSel = null;   // a new card, new annotations
     await loadColourSidecar();     // colours written by another machine
+    await loadMapSidecar();        // and any song-map notes alongside them
     await rescan(cached?.lib);
   }
 
@@ -6070,7 +6793,8 @@ const UI = (() => {
       </div>
       </div>
       <div id="modal-pattern-section" style="display:none"></div>
-      <div id="modal-tables-section" style="display:none"></div>`;
+      <div id="modal-tables-section" style="display:none"></div>
+      <div id="modal-map-section" style="display:none"></div>`;
     body.querySelectorAll('.ichip-instr').forEach(ch =>
       ch.addEventListener('click', () => showInstrParams(p, parseInt(ch.dataset.id, 10))));
     body.querySelectorAll('.play-btn').forEach(b =>
@@ -6233,10 +6957,20 @@ const UI = (() => {
     $('btn-modal-overview')?.classList.toggle('active', tab === 'overview');
     $('btn-modal-patterns')?.classList.toggle('active', tab === 'patterns');
     $('btn-modal-tables')?.classList.toggle('active', tab === 'tables');
-    const ov = $('modal-overview'), pv = $('modal-pattern-section'), tv = $('modal-tables-section');
+    $('btn-modal-map')?.classList.toggle('active', tab === 'map');
+    const ov = $('modal-overview'), pv = $('modal-pattern-section'),
+          tv = $('modal-tables-section'), mv = $('modal-map-section');
     if (ov) ov.style.display = tab === 'overview' ? 'block' : 'none';
     if (pv) pv.style.display = tab === 'patterns' ? 'block' : 'none';
     if (tv) tv.style.display = tab === 'tables' ? 'block' : 'none';
+    if (mv) mv.style.display = tab === 'map' ? 'block' : 'none';
+  }
+  function toggleMapView() {
+    const sec = $('modal-map-section');
+    const parsed = modalProj && fullCache.get(modalProj.dirName);
+    if (!sec || !parsed) return;
+    setModalTab('map');
+    renderSongMap(sec, modalProj, parsed);
   }
   function toggleTablesView() {
     const sec = $('modal-tables-section');
@@ -6882,6 +7616,385 @@ const UI = (() => {
 
   // ── Chain colours as a sidecar on the card ─────────────
   // They lived only in this browser, so they didn't travel with the card.
+  // ── Song map ───────────────────────────────────────────
+  // The arrangement drawn wide, with sections and notes written over it.
+  // The annotations live in a sidecar on the card rather than in this
+  // browser, so a marked-up map travels with the project — the point is
+  // to have something to read on stage, or hand to someone else.
+  const MAP_FILE = 'PTLibrarian_map.json';
+  const SECTION_COLOURS = ['#79b5e3','#34d399','#fcd34d','#f472b6','#a78bfa','#f59e0b','#f87171','#22d3ee'];
+  // Keyed by project directory name, which is only unique WITHIN a card.
+  // Carrying these across cards would mean saving one card's annotations
+  // over another's, so openCard clears them.
+  let songMaps = {};             // dirName -> { sections: [], notes: [] }
+  let mapSel = null;             // id of the selected section
+  let mapDirty = new Set();
+
+  const mapOf = dir => (songMaps[dir] ||= { sections: [], notes: [] });
+  const mapId = () => 'm' + Math.random().toString(36).slice(2, 9);
+
+  // Anything read off the card is untrusted: rows have to land inside the
+  // arrangement and colours have to be colours, or the SVG breaks.
+  function sanitiseMap(raw, rows) {
+    const out = { sections: [], notes: [] };
+    if (!raw || typeof raw !== 'object') return out;
+    const row = v => Math.max(0, Math.min(rows - 1, Math.floor(Number(v)) || 0));
+    for (const s of Array.isArray(raw.sections) ? raw.sections.slice(0, 64) : []) {
+      if (!s || typeof s !== 'object') continue;
+      const a = row(s.from), b = row(s.to);
+      out.sections.push({
+        id: mapId(),
+        from: Math.min(a, b), to: Math.max(a, b),
+        label: String(s.label ?? '').slice(0, 40),
+        colour: /^#[0-9a-fA-F]{6}$/.test(s.colour) ? s.colour : SECTION_COLOURS[0],
+      });
+    }
+    for (const n of Array.isArray(raw.notes) ? raw.notes.slice(0, 64) : []) {
+      if (!n || typeof n !== 'object') continue;
+      const text = String(n.text ?? '').slice(0, 120);
+      if (!text) continue;
+      out.notes.push({ id: mapId(), row: row(n.row), text });
+    }
+    return out;
+  }
+
+  async function saveMapSidecar() {
+    if (!sd || demoMode) { setCacheBar('The demo card is in memory only, so there is nothing to write to.', false); return false; }
+    if (!await ensureWrite()) return false;
+    try {
+      const payload = {};
+      for (const [dir, m] of Object.entries(songMaps))
+        if (m.sections.length || m.notes.length)
+          payload[dir] = {
+            sections: m.sections.map(({ from, to, label, colour }) => ({ from, to, label, colour })),
+            notes: m.notes.map(({ row, text }) => ({ row, text })),
+          };
+      const w = await (await sd.getFileHandle(MAP_FILE, { create: true })).createWritable();
+      await w.write(JSON.stringify({ version: 1, maps: payload }, null, 1));
+      await w.close();
+      mapDirty.clear();
+      setCacheBar(`Song map notes written to ${MAP_FILE} on the card.`, true);
+      return true;
+    } catch (e) {
+      setCacheBar(`Could not write the song map: ${e.message || e}`, false);
+      return false;
+    }
+  }
+
+  async function loadMapSidecar() {
+    if (!sd) return;
+    try {
+      const txt = await (await (await sd.getFileHandle(MAP_FILE)).getFile()).text();
+      const data = JSON.parse(txt);
+      if (!data || !data.maps || typeof data.maps !== 'object') return;
+      for (const [dir, raw] of Object.entries(data.maps)) {
+        // Row bounds are per project; without the parse we clamp to the
+        // format maximum and tighten it for display when it is opened.
+        // The card is the source of truth here — unlike chain colours,
+        // there are no local-only annotations to preserve.
+        songMaps[dir] = sanitiseMap(raw, 256);
+      }
+    } catch {}
+  }
+
+  // Geometry is shared between the on-screen map and the exported image
+  // so what you save is exactly what you marked up.
+  const MAP_GEO = { W: 1400, LEFT: 46, RIGHT: 14, SEC_Y: 10, SEC_H: 26,
+                    GRID_Y: 46, ROW_H: 20, GAP: 2, NOTE_GAP: 16, NOTE_H: 20 };
+
+  function mapMetrics(parsed, m) {
+    const g = MAP_GEO;
+    const rows = Math.max(1, PT.lastSongRow(parsed) + 1);
+    const rw = (g.W - g.LEFT - g.RIGHT) / rows;
+    const gridH = 8 * (g.ROW_H + g.GAP);
+    const notesY = g.GRID_Y + gridH + g.NOTE_GAP;
+    const noteRows = [];
+    // Lay notes out in lanes so overlapping labels do not sit on top of
+    // each other; a marked-up map is useless if you cannot read it.
+    for (const n of (m ? m.notes : [])) {
+      const x = g.LEFT + Math.max(0, Math.min(rows - 1, n.row)) * rw;
+      let lane = 0;
+      while (noteRows[lane] !== undefined && noteRows[lane] > x - 4) lane++;
+      noteRows[lane] = x + Math.max(90, n.text.length * 6.2);
+      n._lane = lane;
+      n._x = x;
+    }
+    const lanes = Math.max(1, noteRows.length);
+    return { rows, rw, gridH, notesY, lanes, H: notesY + lanes * g.NOTE_H + 10 };
+  }
+
+  function songMapSvg(p, parsed, m, opts = {}) {
+    const g = MAP_GEO;
+    const met = mapMetrics(parsed, m);
+    const { rows, rw, gridH } = met;
+    const esc2 = t => esc(String(t));
+    // No clip-path: its units are the element's own box, not the viewBox,
+    // so it silently ate the whole label. Truncate by width instead.
+    const fit = (text, px) => {
+      const max = Math.max(1, Math.floor(px / 7.4));
+      return text.length > max ? text.slice(0, Math.max(1, max - 1)) + '…' : text;
+    };
+    const bg = opts.forExport ? '#0b0d0e' : 'transparent';
+    let out = `<svg id="map-svg" viewBox="0 0 ${g.W} ${met.H}" width="100%" height="${met.H}"
+      preserveAspectRatio="xMidYMin meet" xmlns="http://www.w3.org/2000/svg"
+      style="background:${bg};touch-action:none">`;
+    if (opts.forExport) out += `<rect width="${g.W}" height="${met.H}" fill="#0b0d0e"/>`;
+
+    // Section bands
+    out += `<g class="map-sections">`;
+    for (const sc of m.sections) {
+      const from = Math.max(0, Math.min(rows - 1, sc.from));
+      const to = Math.max(from, Math.min(rows - 1, sc.to));
+      const x = g.LEFT + from * rw;
+      const w = Math.max(rw, (to - from + 1) * rw);
+      const sel = !opts.forExport && sc.id === mapSel;
+      out += `<g class="map-sec${sel ? ' sel' : ''}" data-sec="${sc.id}">
+        <rect x="${x.toFixed(1)}" y="${g.SEC_Y}" width="${w.toFixed(1)}" height="${g.SEC_H}" rx="5"
+          fill="${sc.colour}" fill-opacity="${sel ? 0.55 : 0.32}" stroke="${sc.colour}"
+          stroke-width="${sel ? 2 : 1}"/>
+        <text x="${(x + 7).toFixed(1)}" y="${g.SEC_Y + 18}" fill="#eef1f2" font-size="13"
+          font-weight="700" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif"
+          >${esc2(fit((sc.label || 'untitled') + '  ' + PT.hx2(sc.from) + '–' + PT.hx2(sc.to), w - 12))}</text>
+        <rect class="map-sec-hit" x="${x.toFixed(1)}" y="${g.SEC_Y}" width="${w.toFixed(1)}" height="${g.SEC_H}" fill="transparent"/>
+      </g>`;
+    }
+    out += `</g>`;
+
+    // Row ruler. The step follows the length so a short arrangement is
+    // not left with a single "00" and a long one is not unreadable.
+    const rulerStep = rows <= 20 ? 1 : rows <= 48 ? 4 : rows <= 128 ? 8 : 16;
+    for (let r = 0; r < rows; r += rulerStep) {
+      const x = g.LEFT + r * rw;
+      out += `<text x="${x.toFixed(1)}" y="${g.GRID_Y - 4}" fill="#9aa4ab" font-size="11"
+        font-family="monospace">${PT.hx2(r)}</text>`;
+      out += `<line x1="${x.toFixed(1)}" y1="${g.GRID_Y}" x2="${x.toFixed(1)}" y2="${g.GRID_Y + gridH}"
+        stroke="#292e32" stroke-width="1"/>`;
+    }
+    for (let t = 0; t < 8; t++) {
+      const y = g.GRID_Y + t * (g.ROW_H + g.GAP);
+      // A faint lane behind every channel, so a silent one reads as empty
+      // rather than as missing.
+      out += `<rect x="${g.LEFT}" y="${y}" width="${(g.W - g.LEFT - g.RIGHT).toFixed(1)}" height="${g.ROW_H}"
+        rx="2" fill="#141719"/>`;
+      out += `<text x="6" y="${y + 14}" fill="#9aa4ab" font-size="11" font-family="monospace">C${t + 1}</text>`;
+      for (let r = 0; r < rows; r++) {
+        const c = PT.gridCell(parsed, r, t);
+        if (c === PT.EMPTY) continue;
+        out += `<rect x="${(g.LEFT + r * rw).toFixed(1)}" y="${y}" width="${Math.max(1, rw - 0.6).toFixed(1)}"
+          height="${g.ROW_H}" rx="2" fill="${chainColorOf(p, c, groupChainColor(c))}"/>`;
+      }
+    }
+
+    // Notes, each with a leader line back to its row
+    for (const n of m.notes) {
+      const y = met.notesY + (n._lane || 0) * g.NOTE_H;
+      const sel = !opts.forExport && n.id === mapSel;
+      out += `<g class="map-note${sel ? ' sel' : ''}" data-note="${n.id}">
+        <line x1="${n._x.toFixed(1)}" y1="${g.GRID_Y + gridH}" x2="${n._x.toFixed(1)}" y2="${y + 4}"
+          stroke="#3a4046" stroke-width="1"/>
+        <circle cx="${n._x.toFixed(1)}" cy="${(y + 4).toFixed(1)}" r="2.5" fill="#79b5e3"/>
+        <text x="${(n._x + 7).toFixed(1)}" y="${y + 9}" fill="${sel ? '#79b5e3' : '#eef1f2'}" font-size="12"
+          font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">${esc2(n.text)}</text>
+      </g>`;
+    }
+
+    if (opts.forExport) {
+      out += `<text x="${g.LEFT}" y="${met.H - 2}" fill="#7b858c" font-size="10"
+        font-family="monospace">${esc2(p.name)} · ${parsed.tempo ?? '?'} BPM · ${rows} rows</text>`;
+    }
+    // Invisible full-width strip for creating sections by dragging.
+    if (!opts.forExport)
+      out += `<rect id="map-drag" x="${g.LEFT}" y="${g.SEC_Y}" width="${(g.W - g.LEFT - g.RIGHT).toFixed(1)}"
+        height="${g.SEC_H}" fill="transparent" style="cursor:crosshair"/>`;
+    return out + '</svg>';
+  }
+
+  function renderSongMap(host, p, parsed) {
+    const m = mapOf(p.dirName);
+    const rows = Math.max(1, PT.lastSongRow(parsed) + 1);
+    // Deliberately NOT clamping the stored values here. Shortening the
+    // arrangement (or undoing your way through an empty grid) would
+    // otherwise collapse every section onto the last row for good, and
+    // the next save would make that permanent. Drawing clamps instead,
+    // and anything past the end is called out below.
+    const beyond = m.sections.filter(sc => sc.to > rows - 1).length
+                 + m.notes.filter(n => n.row > rows - 1).length;
+
+    const sel = m.sections.find(x => x.id === mapSel) || m.notes.find(x => x.id === mapSel);
+    host.innerHTML = `
+      <div class="map-bar">
+        <span class="map-hint">Drag across the top strip to mark a section. Click a section or a note to edit it.</span>
+        <button class="btn ghost sm" id="btn-map-note">＋ Note</button>
+        <button class="btn ghost sm" id="btn-map-png">⬇ PNG</button>
+        <button class="btn ghost sm" id="btn-map-svg">⬇ SVG</button>
+        <button class="btn ghost sm" id="btn-map-save"${mapDirty.size ? '' : ' disabled'}
+          title="Write the sections and notes to ${MAP_FILE} on the card so they travel with it">💾 Save to card</button>
+      </div>
+      <div class="map-wrap" id="map-wrap">${songMapSvg(p, parsed, m)}</div>
+      <div class="map-edit" id="map-edit">${sel ? mapEditHtml(sel, rows) : ''}</div>
+      <div class="map-legend">
+        ${m.sections.length || m.notes.length
+          ? `${m.sections.length} section${m.sections.length === 1 ? '' : 's'}, ${m.notes.length} note${m.notes.length === 1 ? '' : 's'}${mapDirty.has(p.dirName) ? ' · unsaved' : ''}`
+          : 'Nothing marked up yet. Drag across the strip above the grid to name a section.'}
+        ${beyond ? `<br><span style="color:var(--warn)">${beyond} annotation${beyond === 1 ? ' sits' : 's sit'} past the end of the arrangement
+          (the song is ${rows} row${rows === 1 ? '' : 's'} long). They are drawn at the last row but kept where you put them,
+          so shortening the song and undoing it does not lose them.</span>` : ''}
+      </div>`;
+    wireSongMap(host, p, parsed, m, rows);
+  }
+
+  function mapEditHtml(item, rows) {
+    const isSec = 'from' in item;
+    return `<div class="map-edit-box">
+      ${isSec ? `
+        <input class="search map-in" id="map-label" value="${esc(item.label)}" placeholder="section name, e.g. Chorus" maxlength="40">
+        <label class="map-l">from <input class="search map-num" id="map-from" type="number" min="0" max="${rows - 1}" value="${item.from}"></label>
+        <label class="map-l">to <input class="search map-num" id="map-to" type="number" min="0" max="${rows - 1}" value="${item.to}"></label>
+        <span class="map-sw">${SECTION_COLOURS.map(c =>
+          `<button class="map-c${c === item.colour ? ' on' : ''}" data-col="${c}" style="background:${c}" title="${c}"></button>`).join('')}</span>
+      ` : `
+        <input class="search map-in" id="map-text" value="${esc(item.text)}" placeholder="note, e.g. repeat x2" maxlength="120">
+        <label class="map-l">at row <input class="search map-num" id="map-row" type="number" min="0" max="${rows - 1}" value="${item.row}"></label>
+      `}
+      <button class="btn ghost sm" id="btn-map-del">Delete</button>
+      <button class="btn ghost sm" id="btn-map-done">Done</button>
+    </div>`;
+  }
+
+  function wireSongMap(host, p, parsed, m, rows) {
+    const redraw = () => { mapDirty.add(p.dirName); renderSongMap(host, p, parsed); };
+    wireMapSvg(host, p, parsed, m, rows);
+
+    host.querySelector('#btn-map-note')?.addEventListener('click', () => {
+      const n = { id: mapId(), row: 0, text: 'note' };
+      m.notes.push(n);
+      mapSel = n.id;
+      redraw();
+      const inp = host.querySelector('#map-text');
+      if (inp) { inp.focus(); inp.select(); }
+    });
+
+    const sel = m.sections.find(x => x.id === mapSel) || m.notes.find(x => x.id === mapSel);
+    if (sel) {
+      const clampRow = v => Math.max(0, Math.min(rows - 1, Math.floor(Number(v)) || 0));
+      const bind = (id, fn) => {
+        const el = host.querySelector('#' + id);
+        if (!el) return;
+        el.addEventListener('input', () => { fn(el.value); mapDirty.add(p.dirName); repaintOnly(); });
+        el.addEventListener('change', () => { fn(el.value); redraw(); });
+        el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+      };
+      // Repaint the picture as you type without rebuilding the form, or
+      // the field you are typing into loses focus on every keystroke.
+      const repaintOnly = () => {
+        const wrap = host.querySelector('#map-wrap');
+        if (wrap) wrap.innerHTML = songMapSvg(p, parsed, m);
+        // The strip lives inside the SVG, so it goes with it. Rebinding
+        // only the click targets left drag-to-create dead until the next
+        // full render.
+        wireMapSvg(host, p, parsed, m, rows);
+      };
+      bind('map-label', v => { sel.label = String(v).slice(0, 40); });
+      bind('map-text', v => { sel.text = String(v).slice(0, 120); });
+      bind('map-from', v => { sel.from = Math.min(clampRow(v), sel.to); });
+      bind('map-to', v => { sel.to = Math.max(clampRow(v), sel.from); });
+      bind('map-row', v => { sel.row = clampRow(v); });
+      host.querySelectorAll('.map-c').forEach(b => b.addEventListener('click', () => {
+        sel.colour = b.dataset.col; redraw();
+      }));
+      host.querySelector('#btn-map-del')?.addEventListener('click', () => {
+        m.sections = m.sections.filter(x => x.id !== mapSel);
+        m.notes = m.notes.filter(x => x.id !== mapSel);
+        mapSel = null; redraw();
+      });
+      host.querySelector('#btn-map-done')?.addEventListener('click', () => {
+        mapSel = null; renderSongMap(host, p, parsed);
+      });
+    }
+
+    host.querySelector('#btn-map-save')?.addEventListener('click', saveMapSidecar);
+    host.querySelector('#btn-map-svg')?.addEventListener('click', () => {
+      const svgTxt = songMapSvg(p, parsed, m, { forExport: true });
+      downloadBlob(new Blob([svgTxt], { type: 'image/svg+xml' }), `${p.name}-songmap.svg`);
+    });
+    host.querySelector('#btn-map-png')?.addEventListener('click', () => exportMapPng(p, parsed, m));
+  }
+
+  // Everything that lives inside the SVG: the drag strip and the click
+  // targets. Called on a full render and again whenever the picture is
+  // repainted on its own, since both replace the whole subtree.
+  function wireMapSvg(host, p, parsed, m, rows) {
+    const g = MAP_GEO;
+    const svg = host.querySelector('#map-svg');
+    if (!svg) return;
+    const rowAt = ev => {
+      const r = svg.getBoundingClientRect();
+      const x = (ev.clientX - r.left) / r.width * g.W;
+      const rw = (g.W - g.LEFT - g.RIGHT) / rows;
+      return Math.max(0, Math.min(rows - 1, Math.floor((x - g.LEFT) / rw)));
+    };
+    const strip = host.querySelector('#map-drag');
+    if (strip) {
+      let from = null;
+      strip.addEventListener('pointerdown', ev => {
+        ev.preventDefault();
+        from = rowAt(ev);
+        try { strip.setPointerCapture(ev.pointerId); } catch {}
+      });
+      strip.addEventListener('pointerup', ev => {
+        if (from === null) return;
+        const to = rowAt(ev);
+        const sec = {
+          id: mapId(), from: Math.min(from, to), to: Math.max(from, to),
+          label: '', colour: SECTION_COLOURS[m.sections.length % SECTION_COLOURS.length],
+        };
+        from = null;
+        m.sections.push(sec);
+        mapSel = sec.id;
+        mapDirty.add(p.dirName);
+        renderSongMap(host, p, parsed);
+        host.querySelector('#map-label')?.focus();
+      });
+    }
+    host.querySelectorAll('.map-sec').forEach(el => el.addEventListener('click', ev => {
+      ev.stopPropagation(); mapSel = el.dataset.sec; renderSongMap(host, p, parsed);
+    }));
+    host.querySelectorAll('.map-note').forEach(el => el.addEventListener('click', ev => {
+      ev.stopPropagation(); mapSel = el.dataset.note; renderSongMap(host, p, parsed);
+    }));
+  }
+
+  function downloadBlob(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+
+  function exportMapPng(p, parsed, m) {
+    const svgTxt = songMapSvg(p, parsed, m, { forExport: true });
+    const { H } = mapMetrics(parsed, m);
+    const scale = 2;
+    const img = new Image();
+    const url = URL.createObjectURL(new Blob([svgTxt], { type: 'image/svg+xml;charset=utf-8' }));
+    img.onload = () => {
+      const cv = Object.assign(document.createElement('canvas'),
+        { width: MAP_GEO.W * scale, height: Math.round(H * scale) });
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#0b0d0e';
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      cv.toBlob(b => { if (b) downloadBlob(b, `${p.name}-songmap.png`); });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      setCacheBar('Could not render the map to PNG. The SVG download works either way.', false);
+    };
+    img.src = url;
+  }
+
   const COLOUR_FILE = 'PTLibrarian_colours.json';
   async function saveColourSidecar() {
     if (!sd || demoMode) return false;
@@ -7559,13 +8672,72 @@ const UI = (() => {
     }
     return items;
   }
-  function noteItems() {
+  // ── Scale lock ─────────────────────────────────────────
+  // Projects carry a scale and a root, but plenty are left on Chromatic
+  // while actually being in a key, so the lock falls back to what the
+  // notes themselves say. Three sources, most specific first: an
+  // override picked here, the project's own setting, then detection.
+  let scaleLockOn = localStorage.getItem('ptScaleLock') === '1';
+  // Overrides are keyed by project. A key you picked to try something in
+  // one song must not silently govern note entry in every other song and
+  // every later session.
+  let scaleOverrides = {};
+  try {
+    const raw = JSON.parse(localStorage.getItem('ptScaleOverrides') || 'null');
+    if (raw && typeof raw === 'object')
+      for (const [dir, v] of Object.entries(raw))
+        if (v && typeof v.root === 'string' && typeof v.name === 'string'
+            && PT.scaleMask(v.root, v.name)) scaleOverrides[dir] = { root: v.root, name: v.name };
+  } catch {}
+  const setScaleLock = v => { scaleLockOn = v; localStorage.setItem('ptScaleLock', v ? '1' : '0'); };
+  const setScaleOverride = (dir, v) => {
+    if (!dir) return;
+    if (v) scaleOverrides[dir] = v; else delete scaleOverrides[dir];
+    try { localStorage.setItem('ptScaleOverrides', JSON.stringify(scaleOverrides)); } catch {}
+  };
+
+  // Three sources, most specific first. `explicit` marks the two you can
+  // stand behind — a detected scale is a guess, and guesses do not get to
+  // offer a one-click rewrite of somebody's notes.
+  function activeScale(parsed, dir) {
+    const ov = dir && scaleOverrides[dir];
+    if (ov) {
+      const mask = PT.scaleMask(ov.root, ov.name);
+      if (mask) return { ...ov, mask, source: 'chosen for this project', explicit: true };
+    }
+    const proj = PT.projectScale(parsed);
+    if (proj) return { ...proj, source: "the project's own setting", explicit: true };
+    const det = PT.detectScales(parsed);
+    const top = det.candidates && det.candidates[0];
+    if (top && det.total >= 8) {
+      const mask = PT.scaleMask(top.root, top.scale);
+      if (mask) return { root: top.root, name: top.scale, mask, source: 'detected from the notes', explicit: false };
+    }
+    return null;
+  }
+  // The mask actually in force. Null when the lock is off or nothing is
+  // known, which every caller treats as "do not constrain anything".
+  const lockedMask = sc => (scaleLockOn && sc ? sc.mask : null);
+
+  function noteItems(mask) {
     const items = [
       { value: PT.EMPTY, label: '---', hint: 'no note', group: '' },
       { value: PT.NOTE_OFF, label: 'OFF', hint: 'note off', group: '' },
     ];
-    for (let v = 0; v <= 119; v++)
+    for (let v = 0; v <= 119; v++) {
+      // With the lock on, out-of-scale notes are left out of the list
+      // rather than silently snapped after you pick them.
+      if (mask && !PT.inScale(v, mask)) continue;
       items.push({ value: v, label: PT.noteStr(v), hint: String(v), group: 'Notes' });
+    }
+    return items;
+  }
+
+  function scaleItems() {
+    const items = [{ value: null, label: 'Follow the project', hint: 'use the project\'s own scale, or what the notes suggest', group: '' }];
+    for (const root of PT.NOTE_NAMES)
+      for (const sc of PT.SCALES)
+        items.push({ value: root + '|' + sc.n, label: `${root} ${sc.n}`, hint: '', group: root });
     return items;
   }
 
@@ -7619,11 +8791,14 @@ const UI = (() => {
         case 'param2': return PT.hx4(st.param2);
       }
     };
+    const sc = activeScale(parsed, modalProj && modalProj.dirName);
+    let outCount = 0;
     let rows = '';
     for (let s = 0; s < PT.STEPS; s++) {
       const st = PT.phraseStep(parsed, ph, s);
       const blank = st.note === PT.EMPTY && st.instr === PT.EMPTY
         && st.cmd1 === PT.CMD_NONE && st.cmd2 === PT.CMD_NONE;
+      if (sc && !PT.inScale(st.note, sc.mask)) outCount++;
       rows += `<div class="pe-row${s % 4 === 0 ? ' beat' : ''}${blank ? ' blank' : ''}" data-step="${s}">
         <span class="pe-i">${PT.hx2(s)}</span>
         ${PE_FIELDS.map((f, c) => {
@@ -7632,7 +8807,10 @@ const UI = (() => {
             || (f === 'instr' && st.instr === PT.EMPTY)
             || ((f === 'cmd1' || f === 'param1') && st.cmd1 === PT.CMD_NONE)
             || ((f === 'cmd2' || f === 'param2') && st.cmd2 === PT.CMD_NONE);
-          return `<span class="pe-c pe-${f}${dim ? ' dim' : ''}" data-f="${f}" data-col="${c}" tabindex="${editable ? 0 : -1}">${esc(v)}</span>`;
+          const out = f === 'note' && sc && !PT.inScale(st.note, sc.mask);
+          return `<span class="pe-c pe-${f}${dim ? ' dim' : ''}${out ? ' pe-out' : ''}" data-f="${f}" data-col="${c}"${
+            out ? ` title="${esc(PT.noteStr(st.note))} is outside ${esc(sc.root + ' ' + sc.name)}"` : ''
+          } tabindex="${editable ? 0 : -1}">${esc(v)}</span>`;
         }).join('')}
       </div>`;
     }
@@ -7654,6 +8832,14 @@ const UI = (() => {
           <button class="btn ghost sm" data-tsp="-1">−1</button>
           <button class="btn ghost sm" data-tsp="1">+1</button>
           <button class="btn ghost sm" data-tsp="12" title="Transpose up an octave">+12</button>
+          <span class="pe-sep"></span>
+          <button class="btn ghost sm${scaleLockOn ? ' on' : ''}" id="btn-ph-scale"
+            title="${sc ? `Constrain note entry and single-step transpose to ${esc(sc.root + ' ' + sc.name)} (${esc(sc.source)}${sc.explicit ? '' : ' — a guess, so nothing is rewritten for you'}). Click to turn ${scaleLockOn ? 'off' : 'on'}.`
+                       : 'No scale is set on this project and there are not enough notes to detect one. Pick one to lock to.'}">
+            ${scaleLockOn ? '🔒' : '🔓'} ${sc ? esc(sc.root + ' ' + sc.name) : 'Scale'}</button>
+          <button class="btn ghost sm" id="btn-ph-scale-pick" title="Choose which scale to lock to">▾</button>
+          ${outCount && sc.explicit ? `<button class="btn ghost sm" id="btn-ph-scale-fix"
+            title="Move every out-of-scale note in this phrase to the nearest note in ${esc(sc.root + ' ' + sc.name)}">↧ Fix ${outCount}</button>` : ''}
           <span class="pe-sep"></span>
           <button class="btn ghost sm" id="btn-ph-ins" title="Insert a blank step at the cursor, pushing the rest down">⤒ Insert</button>
           <button class="btn ghost sm" id="btn-ph-del" title="Delete the step at the cursor, pulling the rest up">⤓ Delete</button>
@@ -7679,6 +8865,8 @@ const UI = (() => {
             <button class="btn ghost sm" id="btn-ph-stepup" title="Larger edit step">+</button>
           </span>
           <span class="pe-sep"></span>
+          <button class="btn ghost sm" id="btn-ph-gen"
+            title="Build a rhythm, an arpeggio, a variation or a velocity pass into this phrase">✨ Generate</button>
           <button class="btn ghost sm" id="btn-ph-clone"
             title="${usage.length > 1
               ? 'Copy this phrase into an empty slot and point only THIS chain step at the copy, leaving the others alone'
@@ -7751,7 +8939,7 @@ const UI = (() => {
       if (f === 'note') {
         const v = PT.noteFromStr(s);
         if (v === null) return false;
-        p.notes[k] = v;
+        p.notes[k] = PT.snapToScale(v, lockedMask(sc));
       } else if (f === 'instr') {
         if (s === '--' || s === '') p.instr[k] = PT.EMPTY;
         else { const v = parseInt(s, 16); if (isNaN(v) || v < 0 || v > 0xFF) return false; p.instr[k] = v; }
@@ -7779,7 +8967,7 @@ const UI = (() => {
     // Note, instrument and FX columns are chosen from a list rather than
     // typed: nobody should have to remember that 0x1E is KIL or which hex
     // id is the bass. Params stay free-text (they're arbitrary values).
-    const PICKABLE = { note: noteItems, instr: () => instrItems(parsed), cmd1: fxItems, cmd2: fxItems };
+    const PICKABLE = { note: () => noteItems(lockedMask(sc)), instr: () => instrItems(parsed), cmd1: fxItems, cmd2: fxItems };
     const beginEdit = (cellEl, seed) => {
       if (cellEl.querySelector('input')) return;
       const step = parseInt(cellEl.closest('.pe-row').dataset.step, 10);
@@ -7927,12 +9115,17 @@ const UI = (() => {
         if (bb.c0 > 0) { setCacheBar('Select the note column to transpose those steps.', false); return; }
       }
       pushUndo();
+      const mask = lockedMask(sc);
+      // With the lock on, +1 means "next note in the key", not "next
+      // semitone". Octaves are octaves either way.
+      const byDegree = mask && Math.abs(d) === 1;
       const b = peSel ? peBox() : { s0: 0, s1: PT.STEPS - 1 };
       for (let st = b.s0; st <= b.s1; st++) {
         const k = peKey(ph, st), v = parsed.phrases.notes[k];
         if (v === PT.EMPTY || v === PT.NOTE_OFF) continue;
+        if (byDegree) { parsed.phrases.notes[k] = PT.transposeInScale(v, mask, d); continue; }
         const nv = v + d;
-        if (nv >= 0 && nv <= 119) parsed.phrases.notes[k] = nv;
+        if (nv >= 0 && nv <= 119) parsed.phrases.notes[k] = mask ? PT.snapToScale(nv, mask) : nv;
       }
       markDirty(); rerender(); focusCell();
     };
@@ -7979,7 +9172,10 @@ const UI = (() => {
             return;
           }
           const isOff = ev.key.toLowerCase() === PIANO_OFF_KEY;
-          const nv = isOff ? PT.NOTE_OFF : pianoNote(ev.key);
+          const raw = isOff ? PT.NOTE_OFF : pianoNote(ev.key);
+          // The piano stays chromatic under the fingers and snaps on the
+          // way in, so muscle memory keeps working with the lock on.
+          const nv = raw === null ? null : PT.snapToScale(raw, lockedMask(sc));
           if (nv !== null) {
             ev.preventDefault();
             pushUndo();
@@ -8053,6 +9249,46 @@ const UI = (() => {
           pb[f][peKey(ph, sIdx)] = pb[f][peKey(ph, sIdx + 1)];
       blankStep(pb, PT.STEPS - 1);
       markDirty(); rerender(); focusCell();
+    });
+    det.querySelector('#btn-ph-scale').addEventListener('click', () => {
+      if (!sc) { setCacheBar('Pick a scale first with the ▾ button next to it.', false); return; }
+      setScaleLock(!scaleLockOn);
+      rerender(); focusCell();
+    });
+    det.querySelector('#btn-ph-scale-pick').addEventListener('click', ev => {
+      openPicker(ev.currentTarget, {
+        items: scaleItems(),
+        placeholder: 'scale, e.g. A Nat. Minor',
+        onPick: v => {
+          const dir = modalProj && modalProj.dirName;
+          if (!v) setScaleOverride(dir, null);
+          else { const [root, name] = String(v).split('|'); setScaleOverride(dir, { root, name }); }
+          rerender(); focusCell();
+        },
+      });
+    });
+    det.querySelector('#btn-ph-scale-fix')?.addEventListener('click', () => {
+      if (!sc) return;
+      // Work out what would move before touching the undo stack, so a
+      // no-op cannot clear a redo the user still wanted.
+      const plan = [];
+      for (let st = 0; st < PT.STEPS; st++) {
+        const k = peKey(ph, st), v = parsed.phrases.notes[k];
+        if (PT.inScale(v, sc.mask)) continue;
+        const nv = PT.snapToScale(v, sc.mask);
+        if (nv !== v) plan.push([k, nv]);
+      }
+      if (!plan.length) return;
+      pushUndo();
+      for (const [k, nv] of plan) parsed.phrases.notes[k] = nv;
+      const moved = plan.length;
+      setCacheBar(`Moved ${moved} note${moved === 1 ? '' : 's'} into ${sc.root} ${sc.name}.`, true);
+      markDirty(); rerender(); focusCell();
+    });
+    det.querySelector('#btn-ph-gen').addEventListener('click', () => {
+      openGenerator(parsed, ph, peSel ? peBox() : null, sc, () => {
+        markDirty(); rerender(); focusCell();
+      }, pushUndo);
     });
     det.querySelector('#btn-ph-copy').addEventListener('click', () => {
       peClipPhrase = phraseSnapshot(parsed, ph);
@@ -9481,6 +10717,360 @@ const UI = (() => {
     return Slicer.markers.map(m =>
       Math.max(1, Math.min(Slicer.srcFrames - 1, Math.round(m * Slicer.srcFrames / Slicer.data.length))));
   }
+  // ── Generators ─────────────────────────────────────────
+  // A preview-then-apply modal over the pure generators in PT. Nothing
+  // is written until Apply, everything goes through the same undo and
+  // save-preview path as hand editing, and the seed is on screen so a
+  // result you liked can be reached again.
+  const GEN = {
+    mode: 'euclid',
+    seed: 1,
+    euclid: { hits: 4, steps: 16, rotate: 0, note: 36, instr: -1, clear: true },
+    arp:    { root: 60, chord: 'min7', pattern: 'up', octaves: 1, every: 1, instr: -1, clear: true },
+    vary:   { similarity: 70, scale: true },
+    human:  { base: 0x60, spread: 0x20, accent: 0x20, every: 4, slot: 'cmd1', replace: false },
+  };
+  let genCtx = null;   // { parsed, ph, box, sc, onDone, pushUndo }
+
+  const genStepRange = () => genCtx && genCtx.box
+    ? { s0: genCtx.box.s0, s1: genCtx.box.s1 }
+    : { s0: 0, s1: PT.STEPS - 1 };
+
+  // Which columns a mode writes, so a block selection that excludes them
+  // can be called out rather than quietly widened. Column 0 is the note,
+  // 1 the instrument, 2/4 the FX slots.
+  const GEN_COLS = { euclid: [0, 1], arp: [0, 1], vary: [0], human: [2, 4] };
+  function genColumnWarning() {
+    if (!genCtx || !genCtx.box) return '';
+    const want = GEN_COLS[GEN.mode] || [];
+    const { c0, c1 } = genCtx.box;
+    if (c0 === undefined || want.some(c => c >= c0 && c <= c1)) return '';
+    const names = { 0: 'note', 1: 'instrument', 2: 'FX 1', 4: 'FX 2' };
+    return `Your selection does not include the ${want.map(c => names[c]).join(' or ')} column,
+      but this generator writes there. Only the step range is used.`;
+  }
+
+  // Build the phrase this generator would produce, without touching
+  // anything. Returns one object per step, or null for "leave it".
+  function genResult() {
+    if (!genCtx) return [];
+    const { parsed, ph, sc } = genCtx;
+    const { s0, s1 } = genStepRange();
+    const n = s1 - s0 + 1;
+    const mask = GEN.mode === 'vary' && GEN.vary.scale && sc ? sc.mask : null;
+    const out = new Array(PT.STEPS).fill(null);
+    const cur = i => PT.phraseStep(parsed, ph, i);
+
+    if (GEN.mode === 'euclid') {
+      const g = GEN.euclid;
+      const pat = PT.euclid(g.hits, n, g.rotate);
+      for (let i = 0; i < n; i++) {
+        const st = s0 + i;
+        if (pat[i]) out[st] = { note: g.note, instr: g.instr < 0 ? undefined : g.instr };
+        else if (g.clear) out[st] = { note: PT.EMPTY, instr: PT.EMPTY };
+      }
+    } else if (GEN.mode === 'arp') {
+      const g = GEN.arp;
+      const chord = PT.CHORDS.find(c => c.n === g.chord) || PT.CHORDS[1];
+      const every = Math.max(1, g.every);
+      const slots = Math.ceil(n / every);
+      const seq = PT.arpSequence(g.root, chord.iv, g.pattern, g.octaves, slots, GEN.seed);
+      for (let i = 0; i < n; i++) {
+        const st = s0 + i;
+        if (i % every === 0 && seq[i / every] !== undefined) {
+          out[st] = { note: seq[i / every], instr: g.instr < 0 ? undefined : g.instr };
+        } else if (g.clear) out[st] = { note: PT.EMPTY, instr: PT.EMPTY };
+      }
+    } else if (GEN.mode === 'vary') {
+      const src = [];
+      for (let i = s0; i <= s1; i++) src.push(cur(i).note);
+      const varied = PT.varyNotes(src, GEN.vary.similarity, GEN.seed, mask);
+      for (let i = 0; i < n; i++) {
+        const st = s0 + i;
+        if (varied[i] !== src[i]) out[st] = { note: varied[i] };
+      }
+    } else if (GEN.mode === 'human') {
+      const g = GEN.human;
+      const src = [];
+      for (let i = s0; i <= s1; i++) src.push(cur(i).note);
+      const vols = PT.humaniseVols(src, {
+        base: g.base, spread: g.spread, accent: g.accent, accentEvery: g.every, seed: GEN.seed,
+      });
+      for (let i = 0; i < n; i++) {
+        if (vols[i] === null) continue;
+        const st = s0 + i;
+        // Never quietly overwrite someone else's command. A groove switch
+        // or a KIL sitting in the target slot is deliberate.
+        const held = g.slot === 'cmd2' ? cur(st).cmd2 : cur(st).cmd1;
+        if (!g.replace && held !== PT.CMD_NONE && held !== PT.CMD_VOL) continue;
+        out[st] = { vol: vols[i], slot: g.slot };
+      }
+    }
+    return out;
+  }
+
+  function genApply() {
+    if (!genCtx) return 0;
+    const { parsed, ph } = genCtx;
+    const res = genResult();
+    const pb = parsed.phrases;
+    let changed = 0;
+    for (let st = 0; st < PT.STEPS; st++) {
+      const r = res[st];
+      if (!r) continue;
+      const k = ph * PT.STEPS + st;
+      if (r.note !== undefined && pb.notes[k] !== r.note) { pb.notes[k] = r.note; changed++; }
+      if (r.instr !== undefined && pb.instr[k] !== r.instr) { pb.instr[k] = r.instr; changed++; }
+      if (r.vol !== undefined) {
+        const cmdF = r.slot === 'cmd2' ? 'cmd2' : 'cmd1';
+        const parF = cmdF === 'cmd2' ? 'param2' : 'param1';
+        if (pb[cmdF][k] !== PT.CMD_VOL || pb[parF][k] !== r.vol) {
+          pb[cmdF][k] = PT.CMD_VOL; pb[parF][k] = r.vol; changed++;
+        }
+      }
+    }
+    return changed;
+  }
+
+  function renderGenPreview() {
+    const host = $('gen-preview');
+    if (!host || !genCtx) return;
+    const { parsed, ph } = genCtx;
+    const res = genResult();
+    const { s0, s1 } = genStepRange();
+    const fx = (cmd, par) => cmd !== PT.CMD_NONE ? ' ' + PT.cmdName(cmd) + PT.hx2(par & 0xFF) : '';
+    const fmt = st => {
+      const c = PT.phraseStep(parsed, ph, st);
+      return PT.noteStr(c.note) + ' ' + (c.instr === PT.EMPTY ? '--' : PT.hx2(c.instr))
+           + fx(c.cmd1, c.param1) + fx(c.cmd2, c.param2);
+    };
+    let html = '';
+    let changes = 0;
+    for (let st = 0; st < PT.STEPS; st++) {
+      const inRange = st >= s0 && st <= s1;
+      const r = res[st];
+      const before = fmt(st);
+      let after = before, cls = '';
+      if (r) {
+        const c = PT.phraseStep(parsed, ph, st);
+        const note = r.note !== undefined ? r.note : c.note;
+        // genApply only writes instr when it says so; the preview used to
+        // claim the instrument column was cleared on a note it emptied.
+        const instr = r.instr !== undefined ? r.instr : c.instr;
+        // …and it only ever rendered FX 1, so writing into FX 2 looked
+        // like it was about to destroy whatever FX 1 held.
+        const cmd1 = (r.vol !== undefined && r.slot !== 'cmd2') ? PT.CMD_VOL : c.cmd1;
+        const par1 = (r.vol !== undefined && r.slot !== 'cmd2') ? r.vol : (c.param1 & 0xFF);
+        const cmd2 = (r.vol !== undefined && r.slot === 'cmd2') ? PT.CMD_VOL : c.cmd2;
+        const par2 = (r.vol !== undefined && r.slot === 'cmd2') ? r.vol : (c.param2 & 0xFF);
+        after = PT.noteStr(note) + ' ' + (instr === PT.EMPTY ? '--' : PT.hx2(instr)) + fx(cmd1, par1) + fx(cmd2, par2);
+        if (after !== before) { changes++; cls = note === PT.EMPTY && c.note !== PT.EMPTY ? ' gone' : ' chg'; }
+      }
+      html += `<div class="gen-prow${st % 4 === 0 ? ' beat' : ''}${cls}"${inRange ? '' : ' style="opacity:.35"'}>
+        <span>${PT.hx2(st)}</span><span class="old">${esc(before)}</span><span class="new">${esc(after)}</span></div>`;
+    }
+    host.innerHTML = html;
+    $('gen-status').textContent = changes
+      ? `${changes} step${changes === 1 ? '' : 's'} would change.`
+      : 'Nothing would change with these settings.';
+    $('btn-gen-apply').disabled = !changes;
+  }
+
+  function renderGenControls() {
+    const host = $('gen-ctrls');
+    if (!host || !genCtx) return;
+    const { parsed, sc } = genCtx;
+    const { s0, s1 } = genStepRange();
+    const n = s1 - s0 + 1;
+    const instrOpts = extra =>
+      `<option value="-1">${extra}</option>` + parsed.instruments.map(i =>
+        `<option value="${i.id}">${PT.hx2(i.id)} ${esc(i.name || '')}</option>`).join('');
+    const row = (label, body, val = '') =>
+      `<div class="gen-r"><span>${label}</span>${body}<span class="gen-rv">${val}</span></div>`;
+
+    if (GEN.mode === 'euclid') {
+      const g = GEN.euclid;
+      const pat = PT.euclid(g.hits, n, g.rotate);
+      host.innerHTML =
+        row('Hits', `<input type="range" id="g-hits" min="0" max="${n}" step="1" value="${Math.min(g.hits, n)}">`, `${Math.min(g.hits, n)} of ${n}`) +
+        row('Rotate', `<input type="range" id="g-rot" min="0" max="${Math.max(0, n - 1)}" step="1" value="${Math.min(g.rotate, n - 1)}">`, String(Math.min(g.rotate, n - 1))) +
+        row('Note', `<select id="g-note">${
+          Array.from({ length: 120 }, (_, v) => `<option value="${v}"${v === g.note ? ' selected' : ''}>${PT.noteStr(v)}</option>`).join('')
+        }</select>`) +
+        row('Instrument', `<select id="g-instr">${instrOpts('leave as is')}</select>`) +
+        row('Empty steps', `<label class="gen-hint" style="flex:1"><input type="checkbox" id="g-clear"${g.clear ? ' checked' : ''}> clear the steps that are not hits</label>`) +
+        `<div class="gen-hint">Euclidean: the hits are spread as evenly as the step count allows. 3 in 8 is the tresillo, 5 in 8 the cinquillo, 7 in 16 a common hat pattern.
+          <div class="gen-pat">${pat.map((h, i) => `<i class="${h ? 'hit' : ''}${i % 4 === 0 ? ' beat' : ''}"></i>`).join('')}</div></div>`;
+      $('g-instr').value = String(g.instr);
+    } else if (GEN.mode === 'arp') {
+      const g = GEN.arp;
+      host.innerHTML =
+        row('Root', `<select id="g-root">${
+          Array.from({ length: 120 }, (_, v) => `<option value="${v}"${v === g.root ? ' selected' : ''}>${PT.noteStr(v)}</option>`).join('')
+        }</select>`) +
+        row('Chord', `<select id="g-chord">${
+          PT.CHORDS.map(c => `<option value="${c.n}"${c.n === g.chord ? ' selected' : ''}>${c.n}</option>`).join('')
+        }</select>`) +
+        row('Pattern', `<select id="g-pattern">${
+          PT.ARP_PATTERNS.filter(x => x !== 'chord').map(x => `<option value="${x}"${x === g.pattern ? ' selected' : ''}>${x}</option>`).join('')
+        }</select>`) +
+        row('Octaves', `<input type="range" id="g-oct" min="1" max="4" step="1" value="${g.octaves}">`, String(g.octaves)) +
+        row('One note every', `<input type="range" id="g-every" min="1" max="8" step="1" value="${g.every}">`, `${g.every} step${g.every === 1 ? '' : 's'}`) +
+        row('Instrument', `<select id="g-instr">${instrOpts('leave as is')}</select>`) +
+        row('Gaps', `<label class="gen-hint" style="flex:1"><input type="checkbox" id="g-clear"${g.clear ? ' checked' : ''}> clear the steps between notes</label>`) +
+        `<div class="gen-hint">${sc ? `The scale lock does not constrain this — a chord is chosen deliberately. ${esc(sc.root + ' ' + sc.name)} is set if you want to match it.` : 'No scale is set on this project.'}</div>`;
+      $('g-instr').value = String(g.instr);
+    } else if (GEN.mode === 'vary') {
+      const g = GEN.vary;
+      host.innerHTML =
+        row('Similarity', `<input type="range" id="g-sim" min="0" max="100" step="1" value="${g.similarity}">`, `${g.similarity}%`) +
+        (sc ? row('Keep in key', `<label class="gen-hint" style="flex:1"><input type="checkbox" id="g-vscale"${g.scale ? ' checked' : ''}> move notes by scale degree in ${esc(sc.root + ' ' + sc.name)}</label>`) : '') +
+        `<div class="gen-hint">Builds a relative of what is already here: notes move a step or two, a few drop out, and gaps are filled from notes the phrase already uses. 100% leaves it alone. Reroll for another take on the same setting.</div>`;
+    } else {
+      const g = GEN.human;
+      host.innerHTML =
+        row('Base level', `<input type="range" id="g-base" min="0" max="255" step="1" value="${g.base}">`, PT.hx2(g.base)) +
+        row('Spread', `<input type="range" id="g-spread" min="0" max="127" step="1" value="${g.spread}">`, '±' + PT.hx2(g.spread)) +
+        row('Accent', `<input type="range" id="g-accent" min="0" max="127" step="1" value="${g.accent}">`, '+' + PT.hx2(g.accent)) +
+        row('Accent every', `<input type="range" id="g-hevery" min="1" max="8" step="1" value="${g.every}">`, `${g.every} step${g.every === 1 ? '' : 's'}`) +
+        row('Write into', `<select id="g-slot"><option value="cmd1"${g.slot === 'cmd1' ? ' selected' : ''}>FX 1</option><option value="cmd2"${g.slot === 'cmd2' ? ' selected' : ''}>FX 2</option></select>`) +
+        row('Occupied slots', `<label class="gen-hint" style="flex:1"><input type="checkbox" id="g-replace"${g.replace ? ' checked' : ''}> replace commands that are already there</label>`) +
+        `<div class="gen-hint">Writes a VOL command on every step that has a note, accented on the beat and scattered either side. Steps without a note are left alone, and so are steps whose chosen slot already holds a different command unless you say otherwise.</div>`;
+    }
+
+    // One handler for the lot: read every control back into GEN and repaint.
+    // Ranges rebuild only their own readout, never the form: replacing the
+    // subtree mid-drag destroys the element holding pointer capture, which
+    // made every slider click-only.
+    host.querySelectorAll('input,select').forEach(el => {
+      const ev = el.type === 'range' ? 'input' : 'change';
+      el.addEventListener(ev, () => {
+        const g = GEN[GEN.mode];
+        const num = id => Number(host.querySelector('#' + id)?.value);
+        // Number('') is 0, which would silently mean instrument 00.
+        const pickInstr = (id, fallback) => {
+          const raw = host.querySelector('#' + id)?.value;
+          return raw === '' || raw === undefined ? fallback : Number(raw);
+        };
+        if (GEN.mode === 'euclid') {
+          g.hits = num('g-hits'); g.rotate = num('g-rot');
+          g.note = num('g-note'); g.instr = pickInstr('g-instr', g.instr);
+          g.clear = host.querySelector('#g-clear').checked;
+        } else if (GEN.mode === 'arp') {
+          g.root = num('g-root'); g.chord = host.querySelector('#g-chord').value;
+          g.pattern = host.querySelector('#g-pattern').value;
+          g.octaves = num('g-oct'); g.every = num('g-every'); g.instr = pickInstr('g-instr', g.instr);
+          g.clear = host.querySelector('#g-clear').checked;
+        } else if (GEN.mode === 'vary') {
+          g.similarity = num('g-sim');
+          const sw = host.querySelector('#g-vscale');
+          if (sw) g.scale = sw.checked;
+        } else {
+          g.base = num('g-base'); g.spread = num('g-spread');
+          g.accent = num('g-accent'); g.every = num('g-hevery');
+          g.slot = host.querySelector('#g-slot').value;
+          g.replace = host.querySelector('#g-replace').checked;
+        }
+        if (el.type === 'range') { refreshGenReadouts(); renderGenPreview(); }
+        else { renderGenControls(); renderGenPreview(); }
+      });
+    });
+  }
+
+  // Update every value label and the euclid strip in place.
+  function refreshGenReadouts() {
+    const host = $('gen-ctrls');
+    if (!host || !genCtx) return;
+    const { s0, s1 } = genStepRange();
+    const n = s1 - s0 + 1;
+    const g = GEN[GEN.mode];
+    const set = (id, txt) => {
+      const el = host.querySelector('#' + id);
+      const out = el && el.parentElement.querySelector('.gen-rv');
+      if (out) out.textContent = txt;
+    };
+    if (GEN.mode === 'euclid') {
+      set('g-hits', `${Math.min(g.hits, n)} of ${n}`);
+      set('g-rot', String(Math.min(g.rotate, Math.max(0, n - 1))));
+      const strip = host.querySelector('.gen-pat');
+      if (strip) strip.innerHTML = PT.euclid(g.hits, n, g.rotate)
+        .map((h, i) => `<i class="${h ? 'hit' : ''}${i % 4 === 0 ? ' beat' : ''}"></i>`).join('');
+    } else if (GEN.mode === 'arp') {
+      set('g-oct', String(g.octaves));
+      set('g-every', `${g.every} step${g.every === 1 ? '' : 's'}`);
+    } else if (GEN.mode === 'vary') {
+      set('g-sim', `${g.similarity}%`);
+    } else {
+      set('g-base', PT.hx2(g.base));
+      set('g-spread', '±' + PT.hx2(g.spread));
+      set('g-accent', '+' + PT.hx2(g.accent));
+      set('g-hevery', `${g.every} step${g.every === 1 ? '' : 's'}`);
+    }
+  }
+
+  function renderGenScope() {
+    const { s0, s1 } = genStepRange();
+    const whole = s0 === 0 && s1 === PT.STEPS - 1;
+    const warn = genColumnWarning();
+    $('gen-scope').innerHTML = (whole
+      ? `Applies to the whole phrase (steps 00–${PT.hx2(PT.STEPS - 1)}). Select a block in the phrase first to narrow it.`
+      : `Applies to steps ${PT.hx2(s0)}–${PT.hx2(s1)} of your selection. Nothing outside that range is touched.`)
+      + (warn ? `<br><span style="color:var(--warn)">${warn}</span>` : '');
+  }
+
+  function openGenerator(parsed, ph, box, sc, onDone, pushUndoFn) {
+    genCtx = { parsed, ph, box, sc, onDone, pushUndo: pushUndoFn };
+    // Default the note and instrument to something already in the phrase,
+    // so the first preview is usually close to what you wanted.
+    // GEN survives between projects, so an instrument id carried over
+    // from another card can easily not exist here. Fall back rather than
+    // writing a reference the user never chose and the list never showed.
+    const first = parsed.instruments[0];
+    const known = id => id >= 0 && parsed.instruments.some(i => i.id === id);
+    for (const key of ['euclid', 'arp'])
+      if (!known(GEN[key].instr)) GEN[key].instr = first ? first.id : -1;
+    $('gen-title').textContent = `Generate into phrase ${PT.hx2(ph)}`;
+    $('gen-modal').style.display = 'flex';
+    document.querySelectorAll('.gen-tab').forEach(b => b.classList.toggle('on', b.dataset.gen === GEN.mode));
+    renderGenControls(); renderGenScope(); renderGenPreview();
+  }
+
+  function closeGenerator() {
+    $('gen-modal').style.display = 'none';
+    genCtx = null;
+  }
+
+  function initGeneratorEvents() {
+    $('btn-gen-close').addEventListener('click', closeGenerator);
+    $('btn-gen-cancel').addEventListener('click', closeGenerator);
+    $('gen-modal').addEventListener('mousedown', e => { if (e.target.id === 'gen-modal') closeGenerator(); });
+    $('gen-tabs').addEventListener('click', e => {
+      const b = e.target.closest('.gen-tab');
+      if (!b) return;
+      GEN.mode = b.dataset.gen;
+      document.querySelectorAll('.gen-tab').forEach(x => x.classList.toggle('on', x === b));
+      renderGenControls(); renderGenScope(); renderGenPreview();
+    });
+    $('btn-gen-reroll').addEventListener('click', () => {
+      GEN.seed = (GEN.seed * 1103515245 + 12345) >>> 8 || 1;
+      renderGenControls(); renderGenPreview();
+    });
+    $('btn-gen-apply').addEventListener('click', () => {
+      if (!genCtx) return;
+      const { onDone, pushUndo: push } = genCtx;
+      // Nothing to do? Say nothing and touch nothing. Pushing an undo
+      // snapshot first and popping it afterwards left the redo stack
+      // cleared, which silently threw away a redo the user still had.
+      if (!genResult().some(Boolean)) { closeGenerator(); return; }
+      push();
+      const changed = genApply();
+      if (!changed) { songUndo.pop(); closeGenerator(); return; }
+      setCacheBar(`Generated ${changed} change${changed === 1 ? '' : 's'} into the phrase. ⌘Z undoes it.`, true);
+      closeGenerator();
+      onDone();
+    });
+  }
+
   async function openSlicer(inst) {
     if (!inst || inst.source !== 'project' || !inst.sample) return;
     const p = inst.proj;
@@ -10420,6 +12010,7 @@ const UI = (() => {
     $('btn-modal-patterns').addEventListener('click', togglePatternView);
     $('btn-modal-overview').addEventListener('click', () => setModalTab('overview'));
     $('btn-modal-tables').addEventListener('click', toggleTablesView);
+    $('btn-modal-map').addEventListener('click', toggleMapView);
     $('btn-modal-midi').addEventListener('click', exportMidi);
     $('btn-modal-diff').addEventListener('click', () => modalProj && startDiff(modalProj));
 
@@ -10524,7 +12115,7 @@ const UI = (() => {
     // Keyboard
     window.addEventListener('beforeunload', e => {
       const any = dirtyGrid.size || dirtyPhrases.size || dirtyChains.size ||
-                  dirtyTables.size || dirtyGrooves.size;
+                  dirtyTables.size || dirtyGrooves.size || mapDirty.size;
       if (any) { e.preventDefault(); e.returnValue = ''; }
     });
     document.addEventListener('keydown', e => {
@@ -10540,6 +12131,11 @@ const UI = (() => {
           $('save-preview').classList.remove('open');
           return;
         }
+        // The generator sits above the project modal and holds a
+        // reference to the project it was opened on. Closing the modal
+        // out from under it left Apply writing into a project the app
+        // had already let go of.
+        if ($('gen-modal').style.display !== 'none') { closeGenerator(); return; }
         closeSearch(); closeDiff(); closeFixModal(); closeSlicer();
         $('samp-modal').classList.remove('open');
         closeProjModal();
@@ -10547,7 +12143,8 @@ const UI = (() => {
       }
       if (inInput || !lib) return;
       // modals own the keyboard while open
-      if ($('slice-modal').style.display !== 'none' || $('fix-modal').classList.contains('open') ||
+      if ($('gen-modal').style.display !== 'none' ||
+          $('slice-modal').style.display !== 'none' || $('fix-modal').classList.contains('open') ||
           $('diff-modal').classList.contains('open') || $('samp-modal').classList.contains('open')) return;
       if ($('proj-modal').style.display !== 'none') {
         // Space plays what you're looking at: the open phrase, else the open
@@ -10638,13 +12235,20 @@ const UI = (() => {
       else $('usb-stage').requestFullscreen?.().catch(() => {});
     });
     $('btn-usb-popout').addEventListener('click', () => Mirror.popOut());
-    $('btn-usb-fx').addEventListener('click', () => {
-      const panel = $('fx-panel');
-      const hide = panel.style.display !== 'none';
-      panel.style.display = hide ? 'none' : 'flex';
-      $('btn-usb-fx').classList.toggle('on', !hide);
+    const setFxPanel = show => {
+      $('fx-panel').style.display = show ? 'flex' : 'none';
+      $('btn-usb-fx').classList.toggle('on', show);
+      $('tab-device').classList.toggle('fx-open', show);
+      Mirror.invalidate();
+    };
+    $('btn-usb-fx').addEventListener('click', () =>
+      setFxPanel($('fx-panel').style.display === 'none'));
+    setFxPanel(true);
+    // Only show the divider once the mirror has actually been scrolled to,
+    // so a short panel does not draw a line under nothing.
+    $('usb-scroll').addEventListener('scroll', () => {
+      $('usb-sticky').classList.toggle('stuck', $('usb-scroll').scrollTop > 4);
     });
-    $('btn-usb-fx').classList.add('on');
     Mirror.init();
 
     // PWA: register the service worker when served over http(s); the
@@ -10654,6 +12258,7 @@ const UI = (() => {
     }
 
     initSlicerEvents();
+    initGeneratorEvents();
     refreshSavedSets();
   }
 

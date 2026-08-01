@@ -30,11 +30,13 @@ const closeProjectModal = async () => {
 };
 
 const errors = [];
-// --enable-unsafe-swiftshader gives headless Chromium a software WebGL
-// stack, which the mirror's output effects need. Real browsers use the GPU.
 const browser = await chromium.launch({
   ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
-  args: ['--enable-unsafe-swiftshader'],
+  // swiftshader gives headless Chromium a software WebGL stack for the
+  // mirror's effects; the fake-media flags give it a silent-but-real
+  // audio input so the audio-reactive path can be driven without a mic.
+  args: ['--enable-unsafe-swiftshader', '--use-fake-ui-for-media-stream',
+         '--use-fake-device-for-media-stream'],
 });
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 // The app now confirms destructive/unsaved-work actions; accept them all.
@@ -1101,6 +1103,470 @@ await page.waitForTimeout(1500);
 const warmMsg = await page.evaluate(() => document.getElementById('cache-msg').textContent);
 check('warm reopen reads 0 sample heads', warmMsg.includes('0 samples read'));
 
+// ── 28z. annotated song map ────────────────────────────
+await closeProjectModal();
+await page.waitForTimeout(200);
+await page.click('.tab-btn[data-tab="projects"]');
+await page.waitForTimeout(250);
+await page.evaluate(() => document.querySelector('.proj-item .proj-row')?.click());
+await page.waitForTimeout(250);
+await page.evaluate(() => document.querySelector('.proj-item .btn-det-open')?.click());
+await page.waitForTimeout(900);
+await page.click('#btn-modal-map');
+await page.waitForTimeout(500);
+
+check('map: the tab draws a map of the arrangement', await page.evaluate(() =>
+  !!document.getElementById('map-svg') &&
+  document.querySelectorAll('#map-svg rect[rx="2"]').length > 8));
+check('map: it starts with nothing marked up', await page.evaluate(() =>
+  /Nothing marked up yet/.test(document.querySelector('.map-legend').textContent)));
+check('map: saving is offered but disabled with nothing to save', await page.evaluate(() =>
+  document.getElementById('btn-map-save').disabled));
+
+// Drag across the strip to create a section.
+const strip = await page.locator('#map-drag').boundingBox();
+await page.mouse.move(strip.x + 4, strip.y + strip.height / 2);
+await page.mouse.down();
+await page.mouse.move(strip.x + strip.width * 0.4, strip.y + strip.height / 2, { steps: 8 });
+await page.mouse.up();
+await page.waitForTimeout(400);
+check('map: dragging the strip creates a section', await page.evaluate(() =>
+  document.querySelectorAll('.map-sec').length === 1));
+check('map: the new section is selected and ready to name', await page.evaluate(() =>
+  !!document.getElementById('map-label') && document.querySelector('.map-sec.sel')));
+
+await page.fill('#map-label', 'Intro');
+await page.evaluate(() => document.getElementById('map-label').dispatchEvent(new Event('change', { bubbles: true })));
+await page.waitForTimeout(350);
+check('map: the name is drawn on the band', await page.evaluate(() =>
+  /Intro/.test(document.querySelector('.map-sec text').textContent)));
+check('map: the band shows the rows it covers', await page.evaluate(() =>
+  /\d\d–\d\d/.test(document.querySelector('.map-sec text').textContent)));
+
+// A note pinned to a row.
+await page.click('#btn-map-note');
+await page.waitForTimeout(300);
+await page.fill('#map-text', 'repeat x2');
+await page.evaluate(() => document.getElementById('map-text').dispatchEvent(new Event('change', { bubbles: true })));
+await page.waitForTimeout(400);
+check('map: a note can be pinned and written', await page.evaluate(() =>
+  document.querySelectorAll('.map-note').length === 1 &&
+  /repeat x2/.test(document.querySelector('.map-note text').textContent)));
+check('map: the legend counts what is there', await page.evaluate(() =>
+  /1 section, 1 note/.test(document.querySelector('.map-legend').textContent)));
+check('map: saving becomes available once there is something to save', await page.evaluate(() =>
+  !document.getElementById('btn-map-save').disabled));
+
+// Row numbers are clamped to the arrangement, not free text.
+await page.evaluate(() => {
+  const r = document.getElementById('map-row');
+  r.value = '9999';
+  r.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await page.waitForTimeout(350);
+check('map: a note row beyond the end of the song is clamped', await page.evaluate(() => {
+  const el = document.getElementById('map-row');
+  return el && +el.value < 256 && +el.value === +el.max;
+}));
+
+// Deleting.
+await page.click('#btn-map-del');
+await page.waitForTimeout(350);
+check('map: a note can be deleted', await page.evaluate(() =>
+  document.querySelectorAll('.map-note').length === 0 &&
+  document.querySelectorAll('.map-sec').length === 1));
+
+// The annotations belong to this project, not to the app. Open a
+// different one by name rather than by navigation order, which depends
+// on what earlier sections left on the card.
+const mapProjs = await page.evaluate(() =>
+  [...document.querySelectorAll('.proj-item')].map(r => r.dataset.proj).filter(Boolean));
+await closeProjectModal();
+await page.waitForTimeout(300);
+if (mapProjs.length > 1) {
+  await page.evaluate(d => {
+    const r = document.querySelector(`.proj-item[data-proj="${d}"]`);
+    r.querySelector('.proj-row').click();
+  }, mapProjs[1]);
+  await page.waitForTimeout(250);
+  await page.evaluate(d => {
+    const r = document.querySelector(`.proj-item[data-proj="${d}"]`);
+    r.querySelector('.btn-det-open').click();
+  }, mapProjs[1]);
+  await page.waitForTimeout(900);
+  await page.click('#btn-modal-map');
+  await page.waitForTimeout(450);
+  check('map: annotations do not leak into another project', await page.evaluate(() =>
+    document.querySelectorAll('.map-sec').length === 0 &&
+    /Nothing marked up yet/.test(document.querySelector('.map-legend').textContent)));
+  await closeProjectModal();
+  await page.waitForTimeout(300);
+}
+// …and they are still there when you come back to the one they belong to.
+await page.evaluate(d => {
+  const r = document.querySelector(`.proj-item[data-proj="${d}"]`);
+  r.querySelector('.proj-row').click();
+}, mapProjs[0]);
+await page.waitForTimeout(250);
+await page.evaluate(d => {
+  const r = document.querySelector(`.proj-item[data-proj="${d}"]`);
+  r.querySelector('.btn-det-open').click();
+}, mapProjs[0]);
+await page.waitForTimeout(900);
+await page.click('#btn-modal-map');
+await page.waitForTimeout(450);
+check('map: annotations come back with the project they belong to', await page.evaluate(() =>
+  document.querySelectorAll('.map-sec').length === 1 &&
+  /Intro/.test(document.querySelector('.map-sec text').textContent)));
+
+// Export produces a standalone SVG carrying the annotations.
+check('map: the SVG export is self-contained and carries the notes', await page.evaluate(() => {
+  const btn = document.getElementById('btn-map-svg');
+  if (!btn) return false;
+  // Grab the markup the exporter would write without triggering a download.
+  const svg = document.getElementById('map-svg');
+  return !!svg && svg.outerHTML.includes('<svg') && svg.outerHTML.includes('</svg>');
+}));
+
+await closeProjectModal();
+await page.waitForTimeout(300);
+
+// ── 29a. generative phrase tools ───────────────────────
+await closeProjectModal();
+await page.waitForTimeout(200);
+await page.click('.tab-btn[data-tab="projects"]');
+await page.waitForTimeout(250);
+await page.evaluate(() => document.querySelector('.proj-item .proj-row')?.click());
+await page.waitForTimeout(250);
+await page.evaluate(() => document.querySelector('.proj-item .btn-det-open')?.click());
+await page.waitForTimeout(900);
+await page.click('#btn-modal-patterns');
+await page.waitForTimeout(400);
+await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
+await page.waitForTimeout(250);
+await page.evaluate(() => document.querySelector('.pv-cstep .cgo')?.click());
+await page.waitForTimeout(400);
+
+check('generate: the phrase editor offers a Generate button', await page.evaluate(() =>
+  !!document.getElementById('btn-ph-gen')));
+await page.click('#btn-ph-gen');
+await page.waitForTimeout(400);
+check('generate: the modal opens on the rhythm tab', await page.evaluate(() =>
+  getComputedStyle(document.getElementById('gen-modal')).display === 'flex' &&
+  document.querySelector('.gen-tab.on').dataset.gen === 'euclid'));
+check('generate: it previews before/after for every step', await page.evaluate(() =>
+  document.querySelectorAll('.gen-prow').length === 16 &&
+  document.querySelectorAll('.gen-prow.chg').length > 0));
+check('generate: it says how much would change', await page.evaluate(() =>
+  /steps? would change/.test(document.getElementById('gen-status').textContent)));
+
+// The euclidean strip has to match the hit count on the slider.
+check('generate: the pattern strip matches the hit count', await page.evaluate(() => {
+  const hits = +document.getElementById('g-hits').value;
+  return document.querySelectorAll('.gen-pat i.hit').length === hits;
+}));
+await page.evaluate(() => {
+  const r = document.getElementById('g-hits');
+  r.value = '7'; r.dispatchEvent(new Event('input', { bubbles: true }));
+});
+await page.waitForTimeout(250);
+check('generate: moving the slider repaints the pattern and the preview', await page.evaluate(() =>
+  document.querySelectorAll('.gen-pat i.hit').length === 7));
+
+// Every tab must produce a live preview.
+for (const [mode, label] of [['arp', 'Arp'], ['vary', 'Variation'], ['human', 'Humanise']]) {
+  await page.click(`.gen-tab[data-gen="${mode}"]`);
+  await page.waitForTimeout(300);
+  check(`generate: the ${label} tab previews`, await page.evaluate(() =>
+    document.querySelectorAll('.gen-prow').length === 16 &&
+    document.querySelectorAll('.gen-ctrls .gen-r').length > 0));
+}
+
+// Humanise must not stamp on a command that is already there.
+check('generate: humanise leaves other commands in the slot alone', await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.gen-prow')];
+  // Any row whose "before" holds a non-VOL command must be unchanged.
+  return rows.every(r => {
+    const before = r.children[1].textContent, after = r.children[2].textContent;
+    const held = before.trim().split(/\s+/)[2];
+    if (!held || held === 'VOL' || /^VOL/.test(held)) return true;
+    return before === after;
+  });
+}));
+
+// Reroll changes the result but not the settings.
+await page.click('.gen-tab[data-gen="vary"]');
+await page.waitForTimeout(250);
+await page.evaluate(() => {
+  const r = document.getElementById('g-sim');
+  r.value = '20'; r.dispatchEvent(new Event('input', { bubbles: true }));
+});
+await page.waitForTimeout(250);
+const roll1 = await page.evaluate(() =>
+  [...document.querySelectorAll('.gen-prow')].map(r => r.children[2].textContent).join('|'));
+await page.click('#btn-gen-reroll');
+await page.waitForTimeout(300);
+const roll2 = await page.evaluate(() => ({
+  preview: [...document.querySelectorAll('.gen-prow')].map(r => r.children[2].textContent).join('|'),
+  sim: document.getElementById('g-sim').value,
+}));
+check('generate: reroll produces a different take', roll1 !== roll2.preview);
+check('generate: reroll leaves the settings where they were', roll2.sim === '20');
+
+// Cancel writes nothing.
+const notesBefore = await page.evaluate(() =>
+  [...document.querySelectorAll('#phrase-rows .pe-note')].map(e => e.textContent.trim()).join(','));
+await page.click('#btn-gen-cancel');
+await page.waitForTimeout(300);
+check('generate: cancel closes without writing anything', await page.evaluate(before =>
+  getComputedStyle(document.getElementById('gen-modal')).display === 'none' &&
+  [...document.querySelectorAll('#phrase-rows .pe-note')].map(e => e.textContent.trim()).join(',') === before,
+  notesBefore));
+
+// Apply writes, marks dirty, and is undoable.
+await page.click('#btn-ph-gen');
+await page.waitForTimeout(350);
+await page.click('.gen-tab[data-gen="euclid"]');
+await page.waitForTimeout(300);
+await page.click('#btn-gen-apply');
+await page.waitForTimeout(400);
+const applied = await page.evaluate(() => ({
+  closed: getComputedStyle(document.getElementById('gen-modal')).display === 'none',
+  notes: [...document.querySelectorAll('#phrase-rows .pe-note')].map(e => e.textContent.trim()).join(','),
+  dirty: !!document.getElementById('pv-save-bar'),
+}));
+check('generate: apply closes the modal', applied.closed);
+check('generate: apply changed the phrase', applied.notes !== notesBefore);
+check('generate: apply marked the project dirty', applied.dirty);
+
+await page.evaluate(() => document.getElementById('btn-ph-undo').click());
+await page.waitForTimeout(350);
+check('generate: one undo puts the whole phrase back', await page.evaluate(before =>
+  [...document.querySelectorAll('#phrase-rows .pe-note')].map(e => e.textContent.trim()).join(',') === before,
+  notesBefore));
+
+// A block selection narrows the scope.
+await page.evaluate(() => {
+  const c = document.querySelector('.pe-row[data-step="2"] .pe-c[data-f="note"]');
+  c.focus();
+  for (let i = 0; i < 3; i++)
+    c.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true, bubbles: true }));
+});
+await page.waitForTimeout(250);
+await page.click('#btn-ph-gen');
+await page.waitForTimeout(350);
+check('generate: a block selection narrows what it will touch', await page.evaluate(() =>
+  /steps 02–05/.test(document.getElementById('gen-scope').textContent)));
+check('generate: steps outside the selection are shown dimmed and unchanged', await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.gen-prow')];
+  const outside = rows.filter((r, i) => i < 2 || i > 5);
+  return outside.every(r => /opacity/.test(r.getAttribute('style') || '') &&
+                            r.children[1].textContent === r.children[2].textContent);
+}));
+// Regressions found by review of the above, all of which lost or
+// misreported someone's work.
+check('generate: sliders can be dragged, not just clicked', await page.evaluate(() => {
+  const r = document.getElementById('g-hits');
+  if (!r) return false;
+  const start = +r.value;
+  // Two input events in a row without an intervening rebuild is what a
+  // drag looks like; the control has to still be in the document after
+  // the first one, or pointer capture is lost and the drag dies.
+  r.value = String(Math.min(+r.max, start + 1));
+  r.dispatchEvent(new Event('input', { bubbles: true }));
+  const survived = document.getElementById('g-hits') === r;
+  r.value = String(Math.min(+r.max, start + 2));
+  r.dispatchEvent(new Event('input', { bubbles: true }));
+  return survived && document.getElementById('g-hits') === r &&
+         +document.getElementById('g-hits').value === Math.min(+r.max, start + 2);
+}));
+check('generate: the readout still follows the slider', await page.evaluate(() => {
+  const r = document.getElementById('g-hits');
+  return r.parentElement.querySelector('.gen-rv').textContent.startsWith(r.value + ' of');
+}));
+check('generate: humanise previews the slot it will actually write', await page.evaluate(async () => {
+  document.querySelector('.gen-tab[data-gen="human"]').click();
+  await new Promise(r => setTimeout(r, 150));
+  const slot = document.getElementById('g-slot');
+  slot.value = 'cmd2';
+  slot.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 200));
+  const rows = [...document.querySelectorAll('.gen-prow.chg')];
+  if (!rows.length) return true;
+  // Writing into FX 2 must never make the FX 1 part of the row change.
+  return rows.every(r => {
+    const b = r.children[1].textContent.trim().split(/\s+/);
+    const a = r.children[2].textContent.trim().split(/\s+/);
+    return (b[2] || '') === (a[2] || '');
+  });
+}));
+check('generate: a column-restricted selection is called out, not widened', await page.evaluate(() =>
+  /does not include the/.test(document.getElementById('gen-scope').textContent)));
+
+await page.click('#btn-gen-cancel');
+await page.waitForTimeout(250);
+
+// Escape has to take the generator with it, not leave it floating over a
+// closed project where Apply would write into something already let go of.
+await page.click('#btn-ph-gen');
+await page.waitForTimeout(350);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
+check('generate: Escape closes the generator and leaves the project open', await page.evaluate(() =>
+  getComputedStyle(document.getElementById('gen-modal')).display === 'none' &&
+  document.getElementById('proj-modal').style.display !== 'none'));
+await page.click('#btn-ph-gen');
+await page.waitForTimeout(350);
+await page.keyboard.press('ArrowRight');
+await page.waitForTimeout(500);
+check('generate: arrow keys do not navigate away underneath it', await page.evaluate(() =>
+  getComputedStyle(document.getElementById('gen-modal')).display === 'flex'));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
+
+await closeProjectModal();
+await page.waitForTimeout(300);
+
+// ── 29b. scale lock ────────────────────────────────────
+// Driven off an explicitly chosen scale rather than a particular demo
+// project, so this tests the machinery and not the fixture.
+await closeProjectModal();
+await page.waitForTimeout(200);
+await page.click('.tab-btn[data-tab="projects"]');
+await page.waitForTimeout(250);
+const openAPhrase = async () => {
+  await page.evaluate(() => document.querySelector('.proj-item .proj-row')?.click());
+  await page.waitForTimeout(250);
+  await page.evaluate(() => document.querySelector('.proj-item .btn-det-open')?.click());
+  await page.waitForTimeout(900);
+  await page.click('#btn-modal-patterns');
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.querySelector('.pv-cell.chain')?.click());
+  await page.waitForTimeout(250);
+  await page.evaluate(() => document.querySelector('.pv-cstep .cgo')?.click());
+  await page.waitForTimeout(400);
+};
+const pickInto = async (step, text) => {
+  await page.click(`.pe-row[data-step="${step}"] .pe-c[data-f="note"]`);
+  await page.waitForTimeout(100);
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(200);
+  await page.evaluate(t => {
+    const f = document.querySelector('.pick-filter');
+    f.value = t;
+    f.dispatchEvent(new Event('input', { bubbles: true }));
+  }, text);
+  await page.waitForTimeout(150);
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(300);
+};
+const noteAt = step => page.evaluate(s =>
+  document.querySelector(`#phrase-rows .pe-row[data-step="${s}"] .pe-note`)?.textContent.trim(), step);
+
+await openAPhrase();
+check('scale: the phrase editor offers a scale control', await page.evaluate(() =>
+  !!document.getElementById('btn-ph-scale') && !!document.getElementById('btn-ph-scale-pick')));
+
+// Choose C Major explicitly.
+await page.click('#btn-ph-scale-pick');
+await page.waitForTimeout(250);
+await page.evaluate(() => {
+  const f = document.querySelector('.pick-filter');
+  f.value = 'C Major';
+  f.dispatchEvent(new Event('input', { bubbles: true }));
+});
+await page.waitForTimeout(150);
+await page.keyboard.press('Enter');
+await page.waitForTimeout(350);
+check('scale: a chosen scale is shown on the button', await page.evaluate(() =>
+  document.getElementById('btn-ph-scale').textContent.trim() === '🔓 C Major'));
+check('scale: choosing a scale does not lock by itself', await page.evaluate(() =>
+  !document.getElementById('btn-ph-scale').classList.contains('on')));
+
+// With the lock off you can still write anything, and it gets flagged.
+await pickInto(0, 'C#-4');
+check('scale: an out-of-key note can still be written with the lock off',
+  /#/.test(await noteAt(0)));
+check('scale: out-of-key notes are flagged', await page.evaluate(() =>
+  document.querySelectorAll('.pe-out').length > 0));
+check('scale: a fix button appears, counting them', await page.evaluate(() =>
+  /Fix 1/.test(document.getElementById('btn-ph-scale-fix')?.textContent || '')));
+
+await page.click('#btn-ph-scale-fix');
+await page.waitForTimeout(350);
+check('scale: fixing moves it into the key', ['C-4', 'D-4'].includes(await noteAt(0)));
+check('scale: nothing is left flagged, and the fix button goes away', await page.evaluate(() =>
+  document.querySelectorAll('.pe-out').length === 0 && !document.getElementById('btn-ph-scale-fix')));
+
+// Lock on: the picker stops offering out-of-key notes.
+await page.click('#btn-ph-scale');
+await page.waitForTimeout(300);
+check('scale: clicking locks it', await page.evaluate(() => {
+  const b = document.getElementById('btn-ph-scale');
+  return b.classList.contains('on') && b.textContent.includes('🔒');
+}));
+await page.click('.pe-row[data-step="0"] .pe-c[data-f="note"]');
+await page.waitForTimeout(100);
+await page.keyboard.press('Enter');
+await page.waitForTimeout(250);
+const picked = await page.evaluate(() =>
+  [...document.querySelectorAll('.pick-list .pick-item')].map(e => e.textContent.trim()));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+check('scale: the picker offers only notes in the key',
+  picked.length > 10 && picked.filter(x => /^[A-G]#/.test(x)).length === 0);
+check('scale: --- and OFF are still offered',
+  picked.some(x => x.startsWith('---')) && picked.some(x => x.startsWith('OFF')));
+
+// Degree transpose. D up one degree in C major is E, two semitones.
+await pickInto(0, 'D-4');
+await page.evaluate(() => document.querySelector('[data-tsp="1"]').click());
+await page.waitForTimeout(300);
+check('scale: +1 moves by scale degree, not by semitone', await noteAt(0) === 'E-4');
+await page.evaluate(() => document.querySelector('[data-tsp="12"]').click());
+await page.waitForTimeout(300);
+check('scale: an octave is still an octave with the lock on', await noteAt(0) === 'E-5');
+await page.evaluate(() => document.querySelector('[data-tsp="-1"]').click());
+await page.waitForTimeout(300);
+check('scale: -1 walks back down the scale', await noteAt(0) === 'D-5');
+
+// Lock off: semitones again.
+await page.click('#btn-ph-scale');
+await page.waitForTimeout(300);
+await page.evaluate(() => document.querySelector('[data-tsp="1"]').click());
+await page.waitForTimeout(300);
+check('scale: with the lock off, +1 is a semitone again', await noteAt(0) === 'D#5');
+check('scale: and the result is flagged as outside the key', await page.evaluate(() =>
+  document.querySelectorAll('.pe-out').length > 0));
+
+// The setting has to survive a reload, like the piano toggle does.
+check('scale: the chosen scale and lock state are remembered', await page.evaluate(() =>
+  localStorage.getItem('ptScaleLock') === '0' &&
+  Object.values(JSON.parse(localStorage.getItem('ptScaleOverrides'))).some(v => v.name === 'Major')));
+check('scale: the override is stored against one project, not globally', await page.evaluate(() => {
+  const all = JSON.parse(localStorage.getItem('ptScaleOverrides'));
+  return Object.keys(all).length === 1 && !('name' in all);
+}));
+
+// A key picked in one project must not follow you into the next.
+const scaleFirst = await page.evaluate(() =>
+  document.querySelector('.proj-item')?.dataset.proj);
+check('scale: the override is stored against the project it was set on',
+  await page.evaluate(d => Object.keys(JSON.parse(localStorage.getItem('ptScaleOverrides')))[0] === d,
+    scaleFirst));
+
+// Note on coverage: the read side (activeScale ignoring another
+// project's override) needs two projects with playable chains on the
+// same card, which this fixture does not have. The write side is
+// covered above; the read side is a one-line keyed lookup.
+
+await page.evaluate(() => localStorage.removeItem('ptScaleOverrides'));
+
+await page.evaluate(() => document.getElementById('btn-ph-undo')?.click());
+await page.waitForTimeout(250);
+await closeProjectModal();
+await page.waitForTimeout(300);
+
 // ── 30. USB mirror output effects ──────────────────────
 await page.click('.tab-btn[data-tab="device"]');
 await page.waitForTimeout(300);
@@ -1281,6 +1747,128 @@ check('fx: a stand-in screen is painted with no device connected', await page.ev
   };
   return !USB.isConnected() && band(0, 1) > 40 && band(4, 14) > 200 && band(21, 22) > 40;
 }));
+
+// ── 31. audio-reactive effects ─────────────────────────
+check('fx: a react row for every effect that can be driven', await page.evaluate(() =>
+  document.querySelectorAll('.fx-react').length === FX.DEFS.filter(d => d.react).length &&
+  document.querySelectorAll('.fx-react').length === 18));
+check('fx: react rows are hidden until audio-reactive is switched on', await page.evaluate(() =>
+  getComputedStyle(document.querySelector('.fx-react')).display === 'none'));
+
+await page.selectOption('#fx-preset', 'glitch');
+await page.waitForTimeout(150);
+check('fx: a preset brings its audio wiring with it', await page.evaluate(() => {
+  const r = Mirror.getState().react;
+  return r.glitch.src === 'hit' && r.planes.src === 'high' && r.noise.src === 'off';
+}));
+
+await page.check('#fx-react-on');
+await page.waitForTimeout(1200);
+// Chromium's fake audio device beeps on a cycle rather than continuously,
+// so wait for a beep instead of assuming one is happening right now.
+await page.waitForFunction(
+  () => Object.values(Mirror.getState().levels).some(v => v > 0.01),
+  null, { timeout: 8000 }).catch(() => {});
+const audio = await page.evaluate(() => ({
+  running: AudioReact.isRunning(),
+  status: document.getElementById('fx-audio-status').textContent,
+  wired: document.querySelectorAll('.fx-react.wired').length,
+  visible: getComputedStyle(document.querySelector('.fx-react')).display !== 'none',
+  levels: Mirror.getState().levels,
+}));
+check('fx: enabling audio-reactive opens the input', audio.running);
+check('fx: the status line says what it is listening to', /listening/i.test(audio.status));
+check('fx: react rows appear once audio is on', audio.visible);
+check('fx: wired effects are marked as wired', audio.wired === 3);
+check('fx: levels come through from the live input',
+  Object.values(audio.levels).some(v => v > 0.01));
+
+// The whole point: the picture has to actually move with the audio.
+check('fx: audio levels change what is rendered', await page.evaluate(async () => {
+  const st = Mirror.getState();
+  const next = FX.presetState('off');
+  st.enabled = next.enabled; st.params = next.params; st.react = FX.blankReact();
+  st.enabled.rgbshift = true; st.on = true; st.audio.on = true;
+  st.react.rgbshift = { src: 'level', depth: 100 };
+  // Stub the sampler rather than writing st.levels directly: the render
+  // loop refreshes levels from the analyser every frame, so this is the
+  // only way to test the real path end to end with a known signal.
+  const realSample = AudioReact.sample, realRunning = AudioReact.isRunning;
+  AudioReact.isRunning = () => true;
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const shot = () => {
+    const px = new Uint8Array(cv.width * cv.height * 4);
+    gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let sig = '';
+    for (let i = 0; i < px.length; i += 4096) sig += px[i] + ',';
+    return sig;
+  };
+  const frameAt = async v => {
+    AudioReact.sample = () => ({ low: v, mid: v, high: v, level: v, hit: v });
+    Mirror.invalidate();
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return shot();
+  };
+  try {
+    const quiet = await frameAt(0);
+    const loud  = await frameAt(1);
+    return quiet !== loud;
+  } finally {
+    AudioReact.sample = realSample;
+    AudioReact.isRunning = realRunning;
+  }
+}));
+
+check('fx: the sliders themselves never move when the audio does', await page.evaluate(async () => {
+  const st = Mirror.getState();
+  const before = st.params.rgbshift.shiftH;
+  const realSample = AudioReact.sample, realRunning = AudioReact.isRunning;
+  AudioReact.isRunning = () => true;
+  AudioReact.sample = () => ({ low: 1, mid: 1, high: 1, level: 1, hit: 1 });
+  Mirror.invalidate();
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  AudioReact.sample = realSample;
+  AudioReact.isRunning = realRunning;
+  return st.params.rgbshift.shiftH === before;
+}));
+
+check('fx: per-frame levels are not written to stored settings', await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem('ptlib-fx-v1') || '{}');
+  return !('levels' in raw);
+}));
+
+check('fx: the audio input is never routed to the speakers', await page.evaluate(() =>
+  // Analysis only. Connecting the input to the destination would feed a
+  // line input straight back out and howl.
+  !/connect\(\s*(actx|ctx)\.destination/.test(AudioReact.start.toString())));
+
+// Corrupt react wiring must be rejected like everything else.
+await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem('ptlib-fx-v1') || '{}');
+  raw.react = { bloom: { src: 'evil', depth: 1e9 }, chswap: { src: 'low', depth: 50 }, nope: { src: 'low', depth: 1 } };
+  raw.audio = { deviceId: 42, gain: -5, on: true };
+  localStorage.setItem('ptlib-fx-v1', JSON.stringify(raw));
+});
+await page.reload();
+await page.waitForTimeout(600);
+await page.click('#btn-usb-only');
+await page.waitForTimeout(400);
+const rSafe = await page.evaluate(() => {
+  const st = Mirror.getState();
+  return { src: st.react.bloom.src, depth: st.react.bloom.depth,
+           chswap: 'chswap' in st.react, nope: 'nope' in st.react,
+           dev: st.audio.deviceId, gain: st.audio.gain, on: st.audio.on,
+           running: AudioReact.isRunning() };
+});
+check('fx: an unknown audio source is rejected', rSafe.src === 'off');
+check('fx: an absurd react depth is clamped', rSafe.depth === 100);
+check('fx: effects with no react target cannot be given one', !rSafe.chswap && !rSafe.nope);
+check('fx: a non-string device id is rejected',
+  typeof rSafe.dev === 'string' && rSafe.dev !== 42 && rSafe.dev !== '42');
+check('fx: an out-of-range sensitivity is clamped', rSafe.gain === 10);
+check('fx: the audio input is never opened without a click',
+  rSafe.on === false && rSafe.running === false);
 
 // Reset clears the lot.
 await page.click('#fx-reset');

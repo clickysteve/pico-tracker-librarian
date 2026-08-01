@@ -23,3 +23,8 @@ export const PT = factory();
 // node exactly like the parser.
 const fxSrc = extractModule('FX');
 export const FX = new Function(`${fxSrc}; return FX;`)();
+
+// AudioReact splits its pure analysis from its Web Audio plumbing for
+// exactly this reason: analyse() can be driven with synthetic spectra.
+const arSrc = extractModule('AudioReact');
+export const AudioReact = new Function(`const navigator = undefined, window = undefined; ${arSrc}; return AudioReact;`)();
