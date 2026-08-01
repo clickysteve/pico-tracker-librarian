@@ -738,9 +738,17 @@
     .pe-row.playing { background:var(--accent-dim); box-shadow:inset 2px 0 0 var(--accent); }
     #tr-loop.on { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
     /* TABLES & GROOVES */
-    .tg-tabs { display:flex; flex-wrap:wrap; gap:3px; margin-bottom:10px; }
+    /* Table picker runs down the left; the editor takes the rest. */
+    .tg-split { display:flex; gap:14px; align-items:flex-start; }
+    .tg-tabs { display:flex; flex-direction:column; gap:3px; flex-shrink:0; width:96px;
+      max-height:440px; overflow-y:auto; padding-right:2px; }
+    .tg-tabs::-webkit-scrollbar { width:5px; }
+    .tg-tabs::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+    .tg-editor { flex:1; min-width:0; }
     .tg-tab { background:var(--surface2); border:1px solid var(--border); color:var(--text);
-      border-radius:4px; padding:3px 7px; font-family:monospace; font-size:11px; cursor:pointer; }
+      border-radius:4px; padding:4px 8px; font-family:monospace; font-size:11px; cursor:pointer;
+      display:flex; align-items:center; justify-content:space-between; gap:6px; text-align:left; }
+    .tg-tab i { font-style:normal; font-size:9px; color:var(--muted); }
     .tg-tab.empty { color:var(--border2); }
     .tg-tab.on { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
     .tg-head, .tg-row { display:grid; grid-template-columns:26px repeat(3, 62px 52px);
@@ -794,8 +802,12 @@
 
     /* PHRASE EDITOR */
     .pe-sep { width:1px; height:16px; background:var(--border2); }
-    .pe-head, .pe-row { display:grid; grid-template-columns:24px 58px 34px 62px 50px 62px 50px;
+    .pe-head, .pe-row { display:grid; grid-template-columns:24px 58px 34px 62px 50px 62px 50px 20px;
       gap:2px; align-items:center; font-family:monospace; font-size:11px; }
+    .pe-rowclear { color:var(--border2); cursor:pointer; text-align:center; border-radius:3px;
+      font-size:10px; opacity:0; user-select:none; }
+    .pe-grid:hover .pe-rowclear { opacity:1; }
+    .pe-rowclear:hover { color:var(--c-miss); background:var(--surface2); }
     .pe-head { color:var(--muted); font-size:9px; letter-spacing:.5px; text-transform:uppercase;
       padding:0 0 4px; border-bottom:1px solid var(--border); margin-bottom:3px; }
     .pe-grid { display:flex; flex-direction:column; gap:1px; }
@@ -929,17 +941,35 @@
     #usb-stage:fullscreen canvas, #tab-device.fx-open #usb-stage:fullscreen canvas {
       width:100vw; height:100vh; max-width:none; max-height:none; object-fit:contain; }
 
-    /* The mirror is pinned to the top of the Device tab and the effects
-       panel scrolls underneath it, so opening the panel can never push
-       the thing you are looking at off the screen. */
-    #usb-sticky { position:sticky; top:0; z-index:6; width:100%; padding:16px 0 12px;
-      background:var(--bg); display:flex; flex-direction:column; align-items:center;
-      border-bottom:1px solid transparent; transition:border-color .15s; }
-    #usb-sticky.stuck { border-bottom-color:var(--border); }
-    #usb-canvas { max-height:56vh; }
-    /* Leave room for the panel when it is open. */
-    #tab-device.fx-open #usb-canvas { max-height:40vh; }
+    /* The mirror owns the main area; the effects live in a drawer down
+       the right-hand side, so opening them costs the picture width it
+       can spare rather than pushing it off the screen entirely. */
+    #device-body { display:flex; flex:1; min-height:0; }
+    #usb-main { flex:1; min-width:0; overflow-y:auto; display:flex; flex-direction:column;
+      align-items:center; justify-content:flex-start; gap:14px; padding:16px; }
+    #usb-main::-webkit-scrollbar { width:5px; }
+    #usb-main::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+    #usb-canvas { max-height:calc(100vh - 220px); }
     #usb-stage:fullscreen { max-height:none; }
+    #fx-drawer { width:430px; flex-shrink:0; border-left:1px solid var(--border);
+      background:var(--surface); overflow-y:auto; padding:12px;
+      margin-right:-442px; visibility:hidden;
+      transition:margin-right .18s ease, visibility .18s; }
+    #tab-device.fx-open #fx-drawer { margin-right:0; visibility:visible; }
+    #fx-drawer::-webkit-scrollbar { width:5px; }
+    #fx-drawer::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+    @media (max-width: 980px) {
+      /* Overlay the mirror, never the toolbar: the toolbar holds the
+         only button that closes this drawer. device-body is the
+         positioning context, so top:0 is below the toolbar by
+         construction. */
+      #device-body { position:relative; }
+      #fx-drawer { position:absolute; right:0; top:0; bottom:0; z-index:8;
+        box-shadow:-12px 0 30px rgba(0,0,0,.45); }
+    }
+    /* Single column inside the drawer; the top bars stack. */
+    #fx-drawer .fx-grid { grid-template-columns:1fr; }
+    #fx-drawer .fx-top { row-gap:8px; }
 
     /* SONG MAP */
     .map-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:12px 16px 8px; }
@@ -1032,6 +1062,7 @@
     .fx-panel.fx-dim .fx-grid { opacity:.45; }
     .fx-note { font-size:11px; color:var(--warn); min-height:0; }
     .fx-panel input:disabled, .fx-panel button:disabled { opacity:.5; cursor:not-allowed; }
+    .btn.busy { opacity:.85; cursor:progress; border-color:var(--accent); color:var(--accent); }
     /* Out-of-scale notes are flagged whether or not the lock is on: knowing
        is useful even when you meant it. */
     .pe-c.pe-out { color:var(--warn) !important; }
@@ -1049,7 +1080,18 @@
     .fx-react { border-top:1px dashed var(--border2); margin-top:4px; padding-top:5px; }
     .fx-react select { background:var(--surface2); border:1px solid var(--border2); color:var(--text);
       font-size:10px; padding:1px 4px; border-radius:4px; outline:none; }
-    .fx-react.wired .fx-plab { color:var(--accent); }
+    .fx-react { display:flex; flex-direction:column; gap:3px; }
+    .fx-rrow { gap:4px; }
+    .fx-rrow select { max-width:88px; }
+    .fx-rarr { color:var(--muted); font-size:10px; flex-shrink:0; }
+    .fx-rrow .fx-rdepth { flex:1; min-width:30px; }
+    .fx-rrow .fx-rval { width:40px; }
+    .fx-rdel { background:none; border:none; color:var(--muted); cursor:pointer; font-size:10px;
+      padding:1px 3px; border-radius:3px; flex-shrink:0; }
+    .fx-rdel:hover { color:var(--c-miss); background:var(--surface2); }
+    .fx-radd { background:none; border:1px dashed var(--border2); color:var(--muted); cursor:pointer;
+      font-size:10px; padding:2px 7px; border-radius:4px; align-self:flex-start; font-family:inherit; }
+    .fx-radd:hover { color:var(--accent); border-color:var(--accent-brd); }
     .fx-panel:not(.fx-reacting) .fx-react { display:none; }
     .no-results { color:var(--muted); padding:36px; text-align:center; }
   </style>
@@ -1058,7 +1100,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.10 Alpha</span>
+    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.11 Alpha</span>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -1309,11 +1351,10 @@
         <button class="btn ghost sm" id="btn-usb-fx" title="Show or hide the output effects">✨ Effects</button>
         <span class="stat-chip" id="usb-status" style="margin-left:auto">Not connected</span>
       </div>
-      <div class="scroll-area" id="usb-scroll" style="display:flex;align-items:center;flex-direction:column;gap:14px;padding:0 16px 16px">
-        <div id="usb-sticky">
-          <div id="usb-stage" style="display:flex;align-items:center;justify-content:center;background:#000;border:1px solid var(--border2);border-radius:8px;max-width:100%">
-            <canvas id="usb-canvas" width="960" height="720" style="max-width:100%;aspect-ratio:4/3;image-rendering:pixelated;display:block"></canvas>
-          </div>
+      <div id="device-body">
+      <div id="usb-main">
+        <div id="usb-stage" style="display:flex;align-items:center;justify-content:center;background:#000;border:1px solid var(--border2);border-radius:8px;max-width:100%">
+          <canvas id="usb-canvas" width="960" height="720" style="max-width:100%;aspect-ratio:4/3;image-rendering:pixelated;display:block"></canvas>
         </div>
         <div id="usb-pad" style="display:none;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center">
           <div style="display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,34px);gap:4px;margin-right:14px">
@@ -1331,6 +1372,18 @@
             Keys: arrows · Z=ENTER · X=EDIT · A=ALT · S=NAV · Space=PLAY
           </span>
         </div>
+        <div style="font-size:11px;color:var(--muted);max-width:640px;text-align:center;line-height:1.7">
+          Live mirror of the picoTracker screen over USB (Remote UI protocol), drawn with the
+          device's own font. Stock firmware is view-only — the experimental input mode speaks a
+          proposed key-event opcode that needs firmware support. Requires Chrome/Edge (WebSerial)
+          and Remote UI set to On in the device config.
+          <br>The output effects run on the GPU and are applied to the mirror only — nothing is
+          ever sent to the device. Pop the mirror out into its own window and capture that window
+          in OBS, or record straight to a video file here. The screen above is a stand-in until a
+          device is connected, so a look can be dialled in ahead of time.
+        </div>
+      </div><!-- /usb-main -->
+      <aside id="fx-drawer" aria-label="Output effects">
         <div id="fx-panel" class="fx-panel">
           <div class="fx-top">
             <label class="fx-master"><input type="checkbox" id="fx-on"> OUTPUT EFFECTS</label>
@@ -1340,6 +1393,7 @@
             <label class="fx-mini">Output <select id="fx-output" title="Size of the canvas that OBS or a capture card sees"></select></label>
             <label class="fx-mini" title="0% fits the 4:3 screen inside the frame; 100% fills the frame and crops the sides">Fill <input type="range" id="fx-zoom" min="0" max="100" step="1"><span id="fx-zoom-v" class="fx-pval"></span></label>
             <label class="fx-mini" title="Colour of the letterbox bars and the bezel">Bars <input type="color" id="fx-bg" value="#000000"></label>
+            <label class="fx-mini" title="The header text on the stand-in screen. Blank removes it. A connected device draws its own screen, so this only affects the demo.">Text <input type="text" id="fx-demo-text" class="search" maxlength="27" placeholder="PT LIBRARIAN" style="width:110px;padding:3px 7px;font-size:11px"></label>
             <span class="fx-sep"></span>
             <button class="btn ghost sm" id="fx-record">● Record</button>
             <button class="btn ghost sm" id="fx-reset" title="Turn every effect off and restore defaults">Reset</button>
@@ -1362,17 +1416,8 @@
           <div class="fx-grid" id="fx-grid"></div>
           <div class="fx-note" id="fx-note"></div>
         </div>
-        <div style="font-size:11px;color:var(--muted);max-width:640px;text-align:center;line-height:1.7">
-          Live mirror of the picoTracker screen over USB (Remote UI protocol), drawn with the
-          device's own font. Stock firmware is view-only — the experimental input mode speaks a
-          proposed key-event opcode that needs firmware support. Requires Chrome/Edge (WebSerial)
-          and Remote UI set to On in the device config.
-          <br>The output effects run on the GPU and are applied to the mirror only — nothing is
-          ever sent to the device. Pop the mirror out into its own window and capture that window
-          in OBS, or record straight to a .webm here. The screen above is a stand-in until a
-          device is connected, so a look can be dialled in ahead of time.
-        </div>
-      </div>
+      </aside>
+      </div><!-- /device-body -->
     </div>
 
   </div><!-- #main -->
@@ -3780,6 +3825,8 @@ const Demo = (() => {
   const u16le = vals => vals.flatMap(v => [v & 0xFF, (v >> 8) & 0xFF]);
 
   function project(o) {
+    // o.legacy widens the command buffers to the old 2-byte encoding,
+    // which the parser detects and treats as read-only end to end.
     const rows = o.advance ? 256 : 128, phrases = o.advance ? 255 : 128;
     const grid = new Array(rows * 8).fill(0xFF);
     const chains = new Array(255 * 16).fill(0xFF);
@@ -3825,9 +3872,9 @@ const Demo = (() => {
         <TRANSPOSES>${chunksOf(tsp)}</TRANSPOSES>
         <NOTES>${chunksOf(notes)}</NOTES>
         <INSTRUMENTS>${chunksOf(instr)}</INSTRUMENTS>
-        <COMMAND1>${chunksOf(cmd1)}</COMMAND1>
+        <COMMAND1>${chunksOf(o.legacy ? u16le(cmd1) : cmd1)}</COMMAND1>
         <PARAM1>${chunksOf(u16le(par1))}</PARAM1>
-        <COMMAND2>${chunksOf(cmd2)}</COMMAND2>
+        <COMMAND2>${chunksOf(o.legacy ? u16le(cmd2) : cmd2)}</COMMAND2>
         <PARAM2>${chunksOf(u16le(par2))}</PARAM2>
     </SONG>
     <INSTRUMENTBANK>${instXml}
@@ -3913,6 +3960,19 @@ const Demo = (() => {
       pool: { 'sub_bass.wav': smp.bassA },   // amen_break + ride_22 missing!
       mtime: days(30),
     });
+    // A legacy 2-byte-command project, so the read-only path has a real
+    // fixture. Every editor in the app must refuse to touch this one.
+    const legacy = project({
+      version: '1.4.0', tempo: 100, legacy: true,
+      grid: [[0,0,0],[1,0,0]],
+      chains: [[0,0,0]],
+      notes: [[0,0,48,0],[0,8,50,0]],
+      instruments: [
+        { name: 'Old Kick', type: 'SAMPLE', sample: 'kick_909.wav', params: { volume: 128 } },
+      ],
+      pool: { 'kick_909.wav': smp.kick },
+      mtime: days(400),
+    });
     const first = project({
       version: '2.3.1', tempo: 138,
       grid: [[0,0,0],[1,0,0]],
@@ -3964,6 +4024,7 @@ const Demo = (() => {
     }, days(2));
     addProject('BREAKS-90', breaks90, { 'sub_bass.wav': smp.bassA }, days(30), true);
     addProject('FIRSTSONG', first, { 'pad_am.wav': smp.pad }, days(140));
+    addProject('ZX-LEGACY', legacy, { 'kick_909.wav': smp.kick }, days(400));
     return cardRoot;
   }
 
@@ -4291,10 +4352,18 @@ const FX = (() => {
   const REACT_TARGET = {};
   for (const d of DEFS) if (d.react) REACT_TARGET[d.id] = d.react;
 
+  // Routings are a LIST per effect: bloom intensity riding the level and
+  // bloom radius riding the bass are two entries, not a fight over one
+  // slot. Each entry names the parameter it drives; d.react is only the
+  // default for a new entry.
+  const MAX_ROUTES = 3;
   function blankReact() {
     const out = {};
-    for (const d of DEFS) if (d.react) out[d.id] = { src: 'off', depth: 60 };
+    for (const d of DEFS) if (d.react) out[d.id] = [];
     return out;
+  }
+  function reactableParams(d) {
+    return d.params.filter(x => x.type !== 'seg');
   }
 
   // Pure: given the user's parameter values, their react wiring and the
@@ -4307,21 +4376,28 @@ const FX = (() => {
     let out = params;
     for (const d of DEFS) {
       if (!d.react) continue;
-      const cfg = react[d.id];
-      if (!cfg || !cfg.src || cfg.src === 'off' || !cfg.depth) continue;
-      const lvl = levels[cfg.src];
-      if (!(lvl > 0)) continue;
-      const par = d.params.find(x => x.key === d.react);
-      if (!par || par.type === 'seg') continue;
-      const base = params[d.id] ? params[d.id][d.react] : par.def;
-      if (typeof base !== 'number') continue;
-      const amount = Math.min(1, Math.abs(cfg.depth) / 100) * Math.min(1, Math.max(0, lvl));
-      const target = cfg.depth >= 0 ? par.max : par.min;
-      const value = Math.min(par.max, Math.max(par.min, base + amount * (target - base)));
-      // Copy lazily: with nothing wired up this returns the caller's own
-      // object and the render path allocates nothing per frame.
-      if (out === params) out = { ...params };
-      out[d.id] = { ...out[d.id], [d.react]: value };
+      const routes = react[d.id];
+      if (!Array.isArray(routes) || !routes.length) continue;
+      for (const cfg of routes) {
+        if (!cfg || !cfg.src || cfg.src === 'off' || !cfg.depth) continue;
+        const lvl = levels[cfg.src];
+        if (!(lvl > 0)) continue;
+        const key = cfg.param || d.react;
+        const par = d.params.find(x => x.key === key);
+        if (!par || par.type === 'seg') continue;
+        // Two routes on the same parameter compose: the second one moves
+        // from wherever the first left it, which keeps the result inside
+        // the range without any special-casing.
+        const cur = out[d.id] ? out[d.id][key] : undefined;
+        const base = typeof cur === 'number' ? cur : par.def;
+        const amount = Math.min(1, Math.abs(cfg.depth) / 100) * Math.min(1, Math.max(0, lvl));
+        const target = cfg.depth >= 0 ? par.max : par.min;
+        const value = Math.min(par.max, Math.max(par.min, base + amount * (target - base)));
+        // Copy lazily: with nothing wired up this returns the caller's own
+        // object and the render path allocates nothing per frame.
+        if (out === params) out = { ...params };
+        out[d.id] = { ...out[d.id], [key]: value };
+      }
     }
     return out;
   }
@@ -4383,7 +4459,8 @@ const FX = (() => {
     const enabled = {};
     for (const d of DEFS) enabled[d.id] = pre.on.includes(d.id);
     const react = blankReact();
-    for (const k in (pre.r || {})) Object.assign(react[k], pre.r[k]);
+    for (const k in (pre.r || {}))
+      if (react[k]) react[k] = [{ src: pre.r[k].src, depth: pre.r[k].depth, param: REACT_TARGET[k] }];
     return { preset: pre.id, enabled, params, react };
   }
 
@@ -5022,8 +5099,8 @@ void main() {
     return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
   }
 
-  return { DEFS, ORDER, PRESETS, OUTPUTS, REACT_TARGET, defaults, blankReact,
-           presetState, modulate, createRenderer,
+  return { DEFS, ORDER, PRESETS, OUTPUTS, REACT_TARGET, MAX_ROUTES, defaults, blankReact,
+           reactableParams, presetState, modulate, createRenderer,
            SRC_W, SRC_H, DEV_W, DEV_H, hexToRgb };
 })();
 
@@ -5238,9 +5315,22 @@ const USB = (() => {
     const put = (str, col, row, inv) => {
       for (let i = 0; i < str.length; i++) drawChar(str.charCodeAt(i), col + i, row, !!inv);
     };
+    // The header and footer text are yours to change — for a stream
+    // overlay you may want your artist name up there, or nothing at all.
+    let hdr = 'PT LIBRARIAN', ftr = 'MIRROR DEMO';
+    try {
+      const t = JSON.parse(localStorage.getItem('ptMirrorText') || 'null');
+      if (t && typeof t === 'object') {
+        if (typeof t.header === 'string') hdr = t.header;
+        if (typeof t.footer === 'string') ftr = t.footer;
+      }
+    } catch {}
+    // Columns 5..31 are what the header can occupy, so 27 characters is
+    // the honest maximum — anything longer would silently lose its tail.
+    hdr = hdr.slice(0, COLS - 5).toUpperCase(); ftr = ftr.slice(0, COLS - 12).toUpperCase();
     fg = [121,181,227];
     put('SONG', 0, 0);
-    put('PT LIBRARIAN', 18, 0);
+    if (hdr) put(hdr, Math.max(5, COLS - hdr.length - 2), 0);
     fg = [123,133,140];
     put('  1 2 3 4 5 6 7 8', 0, 2);
     const rows = [
@@ -5261,7 +5351,7 @@ const USB = (() => {
     put('D#4 01 ---', 0, 17);
     put('G-4 02 K02', 0, 18);
     fg = [121,181,227];
-    put('TEMPO 138   MIRROR DEMO', 0, 21);
+    put('TEMPO 138' + (ftr ? '   ' + ftr : ''), 0, 21);
     fg = [173,173,173];
     dirty = true;
   }
@@ -5338,16 +5428,26 @@ const Mirror = (() => {
     st.zoom = Math.min(100, Math.max(0, Number(raw.zoom) || 0));
     st.preset = FX.PRESETS.some(x => x.id === raw.preset) ? raw.preset : 'custom';
 
-    // React wiring: an unknown source or a wild depth must not reach the
-    // modulator, and effects with no react target must not gain one.
+    // React wiring: an unknown source, parameter or depth must not reach
+    // the modulator, and effects with no react target must not gain one.
+    // Old settings stored one {src, depth} object per effect; migrate.
     const react = FX.blankReact();
-    const srcIds = AudioReact.SOURCES.map(x => x[0]);
+    const srcIds = AudioReact.SOURCES.map(x => x[0]).filter(x => x !== 'off');
     for (const id in react) {
-      const got = raw.react && raw.react[id];
-      if (!got || typeof got !== 'object') continue;
-      if (srcIds.includes(got.src)) react[id].src = got.src;
-      const d = Number(got.depth);
-      if (isFinite(d)) react[id].depth = Math.min(100, Math.max(-100, Math.round(d)));
+      const def = FX.DEFS.find(d => d.id === id);
+      const valid = new Set(FX.reactableParams(def).map(x => x.key));
+      let got = raw.react && raw.react[id];
+      if (got && !Array.isArray(got) && typeof got === 'object') got = [got];
+      if (!Array.isArray(got)) continue;
+      for (const r of got.slice(0, FX.MAX_ROUTES)) {
+        if (!r || typeof r !== 'object' || !srcIds.includes(r.src)) continue;
+        const dep = Number(r.depth);
+        react[id].push({
+          src: r.src,
+          depth: isFinite(dep) ? Math.min(100, Math.max(-100, Math.round(dep))) : 60,
+          param: valid.has(r.param) ? r.param : FX.REACT_TARGET[id],
+        });
+      }
     }
     st.react = react;
 
@@ -5534,11 +5634,19 @@ const Mirror = (() => {
   });
 
   function recMime() {
-    const want = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    // MP4/H.264 first: it opens everywhere (QuickTime, iOS, editors),
+    // where a WebM often reads as "unreadable file" outside the browser.
+    // Chrome has recorded MediaRecorder MP4 since mid-2024; anything
+    // older falls back to WebM, and the filename follows the container.
+    const want = [
+      'video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1', 'video/mp4',
+      'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm',
+    ];
     for (const m of want)
       if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
     return '';
   }
+  const recExt = mime => (mime || '').startsWith('video/mp4') ? 'mp4' : 'webm';
 
   // A capture track keeps the output canvas registered as a frame source
   // for as long as it lives, so every un-stopped stream is a permanent
@@ -5558,8 +5666,9 @@ const Mirror = (() => {
     lockOutputControls(false);
     paintRecordBtn();
     if (blob.size) {
-      download(blob, `picotracker-mirror-${stamp()}.webm`);
-      setNote('');
+      download(blob, `picotracker-mirror-${stamp()}.${recExt(recMimeUsed)}`);
+      setNote(recExt(recMimeUsed) === 'mp4' ? ''
+        : 'Saved as WebM — this browser cannot record MP4. VLC or a current Chrome plays it.');
     } else {
       setNote('Recording produced no data. Try again and give it a second or two.');
     }
@@ -5572,6 +5681,7 @@ const Mirror = (() => {
       return;
     }
     recMimeUsed = recMime();
+    setNote('');
     try { recStream = out.captureStream(60); } catch { recStream = null; }
     if (!recStream) { setNote('Could not capture the output canvas for recording.'); return; }
     try {
@@ -5628,7 +5738,8 @@ const Mirror = (() => {
     if (!b) return;
     b.classList.toggle('on', !!recorder);
     b.textContent = recorder ? '■ Stop recording' : '● Record';
-    b.title = recorder ? 'Stop and download the .webm' : 'Record the output canvas to a .webm file';
+    const ext = recExt(recorder ? recMimeUsed : recMime());
+    b.title = recorder ? `Stop and download the .${ext}` : `Record the output canvas to an .${ext} file`;
   }
 
   function setNote(msg) {
@@ -5672,15 +5783,7 @@ const Mirror = (() => {
                    min="${p.min}" max="${p.max}" step="${p.step}">
             <span class="fx-pval" id="val-${d.id}-${p.key}" data-fx="${d.id}" data-key="${p.key}"></span>
           </div>`).join('')}${d.react ? `
-          <div class="fx-p fx-react" data-fx="${d.id}">
-            <span class="fx-plab">React</span>
-            <select class="fx-rsrc" data-fx="${d.id}" aria-label="${d.label}: audio source driving ${d.react}">${
-              AudioReact.SOURCES.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('')
-            }</select>
-            <input type="range" class="fx-rdepth" data-fx="${d.id}" min="-100" max="100" step="1"
-                   aria-label="${d.label}: how far the audio moves ${d.react}">
-            <span class="fx-pval fx-rval" data-fx="${d.id}"></span>
-          </div>` : ''}</div>
+          <div class="fx-react" data-fx="${d.id}"></div>` : ''}</div>
       </div>`).join('');
 
     // ── Events ──
@@ -5715,6 +5818,20 @@ const Mirror = (() => {
     $('fx-bg').addEventListener('input', e => {
       state.bg = e.target.value;
       save(); invalidate();
+    });
+    // The stand-in screen's header. Stored separately from the effects
+    // blob because it survives Reset — it is labelling, not a look.
+    const demoTxt = $('fx-demo-text');
+    try {
+      const t = JSON.parse(localStorage.getItem('ptMirrorText') || 'null');
+      if (t && typeof t.header === 'string') demoTxt.value = t.header;
+    } catch {}
+    demoTxt.addEventListener('input', () => {
+      let t = {};
+      try { t = JSON.parse(localStorage.getItem('ptMirrorText') || '{}') || {}; } catch {}
+      t.header = demoTxt.value;
+      try { localStorage.setItem('ptMirrorText', JSON.stringify(t)); } catch {}
+      if (!USB.isConnected()) { USB.setDemo(); invalidate(); }
     });
     $('fx-reset').addEventListener('click', () => {
       // Clears the look only. Output size, fill and bar colour are how
@@ -5767,17 +5884,43 @@ const Mirror = (() => {
       save();
     });
     grid.addEventListener('change', e => {
-      const sel = e.target.closest('.fx-rsrc');
+      const sel = e.target.closest('.fx-rsrc, .fx-rparam');
       if (!sel) return;
-      state.react[sel.dataset.fx].src = sel.value;
-      markCustom(); syncUI(); save(); invalidate();
+      const route = state.react[sel.dataset.fx][+sel.dataset.i];
+      if (!route) return;
+      if (sel.classList.contains('fx-rsrc')) route.src = sel.value;
+      else route.param = sel.value;
+      markCustom(); save(); invalidate();
     });
     grid.addEventListener('input', e => {
       const r = e.target.closest('.fx-rdepth');
       if (!r) return;
-      state.react[r.dataset.fx].depth = +r.value;
-      paintReact(r.dataset.fx);
+      const route = state.react[r.dataset.fx][+r.dataset.i];
+      if (!route) return;
+      route.depth = +r.value;
+      const val = r.parentElement.querySelector('.fx-rval');
+      if (val) val.textContent = (route.depth > 0 ? '+' : '') + route.depth + '%';
       markCustom(); save(); invalidate();
+    });
+    grid.addEventListener('click', e => {
+      const add = e.target.closest('.fx-radd');
+      if (add) {
+        const id = add.dataset.fx;
+        if (state.react[id].length < FX.MAX_ROUTES) {
+          state.react[id].push({ src: 'level', depth: 60, param: FX.REACT_TARGET[id] });
+          // Wiring audio to an effect means you want to see it: enable
+          // the card AND the master, like ticking the card does.
+          if (!state.enabled[id]) state.enabled[id] = true;
+          state.on = true;
+          markCustom(); syncUI(); save(); invalidate();
+        }
+        return;
+      }
+      const del = e.target.closest('.fx-rdel');
+      if (del) {
+        state.react[del.dataset.fx].splice(+del.dataset.i, 1);
+        markCustom(); syncUI(); save(); invalidate();
+      }
     });
     AudioReact.setOnChange(() => {
       const el = $('fx-audio-status');
@@ -5836,19 +5979,37 @@ const Mirror = (() => {
     }
   }
 
+  // Rebuilds the routing list inside one card: a row per route with a
+  // source, the parameter it drives, a signed depth, and a remove; plus
+  // an add button while there is room. Selects carry their value in the
+  // markup so a rebuild never fights a drag (sliders are per-row and the
+  // rebuild only happens on structural changes, not on slider input).
   function paintReact(fxId) {
-    const cfg = state.react[fxId];
-    const row = document.querySelector(`.fx-react[data-fx="${fxId}"]`);
-    if (!cfg || !row) return;
-    const wired = cfg.src && cfg.src !== 'off';
-    row.classList.toggle('wired', wired);
-    const val = row.querySelector('.fx-rval');
-    if (val) val.textContent = !wired ? '—'
-      : (cfg.depth > 0 ? '+' : '') + cfg.depth + '%';
-    const dep = row.querySelector('.fx-rdepth');
-    if (dep) { dep.value = cfg.depth; dep.disabled = !wired; }
-    const sel = row.querySelector('.fx-rsrc');
-    if (sel) sel.value = cfg.src;
+    const routes = state.react[fxId];
+    const box = document.querySelector(`.fx-react[data-fx="${fxId}"]`);
+    if (!routes || !box) return;
+    const d = FX.DEFS.find(x => x.id === fxId);
+    box.classList.toggle('wired', routes.length > 0);
+    box.innerHTML = routes.map((r, i) => `
+      <div class="fx-p fx-rrow">
+        <select class="fx-rsrc" data-fx="${fxId}" data-i="${i}" aria-label="${d.label}: audio source">${
+          AudioReact.SOURCES.filter(o => o[0] !== 'off').map(o =>
+            `<option value="${o[0]}"${o[0] === r.src ? ' selected' : ''}>${o[1]}</option>`).join('')
+        }</select>
+        <span class="fx-rarr">→</span>
+        <select class="fx-rparam" data-fx="${fxId}" data-i="${i}" aria-label="${d.label}: parameter to drive">${
+          FX.reactableParams(d).map(pp =>
+            `<option value="${pp.key}"${pp.key === (r.param || FX.REACT_TARGET[fxId]) ? ' selected' : ''}>${pp.label}</option>`).join('')
+        }</select>
+        <input type="range" class="fx-rdepth" data-fx="${fxId}" data-i="${i}" min="-100" max="100" step="1"
+               value="${r.depth}" aria-label="${d.label}: modulation depth">
+        <span class="fx-pval fx-rval">${(r.depth > 0 ? '+' : '') + r.depth}%</span>
+        <button type="button" class="fx-rdel" data-fx="${fxId}" data-i="${i}"
+                title="Remove this routing" aria-label="${d.label}: remove routing">✕</button>
+      </div>`).join('')
+      + (routes.length < FX.MAX_ROUTES
+        ? `<button type="button" class="fx-radd" data-fx="${fxId}"
+             title="Drive a parameter of this effect from an audio source">＋ react</button>` : '');
   }
 
   function markCustom() {
@@ -7024,13 +7185,14 @@ const UI = (() => {
       grid += `<div class="pv-gutter${spare ? ' spare' : ''}">
         <span class="pv-rowplay" data-row="${r}" title="Play song row ${PT.hx2(r)} (all channels)">▶</span>
         <span class="pv-rowcopy" data-row="${r}" title="Copy row ${PT.hx2(r)}">⧉</span>
-        <span class="pv-rowpaste" data-row="${r}" title="Paste over row ${PT.hx2(r)}">⤓</span>
+        <span class="pv-rowpaste" data-row="${r}" title="Insert the copied row here — this row and everything below move down">⤓</span>
+        <span class="pv-rowclear" data-row="${r}" title="Clear row ${PT.hx2(r)} (all channels)">✕</span>
       </div>`;
       grid += `<div class="pv-cell rlbl${spare ? ' spare' : ''}">${PT.hx2(r)}</div>`;
       for (let t = 0; t < CH; t++) {
         const c = PT.gridCell(parsed, r, t);
         grid += c === PT.EMPTY
-          ? `<div class="pv-cell empty${spare ? ' spare' : ''}" data-row="${r}" data-ch="${t}" tabindex="0" title="Row ${PT.hx2(r)} · channel ${t+1} — click to place a chain">··</div>`
+          ? `<div class="pv-cell empty${spare ? ' spare' : ''}" data-row="${r}" data-ch="${t}" tabindex="0" title="Row ${PT.hx2(r)} · channel ${t+1} — type, Enter or double-click to place a chain">··</div>`
           : `<div class="pv-cell chain" data-chain="${c}" data-row="${r}" data-ch="${t}" tabindex="0" style="color:${chainColor.get(c)||'var(--accent)'}" title="Chain ${PT.hx2(c)} at row ${PT.hx2(r)} · channel ${t+1}. Click to open, double-click or type to change.">${PT.hx2(c)}</div>`;
       }
     }
@@ -7088,7 +7250,11 @@ const UI = (() => {
       const w2 = host.querySelector('.pv-grid-wrap');
       if (w2) w2.scrollTop = keep;      // adding rows must not jump to the top
     });
-    // whole-row copy/paste across all 8 channels
+    // whole-row copy/paste across all 8 channels. Legacy 2-byte-command
+    // projects are read-only everywhere else in this view; the gutter's
+    // mutating buttons honour the same gate or an "edit" here would be
+    // stranded in memory with no way to save or undo it.
+    const rowsEditable = (parsed.geometry?.cmdWidth ?? 1) === 1;
     host.querySelectorAll('.pv-rowcopy').forEach(b =>
       b.addEventListener('click', e => {
         e.stopPropagation();
@@ -7100,15 +7266,39 @@ const UI = (() => {
     host.querySelectorAll('.pv-rowpaste').forEach(b =>
       b.addEventListener('click', e => {
         e.stopPropagation();
-        if (!pvRowClip) return;
-        pushArrUndo(parsed);
+        if (!pvRowClip || !rowsEditable) return;
         const r = parseInt(b.dataset.row, 10);
+        const mr = parsed.geometry?.songRows ?? PT.SONG_ROWS;
+        // Insert, not overwrite: the pasted row lands HERE and this row
+        // plus everything below shift down one. Anything on the very
+        // last row of the format would fall off the end, so ask first.
+        const lastOccupied = Array.from({ length: CH },
+          (_, t) => PT.gridCell(parsed, mr - 1, t)).some(v => v !== PT.EMPTY);
+        if (lastOccupied && !confirm(
+          `Inserting a row pushes everything down one, and row ${PT.hx2(mr - 1)} is occupied — its contents would drop off the end of the song. Insert anyway?`)) return;
+        pushArrUndo(parsed);
+        for (let r2 = mr - 1; r2 > r; r2--)
+          for (let t = 0; t < CH; t++)
+            parsed.grid[r2 * PT.CHANNELS + t] = parsed.grid[(r2 - 1) * PT.CHANNELS + t];
         for (let t = 0; t < CH; t++) parsed.grid[r * PT.CHANNELS + t] = pvRowClip[t];
         dirtyGrid.add(p.dirName);
         updateSaveBar(host);
         renderPatterns(host, p, parsed);
       }));
-    host.querySelectorAll('.pv-rowpaste').forEach(b => { if (!pvRowClip) b.style.display = 'none'; });
+    host.querySelectorAll('.pv-rowpaste').forEach(b => { if (!pvRowClip || !rowsEditable) b.style.display = 'none'; });
+    host.querySelectorAll('.pv-gutter .pv-rowclear').forEach(b => { if (!rowsEditable) b.style.display = 'none'; });
+    host.querySelectorAll('.pv-gutter .pv-rowclear').forEach(b =>
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!rowsEditable) return;
+        const r = parseInt(b.dataset.row, 10);
+        if (Array.from({ length: CH }, (_, t) => PT.gridCell(parsed, r, t)).every(v => v === PT.EMPTY)) return;
+        pushArrUndo(parsed);
+        for (let t = 0; t < CH; t++) parsed.grid[r * PT.CHANNELS + t] = PT.EMPTY;
+        dirtyGrid.add(p.dirName);
+        updateSaveBar(host);
+        renderPatterns(host, p, parsed);
+      }));
     host.querySelector('#btn-pv-jump').addEventListener('click', e => openJump(e.currentTarget, p, parsed, host));
     host.querySelector('#btn-pv-savecol').addEventListener('click', saveColourSidecar);
     host.querySelector('#btn-pv-recolour').addEventListener('click', async () => {
@@ -7149,8 +7339,11 @@ const UI = (() => {
     };
     host.querySelectorAll('.pv-cell.chain').forEach(cell =>
       cell.addEventListener('click', () => showChain(parsed, parseInt(cell.dataset.chain, 10), host)));
+    // A click only selects. The picker opens on typing, Enter or a
+    // double-click — the same contract as every other cell in the app,
+    // and it stops a stray click throwing a popover in your face.
     host.querySelectorAll('.pv-cell.empty').forEach(cell =>
-      cell.addEventListener('click', () => editGridCell(cell)));
+      cell.addEventListener('click', () => cell.focus()));
     const focusGrid = (r, t) => {
       pvFocus = { r, t };
       host.querySelector(`.pv-cell[data-row="${r}"][data-ch="${t}"]`)?.focus();
@@ -8150,30 +8343,70 @@ const UI = (() => {
     return off.startRendering();
   }
 
+  // The offline render takes a few seconds before anything appears, and
+  // a button that does nothing for that long reads as broken. Both render
+  // buttons swap to a live status and refuse re-entry while working.
+  let renderBusy = false;
+  function setRenderBtn(id, label) {
+    const b = $(id);
+    if (!b) return;
+    if (label) {
+      if (!b.dataset.idle) b.dataset.idle = b.textContent;
+      b.textContent = label;
+      b.classList.add('busy');
+      b.disabled = true;
+    } else {
+      if (b.dataset.idle) b.textContent = b.dataset.idle;
+      b.classList.remove('busy');
+      b.disabled = false;
+    }
+  }
+
   async function renderToWav(p, stems) {
-    const parsed = fullCache.get(p.dirName) || (await readProjectFull(p)).parsed;
+    if (renderBusy) return;
+    renderBusy = true;
+    const btnId = stems ? 'btn-modal-stems' : 'btn-modal-wav';
+    const otherId = stems ? 'btn-modal-wav' : 'btn-modal-stems';
+    $(otherId) && ($(otherId).disabled = true);
     const safe = p.name.replace(/[^\w.-]+/g, '_');
-    setCacheBar(stems ? 'Rendering stems…' : 'Rendering…', true);
     try {
+      setRenderBtn(btnId, '⏳ Preparing…');
+      const parsed = fullCache.get(p.dirName) || (await readProjectFull(p)).parsed;
       if (!stems) {
+        setRenderBtn(btnId, '⏳ Rendering…');
+        setCacheBar('Rendering the mix… this takes a few seconds.', true);
         const buf = await renderProject(p, parsed);
         dlBytes(encodeWav(buf), `${safe}.wav`);
         setCacheBar(`Rendered ${safe}.wav (${fmtDur(buf.duration)}).`, true);
         return;
       }
-      // one file per channel that actually plays something
+      // One file per channel that actually plays something, delivered as
+      // a single zip rather than a browser-fighting burst of downloads.
       const used = new Set(PT.buildEventTimeline(parsed, {}).events.filter(e => e.type === 'on').map(e => e.ch));
       if (!used.size) throw new Error('no channels play anything');
+      const files = [];
       let n = 0;
       for (const ch of [...used].sort((a, b) => a - b)) {
-        setCacheBar(`Rendering stem ${n + 1}/${used.size} (channel ${ch + 1})…`, true);
-        const buf = await renderProject(p, parsed, { channel: ch });
-        dlBytes(encodeWav(buf), `${safe}_ch${ch + 1}.wav`);
         n++;
+        setRenderBtn(btnId, `⏳ Stem ${n}/${used.size}…`);
+        setCacheBar(`Rendering stem ${n}/${used.size} (channel ${ch + 1})…`, true);
+        const buf = await renderProject(p, parsed, { channel: ch });
+        files.push([`${safe}_ch${ch + 1}.wav`, encodeWav(buf)]);
       }
-      setCacheBar(`Rendered ${n} stem${n > 1 ? 's' : ''}.`, true);
+      setRenderBtn(btnId, '⏳ Zipping…');
+      const parts = [];
+      const sink = { write: async u8 => { parts.push(u8); } };
+      const zip = new Zip.Writer(sink);
+      for (const [name, bytes] of files) await zip.add(name, bytes);
+      await zip.finish();
+      dlBytes(new Blob(parts, { type: 'application/zip' }), `${safe}_stems.zip`, 'application/zip');
+      setCacheBar(`Rendered ${files.length} stem${files.length > 1 ? 's' : ''} into ${safe}_stems.zip.`, true);
     } catch (e) {
       setCacheBar(`Render failed: ${e.message || e}`, false);
+    } finally {
+      renderBusy = false;
+      setRenderBtn(btnId, null);
+      $(otherId) && ($(otherId).disabled = false);
     }
   }
 
@@ -8326,7 +8559,8 @@ const UI = (() => {
     const tabList = tables.map((tt, i) =>
       `<button class="tg-tab${i === tablesSel ? ' on' : ''}${tt.empty ? ' empty' : ''}${writable(tt) ? '' : ' locked'}" data-t="${i}"
         title="${!writable(tt) ? 'this table is stored empty in the file and cannot be edited here yet'
-                 : tt.empty ? 'empty' : 'has commands'}">${PT.hx2(tt.id)}</button>`).join('');
+                 : tt.empty ? 'empty' : 'has commands'}">${PT.hx2(tt.id)}<i>${
+                   !writable(tt) ? 'lock' : tt.empty ? '—' : '●'}</i></button>`).join('');
     const canEditTable = !!t && writable(t);
 
     let rows = '';
@@ -8378,10 +8612,14 @@ const UI = (() => {
         <span class="pv-hint">${editable
           ? 'click a cell, <b>Enter</b> to choose a command or type a value, <b>Del</b> to clear'
           : 'read only (legacy command encoding)'}</span></div>
-      <div class="tg-tabs">${tabList || '<span style="color:var(--muted);font-size:11px">no tables in this project</span>'}</div>
-      ${t && !canEditTable ? `<div class="tg-locked">Table ${PT.hx2(t.id)} is stored empty in the project file, so there is nothing here to rewrite. Add commands to it on the device first.</div>` : ''}
-      ${t ? `<div class="tg-head"><span>#</span><span>cmd 1</span><span>val</span><span>cmd 2</span><span>val</span><span>cmd 3</span><span>val</span></div>
-      <div class="tg-grid">${rows}</div>` : ''}
+      <div class="tg-split">
+        <div class="tg-tabs">${tabList || '<span style="color:var(--muted);font-size:11px">no tables in this project</span>'}</div>
+        <div class="tg-editor">
+          ${t && !canEditTable ? `<div class="tg-locked">Table ${PT.hx2(t.id)} is stored empty in the project file, so there is nothing here to rewrite. Add commands to it on the device first.</div>` : ''}
+          ${t ? `<div class="tg-head"><span>#</span><span>cmd 1</span><span>val</span><span>cmd 2</span><span>val</span><span>cmd 3</span><span>val</span></div>
+          <div class="tg-grid">${rows}</div>` : ''}
+        </div>
+      </div>
       <div class="pv-hdr" style="margin-top:18px"><span class="pv-hdr-title">Grooves</span>
         <span class="pv-hint">step lengths in ticks · 6 is a straight 1/16 · clear a step to end the groove</span></div>
       <div class="tg-grooves">${grooveRows || '<span style="color:var(--muted);font-size:11px">this project has no groove buffer</span>'}</div>`;
@@ -8812,6 +9050,7 @@ const UI = (() => {
             out ? ` title="${esc(PT.noteStr(st.note))} is outside ${esc(sc.root + ' ' + sc.name)}"` : ''
           } tabindex="${editable ? 0 : -1}">${esc(v)}</span>`;
         }).join('')}
+        ${editable ? `<span class="pe-rowclear" data-step="${s}" title="Clear step ${PT.hx2(s)}">✕</span>` : '<span></span>'}
       </div>`;
     }
     // Where this phrase is used, and how we got here. Editing a phrase used
@@ -8881,7 +9120,7 @@ const UI = (() => {
             : 'not referenced by any chain'}
         </span>
       </div>
-      <div class="pe-head"><span class="pe-i">#</span><span>note</span><span>ins</span><span>fx1</span><span>val</span><span>fx2</span><span>val</span></div>
+      <div class="pe-head"><span class="pe-i">#</span><span>note</span><span>ins</span><span>fx1</span><span>val</span><span>fx2</span><span>val</span><span></span></div>
       <div id="phrase-rows" class="pe-grid">${rows}</div>
       ${editable && pianoOn ? `<div class="pe-help pe-help-piano">🎹 <b>Piano entry on.</b> With the cursor in the <b>note</b> column:
         <code>z s x d c v g b h n j m</code> plays C–B in octave <b>${pianoOct}</b>,
@@ -9223,6 +9462,21 @@ const UI = (() => {
     paintPeSel();      // restore the block selection across the re-render
     det.querySelectorAll('[data-tsp]').forEach(b =>
       b.addEventListener('click', () => transposeSel(parseInt(b.dataset.tsp, 10))));
+    det.querySelectorAll('.pe-rowclear').forEach(b =>
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        const at = parseInt(b.dataset.step, 10);
+        const k = peKey(ph, at), pb = parsed.phrases;
+        const empty = pb.notes[k] === PT.EMPTY && pb.instr[k] === PT.EMPTY &&
+                      pb.cmd1[k] === PT.CMD_NONE && pb.cmd2[k] === PT.CMD_NONE &&
+                      !pb.param1[k] && !pb.param2[k];
+        if (empty) return;                 // nothing to clear, keep undo clean
+        pushUndo();
+        pb.notes[k] = PT.EMPTY; pb.instr[k] = PT.EMPTY;
+        pb.cmd1[k] = PT.CMD_NONE; pb.cmd2[k] = PT.CMD_NONE;
+        pb.param1[k] = 0; pb.param2[k] = 0;
+        markDirty(); rerender(); focusCell();
+      }));
     // Insert/delete a step, shifting the rest of the phrase. Insert drops
     // whatever falls off the end; delete leaves a blank last step.
     const PF = ['notes', 'instr', 'cmd1', 'param1', 'cmd2', 'param2'];
@@ -12236,19 +12490,14 @@ const UI = (() => {
     });
     $('btn-usb-popout').addEventListener('click', () => Mirror.popOut());
     const setFxPanel = show => {
-      $('fx-panel').style.display = show ? 'flex' : 'none';
-      $('btn-usb-fx').classList.toggle('on', show);
       $('tab-device').classList.toggle('fx-open', show);
+      $('btn-usb-fx').classList.toggle('on', show);
+      localStorage.setItem('ptFxDrawer', show ? '1' : '0');
       Mirror.invalidate();
     };
     $('btn-usb-fx').addEventListener('click', () =>
-      setFxPanel($('fx-panel').style.display === 'none'));
-    setFxPanel(true);
-    // Only show the divider once the mirror has actually been scrolled to,
-    // so a short panel does not draw a line under nothing.
-    $('usb-scroll').addEventListener('scroll', () => {
-      $('usb-sticky').classList.toggle('stuck', $('usb-scroll').scrollTop > 4);
-    });
+      setFxPanel(!$('tab-device').classList.contains('fx-open')));
+    setFxPanel(localStorage.getItem('ptFxDrawer') !== '0');
     Mirror.init();
 
     // PWA: register the service worker when served over http(s); the

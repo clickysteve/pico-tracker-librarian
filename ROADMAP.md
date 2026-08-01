@@ -73,6 +73,10 @@ slicer's waveform zoom, setlist ordering, the macOS junk-file filter, the
 playback fixes in 0.9.1 (slice/loop sample-rate units, output clipping,
 dropped slice-0 notes), render to WAV and stems, table and groove editing,
 chain-colour sidecars, note entry from a computer keyboard, the mirror's
-output effects with recording and capture-ready output sizes in 0.9.9, and
+output effects with recording and capture-ready output sizes in 0.9.9,
 audio-reactive effects, scale lock, the phrase generators and the
-annotated song map in 0.9.10. See `CHANGELOG.md` for the detail.
+annotated song map in 0.9.10, and the 0.9.11 feedback round: the effects
+drawer, per-parameter audio routing, stems as one zip with render
+progress, insert-paste and row clears on the grids, the tables layout,
+MP4 recording and the editable mirror text. See `CHANGELOG.md` for the
+detail.

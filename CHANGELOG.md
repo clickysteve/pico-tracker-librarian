@@ -1,5 +1,66 @@
 # Changelog
 
+## v0.9.11 — the feedback round: drawer, routing, stems zip, grid manners
+
+Ten items of real-device feedback, all landed.
+
+**The effects moved into a drawer.** The mirror now owns the Device tab
+and the whole effects panel lives in a slide-out sidebar on the right, so
+opening it costs the picture some width instead of pushing it off the
+bottom of the screen. Single-column cards, remembers whether it was open,
+and at narrow windows it overlays the mirror rather than crushing it —
+but never the toolbar, which holds the button that closes it.
+
+**Audio routing went per-parameter.** Each effect can now carry up to
+three routings, each one mapping a source (bass, mids, highs, level,
+transient) to any numeric parameter of that effect — bloom intensity on
+the level AND bloom radius on the bass at the same time, each with its
+own signed depth. The old one-slot wiring migrates automatically.
+
+**Grid manners.** Clicking an empty cell on the main grid now just
+selects it — the picker opens on typing, Enter or a double-click, the
+same contract as every other cell in the app. Row paste on the main grid
+INSERTS: the copied row lands where you point and everything below moves
+down one (with a warning if something would fall off the end of the
+format). Phrases and chains keep overwrite-paste, as asked. Every row of
+the main grid has a one-click clear in the gutter, and every step row of
+the phrase editor has a hover ✕ that clears the whole step, undoably.
+
+**Tables** got the layout asked for: the table list runs down the left,
+the editor sits to the right, with a state dot per table (has commands /
+empty / locked).
+
+**Stems come down as one zip** instead of a burst of separate downloads,
+and both render buttons now show live progress ("⏳ Stem 2/4…") and
+refuse re-entry, because the offline render takes a few seconds and a
+silent button reads as a broken one.
+
+**The mirror's stand-in text is yours.** A Text field in the effects
+drawer replaces the PT LIBRARIAN header on the demo screen, or removes it
+entirely when blank. It only affects the stand-in — a connected device
+draws its own screen.
+
+**Recording prefers MP4.** The recorder now asks for H.264/MP4 first and
+only falls back to WebM on browsers that cannot write it, with the
+filename following the container. An MP4 opens in QuickTime, on a phone,
+and in every editor; the old WebM often read as "unreadable file"
+outside the browser.
+
+**Found by review of the above, before shipping**
+- At narrow windows the open drawer covered the toolbar — including the
+  only button that closes the drawer, with it open by default. It now
+  overlays the mirror only.
+- The new gutter clear and insert-paste ignored the read-only gate on
+  legacy 2-byte-command projects, stranding un-saveable, un-undoable
+  edits in memory. They now honour the same gate as every other mutation
+  path, and the demo card gained a legacy project so the gate is tested
+  against a real fixture.
+- The stand-in header input accepted three more characters than the
+  screen can hold, silently losing the tail.
+- The Record button's tooltip still said .webm after the MP4 switch.
+- Adding an audio routing to an effect enabled the card but not the
+  master switch, so the freshly wired route visibly did nothing.
+
 ## v0.9.10 — audio-reactive effects, scale lock, generators, annotated song map
 
 **Audio-reactive effects.** The mirror's effects can now be driven from a

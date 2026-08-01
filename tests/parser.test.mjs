@@ -1556,7 +1556,14 @@ t('FX: every react target names a real, non-segmented parameter', () => {
 t('FX: blankReact covers every reactable effect and nothing else', () => {
   const r = FX.blankReact();
   eq(Object.keys(r).sort(), FX.DEFS.filter(d => d.react).map(d => d.id).sort());
-  for (const id in r) eq(r[id].src, 'off');
+  for (const id in r) eq(r[id], [], 'a fresh effect has no routings');
+});
+t('FX: reactableParams offers every numeric parameter and no segmented ones', () => {
+  for (const d of FX.DEFS) {
+    const keys = FX.reactableParams(d).map(x => x.key);
+    for (const k of keys) ok(d.params.find(x => x.key === k).type !== 'seg');
+    if (d.react) ok(keys.includes(d.react), `${d.id}'s default target must be routable`);
+  }
 });
 t('FX: modulate is a no-op with no wiring or no audio', () => {
   const p = FX.defaults();
@@ -1565,42 +1572,79 @@ t('FX: modulate is a no-op with no wiring or no audio', () => {
   ok(FX.modulate(p, null, { level: 1 }) === p);
   ok(FX.modulate(p, FX.blankReact(), null) === p);
 });
+const route = (id, r) => ({ [id]: Array.isArray(r) ? r : [r] });
 t('FX: a positive depth pushes towards the maximum, negative towards the minimum', () => {
   const par = FX.DEFS.find(d => d.id === 'bloom').params.find(p => p.key === 'intensity');
   const base = FX.defaults().bloom.intensity;
-  const up = FX.modulate(FX.defaults(), { bloom: { src: 'level', depth: 100 } }, { level: 1 });
+  const up = FX.modulate(FX.defaults(), route('bloom', { src: 'level', depth: 100 }), { level: 1 });
   eq(up.bloom.intensity, par.max);
-  const down = FX.modulate(FX.defaults(), { bloom: { src: 'level', depth: -100 } }, { level: 1 });
+  const down = FX.modulate(FX.defaults(), route('bloom', { src: 'level', depth: -100 }), { level: 1 });
   eq(down.bloom.intensity, par.min);
-  const half = FX.modulate(FX.defaults(), { bloom: { src: 'level', depth: 50 } }, { level: 1 });
+  const half = FX.modulate(FX.defaults(), route('bloom', { src: 'level', depth: 50 }), { level: 1 });
   eq(half.bloom.intensity, base + 0.5 * (par.max - base));
+});
+t('FX: a route can name any numeric parameter, not just the default', () => {
+  const par = FX.DEFS.find(d => d.id === 'bloom').params.find(p => p.key === 'radius');
+  const out = FX.modulate(FX.defaults(),
+    route('bloom', { src: 'low', depth: 100, param: 'radius' }), { low: 1 });
+  eq(out.bloom.radius, par.max, 'the named parameter moves');
+  eq(out.bloom.intensity, FX.defaults().bloom.intensity, 'the default target does not');
+});
+t('FX: two routes on one effect drive their own parameters independently', () => {
+  const defs = FX.DEFS.find(d => d.id === 'bloom');
+  const out = FX.modulate(FX.defaults(), route('bloom', [
+    { src: 'level', depth: 100, param: 'intensity' },
+    { src: 'low', depth: 100, param: 'radius' },
+  ]), { level: 1, low: 0.5 });
+  eq(out.bloom.intensity, defs.params.find(p => p.key === 'intensity').max);
+  const rPar = defs.params.find(p => p.key === 'radius');
+  const rBase = FX.defaults().bloom.radius;
+  eq(out.bloom.radius, rBase + 0.5 * (rPar.max - rBase));
+});
+t('FX: two routes on the SAME parameter compose and stay in range', () => {
+  const par = FX.DEFS.find(d => d.id === 'bloom').params.find(p => p.key === 'intensity');
+  const out = FX.modulate(FX.defaults(), route('bloom', [
+    { src: 'level', depth: 100, param: 'intensity' },
+    { src: 'low', depth: 100, param: 'intensity' },
+  ]), { level: 1, low: 1 });
+  ok(out.bloom.intensity >= par.min && out.bloom.intensity <= par.max);
+  eq(out.bloom.intensity, par.max);
 });
 t('FX: the slider value is the resting point, restored when the audio stops', () => {
   const p = FX.defaults();
-  const wiring = { bloom: { src: 'level', depth: 100 } };
-  eq(FX.modulate(p, wiring, { level: 0 }).bloom.intensity, p.bloom.intensity);
+  eq(FX.modulate(p, route('bloom', { src: 'level', depth: 100 }), { level: 0 }).bloom.intensity,
+     p.bloom.intensity);
 });
 t('FX: modulate never leaves a parameter outside its own range', () => {
   for (const d of FX.DEFS) {
     if (!d.react) continue;
-    const par = d.params.find(x => x.key === d.react);
-    for (const depth of [-100, -37, 37, 100])
-      for (const lvl of [0, 0.5, 1]) {
-        const out = FX.modulate(FX.defaults(), { [d.id]: { src: 'level', depth } }, { level: lvl });
-        const v = out[d.id][d.react];
-        ok(v >= par.min && v <= par.max, `${d.id}.${d.react} = ${v} outside ${par.min}..${par.max}`);
-      }
+    for (const par of FX.reactableParams(d))
+      for (const depth of [-100, -37, 37, 100])
+        for (const lvl of [0, 0.5, 1]) {
+          const out = FX.modulate(FX.defaults(),
+            route(d.id, { src: 'level', depth, param: par.key }), { level: lvl });
+          const v = out[d.id][par.key];
+          ok(v >= par.min && v <= par.max, `${d.id}.${par.key} = ${v} outside ${par.min}..${par.max}`);
+        }
   }
 });
 t('FX: modulate does not mutate the settings it was handed', () => {
   const p = FX.defaults();
   const before = JSON.stringify(p);
-  FX.modulate(p, { bloom: { src: 'level', depth: 100 } }, { level: 1 });
+  FX.modulate(p, route('bloom', { src: 'level', depth: 100 }), { level: 1 });
   eq(JSON.stringify(p), before, 'the user\'s own sliders must not move');
 });
-t('FX: modulate ignores an unknown source rather than producing NaN', () => {
-  const out = FX.modulate(FX.defaults(), { bloom: { src: 'nope', depth: 100 } }, { level: 1 });
-  eq(out.bloom.intensity, FX.defaults().bloom.intensity);
+t('FX: modulate ignores an unknown source or parameter rather than producing NaN', () => {
+  eq(FX.modulate(FX.defaults(), route('bloom', { src: 'nope', depth: 100 }), { level: 1 })
+       .bloom.intensity, FX.defaults().bloom.intensity);
+  const out = FX.modulate(FX.defaults(),
+    route('bloom', { src: 'level', depth: 100, param: 'colour' }), { level: 1 });
+  eq(out.bloom.colour, 'none', 'a segmented parameter cannot be driven');
+  ok(!Object.values(out.bloom).some(v => Number.isNaN(v)));
+});
+t('FX: the old single-object wiring is simply skipped, not misread', () => {
+  const p = FX.defaults();
+  eq(FX.modulate(p, { bloom: { src: 'level', depth: 100 } }, { level: 1 }), p);
 });
 t('FX: presets only wire real effects to real sources', () => {
   const srcs = AudioReact.SOURCES.map(x => x[0]);
@@ -1611,6 +1655,13 @@ t('FX: presets only wire real effects to real sources', () => {
       const dep = pre.r[id].depth;
       ok(dep >= -100 && dep <= 100, `${pre.id}.${id} depth ${dep} out of range`);
       ok(pre.on.includes(id), `${pre.id} wires ${id} but never switches it on`);
+    }
+    const st = FX.presetState(pre.id);
+    for (const id in st.react) {
+      ok(Array.isArray(st.react[id]), `${pre.id}.${id} wiring must be a route list`);
+      for (const r of st.react[id])
+        ok(r.param && FX.reactableParams(FX.DEFS.find(d => d.id === id)).some(x => x.key === r.param),
+           `${pre.id}.${id} route names no valid parameter`);
     }
   }
 });

@@ -122,8 +122,10 @@ if (rendered) {
   console.log(`     wav ${(rendered.size/1024).toFixed(0)}KB · peak ${rendered.peak}/32767`);
 }
 
-// stems: one file per channel that plays, and they must not be identical
-const stems = await page.evaluate(async () => {
+// stems: they now come down as ONE zip. Parse its local-file headers
+// (store method, so the wav bytes sit uncompressed in place) and check
+// every entry is a distinct, audible wav.
+const stemZip = await page.evaluate(async () => {
   const dl = [];
   const realCreate = URL.createObjectURL;
   URL.createObjectURL = b => { dl.push(b); return 'blob:stub'; };
@@ -133,25 +135,37 @@ const stems = await page.evaluate(async () => {
   for (let i = 0; i < 240; i++) {
     await new Promise(r => setTimeout(r, 250));
     const msg = document.getElementById('cache-msg')?.textContent || '';
-    if (/Rendered \d+ stem/.test(msg)) break;
+    if (/stem/.test(msg) && /zip/.test(msg)) break;
   }
   URL.createObjectURL = realCreate;
   HTMLAnchorElement.prototype.click = origClick;
-  const peaks = [];
-  for (const b of dl) {
-    const buf = new Uint8Array(await b.arrayBuffer());
-    const dv = new DataView(buf.buffer);
+  if (dl.length !== 1) return { count: dl.length, entries: [] };
+  const buf = new Uint8Array(await dl[0].arrayBuffer());
+  const dv = new DataView(buf.buffer);
+  const entries = [];
+  let o = 0;
+  while (o + 30 <= buf.length && dv.getUint32(o, true) === 0x04034B50) {
+    const nameLen = dv.getUint16(o + 26, true);
+    const extraLen = dv.getUint16(o + 28, true);
+    const size = dv.getUint32(o + 18, true);
+    const name = new TextDecoder().decode(buf.slice(o + 30, o + 30 + nameLen));
+    const start = o + 30 + nameLen + extraLen;
     let peak = 0, sum = 0;
-    for (let o = 44; o + 1 < buf.length; o += 2) {
-      const v = Math.abs(dv.getInt16(o, true));
+    for (let q = start + 44; q + 1 < start + size; q += 2) {
+      const v = Math.abs(dv.getInt16(q, true));
       if (v > peak) peak = v;
       sum += v;
     }
-    peaks.push({ peak, sum });
+    entries.push({ name, size, peak, sum });
+    o = start + size;
   }
-  return peaks;
+  return { count: dl.length, entries };
 });
-check('stems: one file per playing channel', stems.length >= 2, `got ${stems.length}`);
+const stems = stemZip.entries;
+check('stems: exactly one zip comes down', stemZip.count === 1, `got ${stemZip.count} downloads`);
+check('stems: the zip holds one wav per playing channel',
+  stems.length >= 2 && stems.every(e => /_ch\d\.wav$/.test(e.name)),
+  stems.map(e => e.name).join(','));
 check('stems: every stem has audio', stems.every(s2 => s2.peak > 100),
   stems.map(s2 => s2.peak).join(','));
 check('stems: stems differ from each other',
