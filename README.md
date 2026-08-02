@@ -4,6 +4,8 @@ A librarian and arrangement editor for [picoTracker](https://xiphonics.com/) SD 
 
 Sibling project to [M8 Librarian](https://m8librarian.allmyfriendsaresynths.com), same architecture and safety model.
 
+![The Projects screen](screenshots/projects-screen.png)
+
 Requires Chrome or Edge (it uses the File System Access API to read your card; Firefox and Safari don't support it).
 
 > ## ⚠ Experimental — back up your projects first
@@ -27,9 +29,13 @@ Cards that have been near a Mac collect AppleDouble junk (`._kick.wav`, `.DS_Sto
 
 ### Browse
 
+![Samples across the card, with preview and the slice editor a click away](screenshots/samples-screen.png)
+
 - **Projects** — list and grid views, filtered and sorted by name, date, missing samples, instrument count, BPM or size. Each row plays, opens the pattern editor, or compares directly; expanding it shows the instrument bank, the sample pool with missing/unused markers, project settings, and similar projects by shared samples. An `autosave` badge flags projects where the device would load newer unsaved state.
 - **Instruments** — every `.pti` in `instruments/` plus every project's instrument bank, decoded in full (all parameters, slice points), with type filters (SAMPLE / SAMPLESOURCE / MIDI / SID / OPAL), sample status and usage tracking. Parameters are grouped into Sample / Tuning / Mix / Filter / Crush / Amp / LFO / Table cards with level bars, note names for root note and L/R for pan.
 - **Samples** — the `samples/` library tree plus every project pool, with duration, sample rate and bit depth per WAV, used/unused badges, and up/down arrow-key audition.
+![The theme editor, with a live device-screen preview](screenshots/theme-editor.png)
+
 - **Themes** — visual previews of every `.ptt` with swatches, and the device's active theme flagged. **Preview** applies a palette to the app itself; **Set on device** writes it into the card's `.config.xml` so the tracker boots with it; **Save device colours as .ptt** captures the current device palette as a new theme. There's also a theme creator: build one from scratch or copy an existing one, with a live device-screen preview drawn from the firmware's real colour roles.
 - **Grooves** — every non-default groove across all projects, step-visualised.
 - **Renders** — `renders/` and `recordings/` with waveform preview and playback.
@@ -37,12 +43,14 @@ Cards that have been near a Mac collect AppleDouble junk (`._kick.wav`, `.DS_Sto
 
 ### Play
 
-- **In-browser playback** — press Play on any project and hear it. A Web Audio engine walks the song the way the firmware player does: grooves, per-channel `GRV` switches, `HOP` flow, chain and project transpose, slices, loop modes, and `VOL`/`PAN`/`KIL`. Slice and loop points are converted through each WAV's own sample rate, so playback is in time whatever your machine's audio rate is, and the mix runs through a limiter so dense passages don't clip.
+- **In-browser playback** — press Play on any project and hear it. A Web Audio engine walks the song the way the firmware player does: per-channel advance with **group looping** (a channel that hits an empty cell loops its contiguous run of chains, exactly like the device — verified against the firmware source), chains ending at their first empty step, grooves, per-channel `GRV` switches, `HOP` flow, chain and project transpose, slices, loop modes, and `VOL`/`PAN`/`KIL`. The song's length is the longest channel's single pass; looping channels fill it. Slice and loop points are converted through each WAV's own sample rate, so playback is in time whatever your machine's audio rate is, and the mix runs through a limiter so dense passages don't clip.
   An honest sketch of the song, not an emulation: synth voices (SID/OPAL) and most FX are out of scope by design, `pingpong` loops play forward, and Advance `SAMPLESOURCE` amp envelopes aren't applied.
-- **Play anything, at any level** — the whole song, a single song row across all 8 channels, one chain, or one phrase.
+- **Play anything, from anywhere** — the whole song, from any row (the gutter ▶ starts there and plays on, which is also how you reach parts below a gap), one chain, or one phrase.
 - **Transport** — a bar along the bottom shows what's playing, a scrub bar you can drag to jump around, a loop toggle, elapsed/total, and a stop that works from anywhere; the playing project's row stays lit. **Space** plays whatever you're looking at: the open phrase, else the open chain, else the song. While anything plays, the song grid outlines the cell each channel is currently inside, lights its row, highlights the chains in play, and marks the current step of the open chain.
 
 ### Arrange and edit
+
+![The pattern editor: song grid, chains and phrases](screenshots/pattern-editor.png)
 
 - **Pattern editor** — the song grid at full size, with an ordered chain list down the left bucketed by number group (usage counts, colours, per-chain preview, hover-to-highlight), and chain and phrase panels beside the grid rather than under it.
   Click any cell to choose the chain that sits there from a filterable list of the chains this song already uses, the ones defined but unplaced, and free slots; type a value that isn't listed and it's offered too, so all of `00`–`FE` is reachable. Arrow keys walk the grid — the active cell carries a high-contrast marker with its row and channel labels lit, and the gutter ▶ plays the song from that row to the end — and **shift+arrows or shift+click select a block**, which then copies, pastes or clears as a unit (`⌘/Ctrl+C/V`, `Del`, `⌘/Ctrl+A` for everything, `Esc` to deselect). Whole rows also copy and paste from the gutter, and `⌘/Ctrl+Z` undoes arrangement changes. Spare rows sit past the end of the song so an arrangement can be extended, with **+ more rows** for as far as the geometry allows.
@@ -61,6 +69,8 @@ All edits are held in memory until you explicitly save, and every save goes thro
 
 ### Inspect and export
 
+![Card stats, including sample age](screenshots/stats-age.png)
+
 - **Project overview** — four headline cards (BPM, playback length, scale, samples) over grouped Song / Instruments / File panels, a clickable full-width song map, FX-usage and groove summaries, collapsible instrument and sample sections, and auditionable sample rows with one-click access to the slice editor.
 - **Compare** — diff two projects: shared and unique instruments and samples, metadata side by side.
 - **Song map** — the arrangement drawn wide, with named section bands you drag out over the rows and notes pinned to a row ("Intro", "drop", "repeat x2"). Exports as PNG or SVG for a setlist or a rehearsal sheet, and saves to `PTLibrarian_map.json` on the card so a marked-up map travels with the project.
@@ -68,6 +78,8 @@ All edits are held in memory until you explicitly save, and every save goes thro
 - **MIDI export** — download any project as a Standard MIDI File (type 1, 24 PPQ, a tempo track plus one track per channel that plays anything, chain and project transpose applied, per-channel `GRV` groove switches and `HOP` flow honoured).
 
 ### Device (USB)
+
+![The mirror through the output effects, with the drawer open](screenshots/display-fx.png)
 
 - **Live screen mirror** — connect the picoTracker over USB (WebSerial) and watch the device screen in the browser, rendered pixel-for-pixel with the device's own bitmap font — or in one of six alternative faces (Terminal, Typewriter, Clean, Serif, Heavy, Hand) built at runtime from fonts your system already has, with the device's special glyphs always kept native. Full-refresh requests, a pop-out window for capture, full-screen mode and PNG snapshots. Reachable straight from the landing page, no SD card needed. Requires the `https://` page, since WebSerial only exists in secure contexts.
 - **Audio-reactive effects** — drive the effects from a live audio input. Pick the interface the picoTracker (or your mixer) is plugged into and the picture moves with what you are hearing; there is no sync problem because it is the real signal, a frame or two behind. Bass, mids, highs, level and a transient pulse are each available as a source, and every effect can carry up to three routings, each mapping a source to any numeric parameter of that effect with its own signed depth (−100% to +100%), so bloom intensity can ride the level while bloom radius rides the bass, and an effect can duck on a beat as well as swell on one. Your sliders stay where you put them and the modulation rides on top. Nothing is routed to the speakers, and no audio device is opened without a click.
@@ -79,6 +91,8 @@ All edits are held in memory until you explicitly save, and every save goes thro
 
 ### Maintain
 
+![Backup: pick what to include, to a folder or a zip](screenshots/backup-ui.png)
+
 - **Problems tab** — missing sample references, unused pool samples with reclaimable sizes, unused instruments, content-identical samples (byte-level dupe scan), duplicate `.pti` names, stale autosaves, unreadable files, backbone sounds, and the repair log. Most problems can be fixed from the tab itself.
 - **Fix all exact matches** — one-click batch repair: every missing reference with an exact-name copy elsewhere on the card is restored by file copy, verified and audit-logged.
 - **Repair mode** — two fixes for a broken reference: *copy* a matching WAV from the library or another project's pool into this project's pool (no project-file edit), or *re-point* the reference to an existing pool sample by rewriting only that attribute inside the project file.
@@ -86,6 +100,8 @@ All edits are held in memory until you explicitly save, and every save goes thro
 - **Extract as .pti** — pull any instrument out of a project bank into `instruments/` as a `.pti` (or download it if the card is read-only).
 - **Backup** — copy the card to a folder or download it as a ZIP, with per-directory selection (`.config.xml` and `.current` always included).
 - **Chain colours travel with the card** — write them to `PTLibrarian_colours.json` at the card root, and they're picked up on any machine.
+![Ordered setlists, exported card-ready](screenshots/sets-section.png)
+
 - **Setlists** — click projects to add them to an ordered setlist, drag or ▲▼ to reorder, then export a lean, card-ready `projects/` layout as a folder or ZIP. Folders can be numbered (`01_`, `02_` …) so the device lists them in playing order. Setlists save with their order.
 
 ## The safety model
@@ -119,10 +135,10 @@ The entire app is a single `index.html` — deliberately, so it can be hosted an
 Tests are zero-dependency Node scripts that extract modules straight out of `index.html`, so they always run against the shipped code:
 
 ```bash
-node tests/parser.test.mjs   # 171 unit tests: formats, MIDI timing, slice/loop units, round-trips, generators, scales, audio analysis
+node tests/parser.test.mjs   # 175 unit tests: formats, MIDI timing, slice/loop units, round-trips, generators, scales, audio analysis
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
 node tests/audio.test.mjs    # renders the mix and a WAV export offline: no clipping, correct slice offsets, valid stems
-node tests/e2e.mjs           # 286 browser checks (needs: npm i -D playwright)
+node tests/e2e.mjs           # 293 browser checks (needs: npm i -D playwright)
 ```
 
 The parser tests run round-trip checks against real Advance project files when they're present locally; those files are not in this repository.

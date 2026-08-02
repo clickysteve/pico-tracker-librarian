@@ -28,6 +28,9 @@
       padding:0 20px; height:52px; background:var(--surface);
       border-bottom:1px solid var(--border); flex-shrink:0; }
     .logo { font-size:15px; font-weight:700; letter-spacing:3px; color:var(--accent); }
+    .logo a#logo-home { color:inherit; text-decoration:none; cursor:pointer; }
+    .logo a#logo-home:hover { text-shadow:0 0 12px rgba(121,181,227,.5); }
+    .logo a:hover { opacity:.9; }
     .hdr-right { display:flex; align-items:center; gap:10px; }
     #sd-label { color:var(--muted); font-size:12px; }
     .ro-badge { display:none; font-size:10px; font-weight:700; letter-spacing:.8px;
@@ -1109,7 +1112,10 @@
 <div id="app">
 
   <header>
-    <div class="logo">PICOTRACKER LIBRARIAN <span style="font-size:10px;font-weight:400;opacity:.45;letter-spacing:1px">v0.9.13 Alpha</span>
+    <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
+      <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
+         title="Source, issues and release notes on GitHub"
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v0.9.14 Alpha</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -2388,6 +2394,12 @@ const PT = (() => {
     while ((n >>= 7) > 0) out.unshift((n & 0x7F) | 0x80);
     return out;
   }
+  // MIDI stays a LINEAR export by design: one pass of each channel laid
+  // out in arrangement order is what you want on a DAW timeline, not an
+  // infinite loop. But it must not export what the device cannot play:
+  // chains end at their first empty step, and a channel's walk ends at
+  // its first gap (content below a gap is a separate loop-block the
+  // device only reaches when started there).
   function buildMidi(proj, name) {
     const last = lastSongRow(proj);
     if (last < 0) return null;
@@ -2404,12 +2416,18 @@ const PT = (() => {
       // per-channel groove state (GRV switches it; position resets)
       let gSteps = grooveOf(0), gPos = 0, trackHopEntry = 0;
       const noteOff = at => { if (open !== null) { ev.push({tick: at, data: [0x80 | t, open, 0x40]}); open = null; } };
+      let started = false;
       for (let row = 0; row <= last; row++) {
         const c = gridCell(proj, row, t);
-        if (c === EMPTY) continue;
+        if (c === EMPTY) {
+          if (started) break;     // a gap ends this channel's reachable run
+          continue;               // leading blanks: strictly the device never
+        }                         // starts this channel, but silently dropping
+        if (!started) started = true;   // it from a DAW export helps nobody —
+                                        // its first block is exported in place
         for (let cs = 0; cs < STEPS; cs++) {
           const { phrase, transpose } = chainStep(proj, c, cs);
-          if (phrase === EMPTY || phrase >= geom(proj).phraseCount) continue;
+          if (phrase === EMPTY || phrase >= geom(proj).phraseCount) break;   // first empty step ends the chain
           // enterAt: HOP lands us mid-phrase (player semantics: the HOP
           // step itself is not played; playback continues in the NEXT
           // chain phrase at the hop target step)
@@ -2772,43 +2790,74 @@ const PT = (() => {
 
   // ── Event timeline for playback (player semantics, matching
   //    moveToNextStep / getChannelHop / GRV handling) ─────
+  // The playback walk, matching Player.cpp in the open firmware:
+  //  - a channel starts at the start row; an empty cell there (or a chain
+  //    whose first step is empty) leaves that channel silent — there is
+  //    no forward search;
+  //  - a chain ends at its first empty step;
+  //  - when the next row is empty (or its chain starts empty), the
+  //    channel LOOPS: it scans upward past blanks' edge — even past the
+  //    row playback started on — and re-enters its contiguous group at
+  //    the top. Groups loop forever on the device;
+  //  - content below a gap is only reachable by starting playback there.
+  // A timeline needs an end, so: every channel is simulated to its first
+  // loop-back (one full pass of its group), the longest pass sets the
+  // song length, and shorter channels keep looping until that point.
   function buildEventTimeline(proj, opts = {}) {
     const last = lastSongRow(proj);
     const solo = opts.chain != null || opts.phrase != null;   // single-chain / single-phrase preview
-    // opts.songRow: play one row of the song grid across all 8 channels
-    const oneRow = !solo && opts.songRow != null;
     if (!solo && last < 0) return null;
-    if (oneRow && (opts.songRow < 0 || opts.songRow > last)) return null;
+    const startRow = solo ? 0 : Math.max(0, opts.startRow ?? 0);
+    if (!solo && startRow > last) return null;
     const CMD_KIL = 0x1E, CMD_HOP = 0x1B, CMD_GRV = 0x1A, CMD_PAN = 0x2A;
     const bpm = proj.tempo && proj.tempo > 0 ? proj.tempo : 120;
     const tickSec = 60 / (bpm * 24);       // 24 ticks per beat, default step = 6 ticks
+    const rows = geom(proj).songRows;
     const grooveOf = g => {
       const steps = (proj.grooves[g] || []).filter(v => v > 0 && v <= 0x80);
       return steps.length ? steps : [6];
     };
+    // Playable = the firmware's isPlayable: a chain sits here and its
+    // first step names a phrase.
+    const playableAt = (row, t) => {
+      if (row < 0 || row >= rows) return false;
+      const c = gridCell(proj, row, t);
+      if (c === EMPTY) return false;
+      return chainStep(proj, c, 0).phrase !== EMPTY;
+    };
+    const groupStart = (row, t) => {
+      let p2 = row;
+      while (p2 - 1 >= 0 && playableAt(p2 - 1, t)) p2--;
+      return p2;
+    };
+
     const events = [];
     const marks = [];
-    let endTick = 0;
-    // opts.chain / opts.phrase: preview one chain or one phrase, played once
-    // on channel 0. Everything downstream is the normal song path.
-    const chanCount = solo ? 1 : CHANNELS;
-    for (let t = 0; t < chanCount; t++) {
+
+    // Walk one channel. stopTick null = run to the first loop-back and
+    // return the tick reached (phase 1); otherwise emit events/marks
+    // until the tick passes stopTick (phase 2).
+    const walk = (t, stopTick, budget) => {
+      const emit = stopTick !== null;
       let tick = 0, gSteps = grooveOf(0), gPos = 0, hopEntry = 0;
-      const firstRow = oneRow ? opts.songRow : 0;
-      const lastRow = solo ? 0 : (oneRow ? opts.songRow : last);
-      for (let row = firstRow; row <= lastRow; row++) {
+      if (!solo && !playableAt(startRow, t)) return 0;
+      let row = startRow;
+      // One full pass can legitimately be songRows × 16 chain steps × 16
+      // phrase steps; a flat constant silently truncated dense 1024-row
+      // grids. Two passes' worth of headroom covers phase 2's loops.
+      let guard = Math.max(budget || 0, rows * STEPS * STEPS * 2 + 1000);
+      for (;;) {
         const c = opts.chain != null ? opts.chain : (solo ? 0 : gridCell(proj, row, t));
-        if (c === EMPTY) continue;
         for (let cs = 0; cs < STEPS; cs++) {
           const { phrase, transpose } = opts.phrase != null
             ? (cs === 0 ? { phrase: opts.phrase, transpose: 0 } : { phrase: EMPTY, transpose: 0 })
             : chainStep(proj, c, cs);
-          if (phrase === EMPTY || phrase >= geom(proj).phraseCount) continue;
-          // Position marks let the UI show what is playing where: grid cell,
-          // chain step, phrase and phrase step, per channel. Emitted per
-          // phrase step so the phrase grid gets a playhead too.
+          // The chain ends at its FIRST empty step (Player.cpp: canContinue).
+          if (phrase === EMPTY || phrase >= geom(proj).phraseCount) break;
           const enterAt = hopEntry; hopEntry = 0;
           for (let ps = enterAt; ps < STEPS; ps++) {
+            if (guard-- <= 0) return tick;
+            if (emit && tick > stopTick) return tick;
             const st = phraseStep(proj, phrase, ps);
             if (st.cmd1 === CMD_HOP || st.cmd2 === CMD_HOP) {
               hopEntry = (st.cmd1 === CMD_HOP ? st.param1 : st.param2) & 0xF;
@@ -2818,28 +2867,48 @@ const PT = (() => {
               const g = (st.cmd1 === CMD_GRV ? st.param1 : st.param2) & 0xFF;
               if (g < GROOVE_COUNT) { gSteps = grooveOf(g); gPos = 0; }
             }
-            const time = tick * tickSec;
-            marks.push({ time, ch: t, row, chain: c, step: cs, phrase, pstep: ps });
-            if (st.cmd1 === CMD_KIL || st.cmd2 === CMD_KIL || st.note === NOTE_OFF)
-              events.push({ time, ch: t, type: 'off' });
-            for (const [cmd, param] of [[st.cmd1, st.param1], [st.cmd2, st.param2]]) {
-              if (cmd === CMD_VOL) events.push({ time, ch: t, type: 'vol', value: (param & 0xFF) / 255 });
-              if (cmd === CMD_PAN) events.push({ time, ch: t, type: 'pan', value: ((param & 0xFF) - 0x7F) / 127 });
-            }
-            if (st.note !== EMPTY && st.note !== NOTE_OFF && st.note <= 119) {
-              events.push({ time, ch: t, type: 'on', note: st.note,
-                transpose: transpose + proj.transpose, instr: st.instr });
+            if (emit) {
+              const time = tick * tickSec;
+              // Position marks let the UI show what is playing where:
+              // grid cell, chain step, phrase and phrase step, per channel.
+              marks.push({ time, ch: t, row, chain: c, step: cs, phrase, pstep: ps });
+              if (st.cmd1 === CMD_KIL || st.cmd2 === CMD_KIL || st.note === NOTE_OFF)
+                events.push({ time, ch: t, type: 'off' });
+              for (const [cmd, param] of [[st.cmd1, st.param1], [st.cmd2, st.param2]]) {
+                if (cmd === CMD_VOL) events.push({ time, ch: t, type: 'vol', value: (param & 0xFF) / 255 });
+                if (cmd === CMD_PAN) events.push({ time, ch: t, type: 'pan', value: ((param & 0xFF) - 0x7F) / 127 });
+              }
+              if (st.note !== EMPTY && st.note !== NOTE_OFF && st.note <= 119) {
+                events.push({ time, ch: t, type: 'on', note: st.note,
+                  transpose: transpose + proj.transpose, instr: st.instr });
+              }
             }
             tick += gSteps[gPos % gSteps.length];
             gPos++;
           }
         }
+        if (solo) return tick;             // previews play once, no loop
+        // Chain done — advance or loop the group, per moveToNextChain.
+        if (playableAt(row + 1, t)) { row++; continue; }
+        if (stopTick === null) return tick;          // phase 1: one pass done
+        row = groupStart(row, t);                    // phase 2: loop the group
+        if (emit && tick > stopTick) return tick;
       }
-      endTick = Math.max(endTick, tick);
-    }
+    };
+
+    const chanCount = solo ? 1 : CHANNELS;
+    let endTick = 0;
+    for (let t = 0; t < chanCount; t++) endTick = Math.max(endTick, walk(t, null));
+    if (endTick <= 0) return null;
+    // Phase 2's step budget: every step advances at least one tick, so
+    // endTick steps is a true upper bound however short the loop is.
+    for (let t = 0; t < chanCount; t++) walk(t, endTick - 1, endTick + 1000);
     events.sort((a, b) => a.time - b.time);
     marks.sort((a, b) => a.time - b.time);
-    return { events, marks, duration: endTick * tickSec, bpm };
+    // Drop anything past the end (a loop pass can overshoot by a step).
+    const dur = endTick * tickSec;
+    return { events: events.filter(e => e.time < dur), marks: marks.filter(m => m.time < dur),
+             duration: dur, bpm };
   }
 
   // ── Rewrite an instrument's slice points in project XML ──
@@ -3531,7 +3600,28 @@ const Zip = (() => {
       for (const p of parts) await this._write(p);
     }
   }
-  return { Writer };
+  // File System Access writes cost real time PER CALL, and the writer
+  // emits dozens of tiny header pieces per entry — a set of a few hundred
+  // files meant thousands of awaited writes and an export that looked
+  // hung. Batching into ~4MB chunks turns that into a handful.
+  function bufferedSink(writable, chunkSize = 1 << 22) {
+    let buf = new Uint8Array(chunkSize), used = 0;
+    return {
+      write: async u8 => {
+        if (used + u8.length > chunkSize) {
+          await writable.write(buf.slice(0, used));
+          used = 0;
+        }
+        if (u8.length >= chunkSize) { await writable.write(u8); return; }
+        buf.set(u8, used);
+        used += u8.length;
+      },
+      flush: async () => {
+        if (used) { await writable.write(buf.slice(0, used)); used = 0; }
+      },
+    };
+  }
+  return { Writer, bufferedSink };
 })();
 
 async function createBackupZip(sdHandle, dirs, onLog, onDone, onError) {
@@ -3552,7 +3642,8 @@ async function createBackupZip(sdHandle, dirs, onLog, onDone, onError) {
     writable = { write: async u8 => { blobParts.push(u8); }, close: async () => {}, abort: async () => { blobParts = null; } };
     onLog?.('log', 'No save dialog support — building ZIP in memory.');
   }
-  const zip = new Zip.Writer(writable);
+  const sink = writable.write ? Zip.bufferedSink(writable) : writable;
+  const zip = new Zip.Writer(sink);
   try {
     onLog?.('head', `Creating PT_BACKUP_${stamp}.zip…`);
     let count = 0;
@@ -3581,6 +3672,7 @@ async function createBackupZip(sdHandle, dirs, onLog, onDone, onError) {
       } catch {}
     }
     await zip.finish();
+    await sink.flush?.();
     await writable.close();
     if (blobParts) {
       const blob = new Blob(blobParts, {type:'application/zip'});
@@ -3928,7 +4020,10 @@ const Demo = (() => {
     const VOL = 0x45, PAN = 0x2A, PSL = 0x30, KIL = 0x1E, GRV = 0x1A;
     const nightdrive = project({
       version: '3.1.1', tempo: 124, scale: 'Dorian', root: 'A ', advance: true,
-      grid: [[0,0,0],[1,0,0],[2,0,0],[3,0,0], [0,1,1],[1,1,1],[2,1,1],[3,1,1], [1,2,2],[2,2,2],[3,2,2], [2,3,3],[3,3,3]],
+      // Every channel enters at row 0: per firmware semantics a channel
+      // whose start cell is blank never plays (blanks are loop-group
+      // separators, not rests). LGPT idiom is to start all columns.
+      grid: [[0,0,0],[1,0,0],[2,0,0],[3,0,0], [0,1,1],[1,1,1],[2,1,1],[3,1,1], [0,2,2],[1,2,2],[2,2,2],[3,2,2], [0,3,3],[1,3,3],[2,3,3],[3,3,3]],
       chains: [[0,0,0],[1,0,1],[2,0,2],[3,0,3]],
       notes: [
         [0,0,36,KIT.kick],[0,4,36,KIT.kick],[0,8,36,KIT.kick],[0,12,36,KIT.kick],
@@ -7608,7 +7703,7 @@ const UI = (() => {
     host.innerHTML = `
       <div class="pv-hdr">
         <span class="pv-hdr-title">Song grid — ${last+1} rows</span>
-        <span class="pv-hint">arrows move · <b>shift+arrows</b> or shift+click select a block · <b>Enter</b> pick a chain ·
+        <span class="pv-hint">arrows move · <b>⌥↓/⌥↑</b> drill in / out · <b>shift+arrows</b> or shift+click select a block · <b>Enter</b> pick a chain ·
           <b>Del</b> clear · <b>⌘/Ctrl+C/V</b> copy &amp; paste · <b>⌘/Ctrl+A</b> all · ▶ plays a whole row
           <span id="pv-selinfo"></span></span>
         <button class="btn ghost sm" id="btn-pv-jump" title="Open any chain or phrase, placed in the song or not (⌘/Ctrl+G)">⤳ Go to…</button>
@@ -7811,6 +7906,7 @@ const UI = (() => {
       });
       cell.addEventListener('dblclick', e => { e.stopPropagation(); editGridCell(cell); });
       cell.addEventListener('keydown', ev => {
+        if (ev.altKey && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp')) return;   // ⌥-nav, handled globally
         const r = parseInt(cell.dataset.row, 10), t = parseInt(cell.dataset.ch, 10);
         pvFocus = { r, t };
         const move = (nr, nt) => {
@@ -7971,28 +8067,19 @@ const UI = (() => {
     if (SongPlayer.isPlaying()) { SongPlayer.stop(); return; }
     const host = el.closest('#modal-pattern-section');
     host?.querySelectorAll('.pv-rowplay.playing').forEach(x => x.classList.remove('playing'));
-    // Play FROM here, not just this row: the full song timeline, seeked
-    // to where this row starts. Rows are not uniform in time (grooves),
-    // so the start comes from the timeline's own marks — the earliest
-    // mark on this row, or on the next row that has one if this row is
-    // empty on every channel.
-    const tl = PT.buildEventTimeline(parsed, {});
-    let at = null;
-    if (tl && tl.marks) {
-      for (const m of tl.marks) if (m.row === row) { at = m.time; break; }   // marks are time-sorted
-      if (at === null) for (const m of tl.marks) if (m.row > row) { at = m.time; break; }
-    }
-    if (at === null) {
-      // Nothing plays at or after this row (a spare row past the end);
-      // starting from the top here would be a surprise, so decline.
-      setCacheBar(`Nothing plays at or after row ${PT.hx2(row)}.`, false);
+    // Play FROM here, the way the device does from its cursor: the
+    // timeline is rebuilt with this row as the start, so content that
+    // sits below a gap — unreachable from the top — plays from here.
+    const probe = PT.buildEventTimeline(parsed, { startRow: row });
+    if (!probe) {
+      setCacheBar(`Nothing plays from row ${PT.hx2(row)} — every channel is empty there.`, false);
       return;
     }
     el.textContent = '…';
     el.classList.add('playing');
     SongPlayer.play(sd, p, parsed, transportProgress,
       () => { el.textContent = '▶'; el.classList.remove('playing'); hideTransport(); },
-      { startAt: at })
+      { startRow: row })
       .then(ok => {
         el.textContent = ok ? '■' : '▶';
         if (ok) showTransport(`${p.name} — from row ${PT.hx2(row)}`, 'playing to the end');
@@ -8046,7 +8133,7 @@ const UI = (() => {
         phrases are hex <code>00</code>–<code>${PT.hx2(phraseMax)}</code>, transpose is a signed number like <code>-12</code>.
         Edits stay in memory until you press “Save edits to card”.</div>` : ''}`;
     det.querySelector('.cp-play').addEventListener('click', e => previewChain(pRef, parsed, c, e.target));
-    det.querySelectorAll('.cgo').forEach(el =>
+    det.querySelectorAll('.cgo[data-p]').forEach(el =>
       el.addEventListener('click', () => {
         jumpPhraseFrom = { chain: c, step: parseInt(el.closest('.pv-cstep').dataset.step, 10) };
         showPhrase(parsed, parseInt(el.dataset.p, 10), host);
@@ -8670,7 +8757,7 @@ const UI = (() => {
   async function renderProject(p, parsed, opts = {}) {
     const RATE = 44100;
     const tl = PT.buildEventTimeline(parsed, {});
-    if (!tl || !(tl.duration > 0)) throw new Error('nothing to render — the song grid is empty');
+    if (!tl || !(tl.duration > 0)) throw new Error('nothing to render — no channel is playable from row 00 (blanks at the top of a column keep that channel silent, as on the device)');
     const tail = 2;
     const off = new OfflineAudioContext(2, Math.ceil((tl.duration + tail) * RATE), RATE);
     // load and decode every pool sample into this context
@@ -8799,7 +8886,9 @@ const UI = (() => {
       }
       // One file per channel that actually plays something, delivered as
       // a single zip rather than a browser-fighting burst of downloads.
-      const used = new Set(PT.buildEventTimeline(parsed, {}).events.filter(e => e.type === 'on').map(e => e.ch));
+      const probeTl = PT.buildEventTimeline(parsed, {});
+      if (!probeTl) throw new Error('nothing is playable from row 00 — on the device, blanks at the top of a column keep that channel silent');
+      const used = new Set(probeTl.events.filter(e => e.type === 'on').map(e => e.ch));
       if (!used.size) throw new Error('no channels play anything');
       const files = [];
       let n = 0;
@@ -10018,13 +10107,18 @@ const UI = (() => {
     const nC = dirtyChains.get(d)?.size ?? 0;
     const gridDirty = dirtyGrid.has(d);
     const tDirty = dirtyTables.has(d), gDirty = dirtyGrooves.has(d);
-    let bar = host.querySelector('#pv-save-bar');
+    // ONE bar, anchored to the modal body: callers pass whichever section
+    // they were editing, and anchoring to the section meant the patterns
+    // and tables tabs could each grow their own copy of the same message.
+    const anchor = document.getElementById('modal-body') || host;
+    let bar = document.getElementById('pv-save-bar');
     if (!nP && !nC && !gridDirty && !tDirty && !gDirty) { bar?.remove(); return; }
-    if (!bar) {
+    if (!bar || !anchor.contains(bar)) {
+      bar?.remove();
       bar = document.createElement('div');
       bar.id = 'pv-save-bar';
-      bar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 12px;background:#1f1200;border:1px solid #4a2e00;border-radius:6px;font-size:12px;color:var(--warn)';
-      host.prepend(bar);
+      bar.style.cssText = 'display:flex;align-items:center;gap:10px;margin:10px 0;padding:8px 12px;background:#1f1200;border:1px solid #4a2e00;border-radius:6px;font-size:12px;color:var(--warn)';
+      anchor.prepend(bar);
     }
     const parts = [];
     if (gridDirty) parts.push('song grid');
@@ -10151,16 +10245,23 @@ const UI = (() => {
     const p = modalProj;
     const parsed = p && fullCache.get(p.dirName);
     if (!p || !parsed) {
-      const bar = host.querySelector('#pv-save-bar');
+      const bar = document.getElementById('pv-save-bar');
       if (bar) bar.firstElementChild.textContent = 'Stale editor state — reopen the project and re-apply the edits.';
       return;
     }
     if (!await ensureWrite()) return;
     saveInFlight = true;
-    const saveBtn = host.querySelector('#btn-save-edits');
+    const saveBtn = document.getElementById('btn-save-edits');
     if (saveBtn) saveBtn.disabled = true;
-    const bar = host.querySelector('#pv-save-bar');
-    const setBar = msg => { if (bar && bar.firstElementChild) bar.firstElementChild.textContent = msg; };
+    const bar = document.getElementById('pv-save-bar');
+    // The bar is the primary surface, but save failures are exactly when
+    // the UI may be mid-rebuild — mirror everything to the cache bar so a
+    // failed write can never be silent.
+    const setBar = msg => {
+      const b = document.getElementById('pv-save-bar');
+      if (b && b.firstElementChild) b.firstElementChild.textContent = msg;
+      setCacheBar(msg, !/fail|error|restored|changed on card/i.test(msg));
+    };
     const projPath = `projects/${p.dirName}`;
     const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
     let backedUp = false, original = null, committed = false;
@@ -12421,21 +12522,26 @@ const UI = (() => {
           types: [{description:'ZIP archive', accept:{'application/zip':['.zip']}}] });
         writable = await fh.createWritable();
       } catch(e) { if (e.name !== 'AbortError') setLog('err', e.message); return; }
-      const zip = new Zip.Writer(writable);
+      const sink = Zip.bufferedSink(writable);
+      const zip = new Zip.Writer(sink);
       try {
-        let count = 0;
+        let count = 0, bytes = 0;
         for (const [i, d] of dirNames.entries()) {
           setLog('ok', `Adding ${d} → ${destName(d, i)}…`);
           const pd = await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(d);
           for await (const entry of Scanner.walkFiles(pd, `${name}/projects/${destName(d, i)}`)) {
             const f = await entry.handle.getFile();
-            await zip.add(entry.path, new Uint8Array(await f.arrayBuffer()), f.lastModified);
-            count++;
+            const data = new Uint8Array(await f.arrayBuffer());
+            await zip.add(entry.path, data, f.lastModified);
+            count++; bytes += data.length;
+            if (count % 25 === 0) setLog('ok', `…${count} files, ${fmtBytes(bytes)} written`);
           }
         }
         await zip.finish();
+        await sink.flush();
+        setLog('ok', `Finalising ${name}.zip (${fmtBytes(bytes)})… the browser moves it into place when this finishes, which can take a moment on a synced folder.`);
         await writable.close();
-        setLog('ok', `Done — ${count} files.`);
+        setLog('ok', `Done — ${count} files, ${fmtBytes(bytes)}, saved as ${name}.zip.`);
       } catch(e) {
         try { await writable.abort?.(); } catch {}
         setLog('err', e.message||String(e));
@@ -12835,9 +12941,46 @@ const UI = (() => {
           } else $('btn-modal-play').click();
           return;
         }
+        // ⌥↓ drills into the hierarchy (grid cell → its chain → a phrase),
+        // ⌥↑ climbs back out — from anywhere in the patterns view,
+        // including with a cell focused.
+        if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+          const sec = $('modal-pattern-section');
+          if (!sec || sec.style.display === 'none') return;
+          e.preventDefault();
+          const phEl = sec.querySelector('#pv-phrase-detail');
+          const chEl = sec.querySelector('#pv-chain-detail');
+          const phraseOpen = phEl && phEl.style.display !== 'none' && phEl.dataset.phrase !== undefined;
+          const chainOpen = chEl && chEl.style.display !== 'none' && chEl.dataset.chain !== undefined;
+          if (e.key === 'ArrowDown') {
+            if (phraseOpen) return;                     // already at the bottom
+            if (chainOpen) {
+              // The first step that actually has a phrase — step 00 can
+              // be empty, and its placeholder span opens nothing.
+              sec.querySelector('.pv-cstep .cgo[data-p]')?.click();
+            }
+            else sec.querySelector('.pv-cell.cur.chain')?.click();
+          } else {
+            if (phraseOpen) {
+              // Back to the chain: the breadcrumb when there is one,
+              // otherwise just put the phrase panel away.
+              const crumb = sec.querySelector('.pe-crumb a');
+              if (crumb) crumb.click();
+              else phEl.style.display = 'none';
+            } else if (chainOpen) {
+              chEl.style.display = 'none';
+              chEl.removeAttribute('data-chain');
+              sec.querySelectorAll('.pv-cell.chain.hi').forEach(x => x.classList.remove('hi'));
+              const hint = sec.querySelector('#pv-side-hint');
+              if (hint) hint.style.display = '';
+              sec.querySelector('.pv-cell.cur')?.focus();
+            }
+          }
+          return;
+        }
         // Don't steal the arrows from an editor: the phrase grid, chain
         // steps and song grid all navigate with them. Project-to-project
-        // nav only applies when nothing editable has focus.
+        // nav only applies with no modifier and nothing editable focused.
         const a = document.activeElement;
         if (a && a.closest && a.closest('.pe-c, .pv-cell, .pv-cstep, .pick')) return;
         if (e.key === 'ArrowLeft') modalNav(-1);
@@ -12914,6 +13057,14 @@ const UI = (() => {
     };
     $('btn-usb-fx').addEventListener('click', () =>
       setFxPanel(!$('tab-device').classList.contains('fx-open')));
+    $('logo-home').addEventListener('click', e => {
+      e.preventDefault();
+      // Home = the Projects tab with everything layered above it closed.
+      closeSearch(); closeDiff(); closeFixModal(); closeSlicer(); closeGenerator();
+      $('samp-modal').classList.remove('open');
+      closeProjModal();
+      if (lib) switchTab('projects');
+    });
     setFxPanel(localStorage.getItem('ptFxDrawer') !== '0');
     Mirror.init();
 

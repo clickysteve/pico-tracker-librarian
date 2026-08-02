@@ -1,5 +1,51 @@
 # Changelog
 
+## v0.9.14 — the loop round: firmware playback semantics, and eight bits of polish
+
+**Playback now loops the way the device does.** Verified line by line
+against the open firmware's Player.cpp: each channel advances through
+the song grid independently; a chain ends at its first empty step; and
+when a channel's next row is blank (or holds a chain that starts empty),
+it loops back to the top of its contiguous group — blanks are loop-block
+separators, not rests. A channel whose start cell is blank stays silent,
+and content below a gap is only reachable by starting playback there
+(the gutter ▶ does exactly that). The song's length is the longest
+channel's single pass; looping channels fill it, in playback, in WAV
+renders and in stems. MIDI export stays a deliberate linear pass for DAW
+use, but no longer exports steps and rows the device can never reach.
+The demo card's NIGHTDRIVE was quietly non-idiomatic (staggered entries
+via blanks, which the device would never play) and has been fixed.
+
+**The rest of the round:**
+- The **PT LIBRARIAN title is a home button** (closes whatever is open,
+  back to Projects) and the **version number links to GitHub**.
+- **One save bar.** Grid, phrase, chain, table and groove edits now share
+  a single consolidated bar anchored to the project workspace, visible on
+  every tab, instead of stacking one bar per tab.
+- **Set ZIP export unstuck.** File System Access writes cost real time
+  per call, and the zip writer was making thousands of tiny ones — the
+  export looked hung and the finished file could take an age to appear.
+  Writes are now batched into 4MB chunks (the card backup ZIP too), with
+  live file/byte progress and an honest "finalising" message, since the
+  browser only moves the file into place at the very end — slow on a
+  Dropbox-synced destination.
+- **⌥↓ / ⌥↑ walk the editor hierarchy**: grid cell → its chain → a
+  phrase, and back out, from anywhere in the patterns view.
+- **README refreshed** with screenshots throughout.
+
+**Found by review, before shipping**
+- Moving the save bar broke the save path's own progress and FAILURE
+  messages — a failed write could report nothing at all. Save feedback
+  now also mirrors to the status bar, so it cannot be silent.
+- ⌥↓ into a chain whose first step is empty opened a "Phrase NaN"
+  editor whose edits were silently dropped; the same latent bug was
+  reachable by clicking the disabled edit placeholder.
+- The playback walk's safety counter could silently truncate dense
+  1024-row songs and starve fast-looping channels against slow ones; it
+  is now sized from the song's own geometry and tick budget.
+- Stems on a project with nothing playable at row 00 threw a raw
+  TypeError instead of explaining the (new, device-accurate) reason.
+
 ## v0.9.13 — play from here, and an unmissable cursor
 
 Two pieces of real-device feedback.

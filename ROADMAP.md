@@ -26,6 +26,9 @@ actually audible rather than theoretical:
 
 - **`pingpong` loops play forward.** Web Audio has no ping-pong loop mode;
   it needs manual scheduling or a reversed buffer.
+- ~~Song-grid group looping~~ — fixed in 0.9.14: channels loop their
+  contiguous blocks exactly as Player.cpp does, verified against the
+  firmware source.
 - **Advance `SAMPLESOURCE` amp envelopes aren't applied**, so notes sustain
   until the next one instead of decaying. On projects where every
   instrument loops, this is the most noticeable difference from the

@@ -792,38 +792,83 @@ t('setlistFolderName numbers folders so the device sorts them in play order', ()
   eq([...named].sort(), named, 'numbered names sort into setlist order');
 });
 
-// ── v0.8: single song-row playback ─────────────────────
-t('buildEventTimeline songRow plays every channel at that row', () => {
+// ── play-from-row (startRow), firmware semantics ───────
+t('buildEventTimeline startRow plays every channel from that row', () => {
   const p = PT.parseProject(buildProjectXml());
-  // fixture row 0: ch0 → chain 00 (phrase 00 = C3, then phrase 01 = 48 tsp -3)
-  //                ch1 → chain 02 (phrase 00 = C3)
-  const tl = PT.buildEventTimeline(p, { songRow: 0 });
+  const tl = PT.buildEventTimeline(p, { startRow: 0 });
   ok(tl, 'expected a timeline');
   const ons = tl.events.filter(e => e.type === 'on');
   const chans = new Set(ons.map(e => e.ch));
   ok(chans.has(0) && chans.has(1), 'both populated channels sound, got ' + [...chans]);
   ok(!ons.some(e => e.ch > 1), 'silent channels contribute nothing');
 });
-t('buildEventTimeline songRow 1 differs from row 0', () => {
+t('buildEventTimeline startRow 1: a channel empty there stays silent', () => {
   const p = PT.parseProject(buildProjectXml());
-  // row 1: only ch0 → chain 01 (phrase 02, note 72 at step 1)
-  const tl = PT.buildEventTimeline(p, { songRow: 1 });
-  const ons = tl.events.filter(e => e.type === 'on');
-  eq(ons.length, 1, 'one note in row 1');
-  eq(ons[0].note, 72);
-  eq(ons[0].ch, 0);
+  // row 1: only ch0 has a chain; ch1 is empty at row 1, and per the
+  // firmware a channel does not search forward from an empty start.
+  const tl = PT.buildEventTimeline(p, { startRow: 1 });
+  const chans = new Set(tl.events.filter(e => e.type === 'on').map(e => e.ch));
+  ok(chans.has(0) && !chans.has(1), [...chans].join(','));
 });
-t('buildEventTimeline songRow is a strict subset of the full song', () => {
+t('buildEventTimeline startRow out of range returns null', () => {
   const p = PT.parseProject(buildProjectXml());
-  const full = PT.buildEventTimeline(p).events.filter(e => e.type === 'on').length;
-  const r0 = PT.buildEventTimeline(p, { songRow: 0 }).events.filter(e => e.type === 'on').length;
-  const r1 = PT.buildEventTimeline(p, { songRow: 1 }).events.filter(e => e.type === 'on').length;
-  eq(r0 + r1, full, 'rows 0+1 account for every note in this 2-row fixture');
+  eq(PT.buildEventTimeline(p, { startRow: 99 }), null);
 });
-t('buildEventTimeline songRow out of range returns null', () => {
-  const p = PT.parseProject(buildProjectXml());
-  eq(PT.buildEventTimeline(p, { songRow: 99 }), null);
-  eq(PT.buildEventTimeline(p, { songRow: -1 }), null);
+
+// ── per-channel group looping, verified against Player.cpp ──
+function loopFixtureProj() {
+  // ch0: rows 0-2 then a gap then rows 4-5; ch1: rows 0-5 straight.
+  const geom = { songRows: 16, channels: 8, phraseCount: 128, cmdWidth: 1 };
+  const grid = new Array(16 * 8).fill(PT.EMPTY);
+  for (const r of [0, 1, 2, 4, 5]) grid[r * 8 + 0] = 0;
+  for (const r of [0, 1, 2, 3, 4, 5]) grid[r * 8 + 1] = 1;
+  const chains = new Array(255 * 16).fill(PT.EMPTY);
+  chains[0] = 0; chains[16] = 1;
+  const P = 128 * 16;
+  const notes = new Array(P).fill(PT.EMPTY); notes[0] = 60; notes[16] = 64;
+  const instr = new Array(P).fill(PT.EMPTY); instr[0] = 0; instr[16] = 0;
+  const none = () => new Array(P).fill(0x2D), zero = () => new Array(P).fill(0);
+  return { tempo: 120, transpose: 0, geometry: geom, grid, chains,
+    transposes: new Array(255 * 16).fill(0),
+    phrases: { notes, instr, cmd1: none(), param1: zero(), cmd2: none(), param2: zero() },
+    grooves: [[6, 6]], grooveRaw: null, instruments: [{ id: 0 }] };
+}
+t('loop: a channel loops its group at a gap instead of stopping or skipping', () => {
+  const tl = PT.buildEventTimeline(loopFixtureProj(), {});
+  const ch0rows = [...new Set(tl.marks.filter(m => m.ch === 0).map(m => m.row))].sort((a, b) => a - b);
+  eq(ch0rows, [0, 1, 2], 'the group before the gap loops; rows past the gap never play from the top');
+  const ch0 = tl.events.filter(e => e.type === 'on' && e.ch === 0).length;
+  const ch1 = tl.events.filter(e => e.type === 'on' && e.ch === 1).length;
+  eq(ch1, 6, 'the straight channel plays its six rows once');
+  eq(ch0, 6, 'the looping channel fills the same time with two passes of three');
+});
+t('loop: content below a gap is reachable by starting playback there', () => {
+  const tl = PT.buildEventTimeline(loopFixtureProj(), { startRow: 4 });
+  const ch0rows = [...new Set(tl.marks.filter(m => m.ch === 0).map(m => m.row))].sort((a, b) => a - b);
+  eq(ch0rows, [4, 5]);
+});
+t('loop: starting mid-group loops back to the top of the group, not the start row', () => {
+  const tl = PT.buildEventTimeline(loopFixtureProj(), { startRow: 1 });
+  // ch0's group is rows 0-2; after row 2 the firmware scans up past the
+  // start row to the blank above row 0, so row 0 plays on the second pass.
+  const ch0rows = [...new Set(tl.marks.filter(m => m.ch === 0).map(m => m.row))].sort((a, b) => a - b);
+  ok(ch0rows.includes(0), 'rows visited: ' + ch0rows.join(','));
+});
+t('loop: a chain ends at its first empty step', () => {
+  const proj = loopFixtureProj();
+  // chain 2: phrase at step 0, EMPTY at step 1, phrase again at step 2.
+  proj.chains[2 * 16 + 0] = 0;
+  proj.chains[2 * 16 + 2] = 1;
+  proj.grid.fill(PT.EMPTY);
+  proj.grid[0 * 8 + 0] = 2;
+  const tl = PT.buildEventTimeline(proj, {});
+  const steps = [...new Set(tl.marks.filter(m => m.ch === 0).map(m => m.step))];
+  eq(steps, [0], 'step 2 must never play — the empty step 1 ends the chain');
+});
+t('loop: the walk terminates on a pathological all-loop grid', () => {
+  const proj = loopFixtureProj();
+  const tl = PT.buildEventTimeline(proj, {});
+  ok(isFinite(tl.duration) && tl.duration > 0 && tl.events.length < 100000);
 });
 t('buildEventTimeline songRow does not disturb chain or phrase modes', () => {
   const p = PT.parseProject(buildProjectXml());

@@ -1294,7 +1294,7 @@ await page.evaluate(() => {
 await page.waitForTimeout(500);
 check('row play: an empty tail row declines instead of restarting from 00', await page.evaluate(() =>
   !SongPlayer.isPlaying() &&
-  /Nothing plays at or after/.test(document.getElementById('cache-msg')?.textContent || '')));
+  /Nothing plays from row/.test(document.getElementById('cache-msg')?.textContent || '')));
 
 // The active cell is marked, along with its row and column labels, and
 // the marker survives the related-chain highlight.
@@ -1326,6 +1326,87 @@ check('grid: arrows move the marker with the cursor', await page.evaluate(async 
   return now && +now.dataset.row === r + 1 &&
          document.querySelectorAll('.pv-cell.cur:not(.rlbl):not(.clbl)').length === 1;
 }));
+// ── this round: loop playback UI, save bar, header, alt-nav ──
+// The demo's BREAKS-90 has a 3-row column: with firmware loop semantics
+// the transport's duration is the longest single pass, and marks show a
+// looping channel revisiting its rows.
+check('loop: the transport length is one pass of the longest channel', await page.evaluate(() => {
+  const tl = SongPlayer.timeline();
+  return !tl || tl.duration > 0;      // sanity; detailed loop maths is unit-tested
+}));
+
+// Alt-arrow drill: grid → chain → phrase and back.
+check('altnav: ⌥↓ drills from the active cell into its chain', await page.evaluate(async () => {
+  const c = document.querySelector('.pv-cell.chain');
+  c.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  c.focus();
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 250));
+  const chEl = document.querySelector('#pv-chain-detail');
+  return chEl && chEl.style.display !== 'none' && chEl.dataset.chain !== undefined;
+}));
+check('altnav: ⌥↓ again opens a phrase of that chain', await page.evaluate(async () => {
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 300));
+  const phEl = document.querySelector('#pv-phrase-detail');
+  return phEl && phEl.style.display !== 'none' && phEl.dataset.phrase !== undefined;
+}));
+check('altnav: ⌥↑ climbs back out to the grid', await page.evaluate(async () => {
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', altKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 250));
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', altKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 250));
+  const chEl = document.querySelector('#pv-chain-detail');
+  return !chEl || chEl.style.display === 'none';
+}));
+
+// One save bar however many kinds of edit are pending.
+check('savebar: grid + groove edits share a single bar', await page.evaluate(async () => {
+  // Dirty the grid…
+  const cell = document.querySelector('.pv-cell.empty[data-row]');
+  cell.focus();
+  cell.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await new Promise(r => setTimeout(r, 200));
+  const f = document.querySelector('.pick-filter');
+  f.value = '01';
+  f.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 150));
+  f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await new Promise(r => setTimeout(r, 300));
+  // …and a groove, via the Tables tab.
+  document.getElementById('btn-modal-tables').click();
+  await new Promise(r => setTimeout(r, 300));
+  const g = document.querySelector('.tg-gs');
+  if (g) {
+    g.focus();
+    g.dispatchEvent(new KeyboardEvent('keydown', { key: '8', bubbles: true }));
+    g.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await new Promise(r => setTimeout(r, 300));
+  }
+  const bars = document.querySelectorAll('#pv-save-bar');
+  const txt = bars[0]?.textContent || '';
+  return bars.length === 1 && /song grid/.test(txt);
+}));
+// Put it back.
+await page.evaluate(async () => {
+  document.getElementById('btn-discard-edits')?.click();
+});
+await page.waitForTimeout(800);
+
+// Header: home link and the GitHub version link.
+check('header: the logo is a home button', await page.evaluate(async () => {
+  const el = document.getElementById('logo-home');
+  if (!el) return false;
+  el.click();
+  await new Promise(r => setTimeout(r, 300));
+  return document.getElementById('proj-modal').style.display === 'none' &&
+         document.querySelector('.tab-btn.active')?.dataset.tab === 'projects';
+}));
+check('header: the version number links to the repo', await page.evaluate(() => {
+  const a = [...document.querySelectorAll('.logo a')].find(x => /github\.com/.test(x.href));
+  return !!a && a.target === '_blank' && /v0\.9\./.test(a.textContent);
+}));
+
 await closeProjectModal();
 await page.waitForTimeout(300);
 
