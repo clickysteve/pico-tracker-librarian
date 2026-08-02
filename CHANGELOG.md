@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.0.1 — MIDI stems, and MIDI instruments treated as MIDI
+
+The first from-the-wild request: proper MIDI export for MIDI
+instruments.
+
+- **⬇ MIDI stems** next to the audio stems: one `.mid` per channel that
+  plays, zipped. Each stem is a type-1 SMF with its own tempo track, so
+  a DAW picks up the BPM file by file.
+- **MIDI instruments now export as MIDI instruments**, in both the
+  combined export and the stems: their notes land on the instrument's
+  configured `channel` (not the tracker channel), at the firmware's
+  initial velocity (127), and their `note length` counts down in device
+  ticks to a real note-off — all three read from the firmware source.
+  Sample-channel notes stay on their own track channel at a neutral
+  velocity, as before.
+- A phrase step that names a note but no instrument now keeps the
+  channel's last instrument in the export, matching how phrases are
+  actually written.
+- `VELM` velocity commands are not yet simulated (the librarian's
+  command table doesn't carry them); MIDI notes export at velocity 127.
+
+
 ## v1.0.0 Beta — into the wild
 
 No new features: v0.9.18 promoted to beta, on Steve's call. The version

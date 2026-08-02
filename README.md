@@ -1,6 +1,6 @@
 # picoTracker Librarian
 
-A librarian and arrangement editor for [picoTracker](https://xiphonics.com/) SD cards that runs entirely in your browser — pico and Advance cards alike. Browse and audit your projects, instruments, samples and themes; hear a song without leaving the page; edit the arrangement, phrases, slice points and instrument parameters; find and repair broken sample references; build ordered setlists; export MIDI. One HTML file, no install, no server, and no data ever leaves your machine.
+A librarian and arrangement editor for [picoTracker](https://xiphonics.com/) SD cards that runs entirely in your browser — pico and Advance cards alike. Browse and audit your projects, instruments, samples and themes; hear a song without leaving the page; edit the arrangement, phrases, slice points and instrument parameters; find and repair broken sample references; build ordered setlists; export MIDI — whole song or per-channel stems, with MIDI instruments on their configured channels. One HTML file, no install, no server, and no data ever leaves your machine.
 
 Sibling project to [M8 Librarian](https://m8librarian.allmyfriendsaresynths.com), same architecture and safety model.
 
@@ -75,7 +75,7 @@ All edits are held in memory until you explicitly save, and every save goes thro
 - **Compare** — diff two projects: shared and unique instruments and samples, metadata side by side.
 - **Song map** — the arrangement drawn wide, with named section bands you drag out over the rows and notes pinned to a row ("Intro", "drop", "repeat x2"). Exports as PNG or SVG for a setlist or a rehearsal sheet, and saves to `PTLibrarian_map.json` on the card so a marked-up map travels with the project.
 - **Render to WAV** — bounce a project to a stereo 16-bit WAV, or to **stems**, one WAV per channel that plays, delivered as a single zip. Rendered offline through the same scheduling as the preview, so it sounds like what you heard, with live progress on the buttons while it works.
-- **MIDI export** — download any project as a Standard MIDI File (type 1, 24 PPQ, a tempo track plus one track per channel that plays anything, chain and project transpose applied, per-channel `GRV` groove switches and `HOP` flow honoured).
+- **MIDI export** — download any project as a Standard MIDI File (type 1, 24 PPQ, a tempo track plus one track per channel that plays anything, chain and project transpose applied, per-channel `GRV` groove switches and `HOP` flow honoured), or as **MIDI stems**: one `.mid` per playing channel, zipped, each with its own tempo track. Notes played by a `MIDI` instrument export on that instrument's configured channel at the firmware's velocity, with its `note length` producing a real note-off — so a project driving hardware exports ready to drive the same hardware from a DAW.
 
 ### Device (USB)
 
@@ -135,10 +135,10 @@ The entire app is a single `index.html` — deliberately, so it can be hosted an
 Tests are zero-dependency Node scripts that extract modules straight out of `index.html`, so they always run against the shipped code:
 
 ```bash
-node tests/parser.test.mjs   # 187 unit tests: formats, MIDI timing, slice/loop units, islands, pingpong, round-trips, generators, scales, audio analysis
+node tests/parser.test.mjs   # 191 unit tests: formats, MIDI timing, slice/loop units, islands, pingpong, round-trips, generators, scales, audio analysis
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
 node tests/audio.test.mjs    # renders the mix and a WAV export offline: no clipping, correct slice offsets, valid stems
-node tests/e2e.mjs           # 309 browser checks (needs: npm i -D playwright)
+node tests/e2e.mjs           # 310 browser checks (needs: npm i -D playwright)
 ```
 
 The parser tests run round-trip checks against real Advance project files when they're present locally; those files are not in this repository.

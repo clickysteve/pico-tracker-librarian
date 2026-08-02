@@ -1119,7 +1119,7 @@
     <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
       <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
          title="Source, issues and release notes on GitHub"
-         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.0.0 Beta</a>
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.0.1 Beta</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -1479,7 +1479,8 @@
       <span class="proj-modal-title" id="modal-title"></span>
       <span class="proj-modal-meta" id="modal-meta"></span>
       <button class="btn sm" id="btn-modal-play" title="Play this project in the browser (approximate — sample channels only)">▶ Play</button>
-      <button class="btn ghost sm" id="btn-modal-midi" title="Export as a Standard MIDI File">⬇ MIDI</button>
+      <button class="btn ghost sm" id="btn-modal-midi" title="Export as one Standard MIDI File — a track per channel; MIDI instruments keep their configured channel">⬇ MIDI</button>
+      <button class="btn ghost sm" id="btn-modal-midistems" title="One .mid per channel that plays, zipped — the MIDI counterpart of the audio stems">⬇ MIDI stems</button>
       <button class="btn ghost sm" id="btn-modal-wav" title="Render the song to a WAV file">⬇ WAV</button>
       <button class="btn ghost sm" id="btn-modal-stems" title="Render one WAV per channel that plays">⬇ Stems</button>
       <button class="btn ghost sm" id="btn-modal-diff">⇌ Compare</button>
@@ -2403,7 +2404,13 @@ const PT = (() => {
   // chains end at their first empty step, and a channel's walk ends at
   // its first gap (content below a gap is a separate loop-block the
   // device only reaches when started there).
-  function buildMidi(proj, name) {
+  // The shared walk behind both MIDI exports. Notes played by a MIDI
+  // instrument export on ITS configured channel with the firmware's
+  // initial velocity (0x7F) and its note-length countdown (device ticks,
+  // which match the SMF division 1:1); everything else stays on the
+  // track's own channel at a neutral velocity. A step without an
+  // instrument keeps the channel's last one, as entry conventions assume.
+  function buildMidiTracks(proj) {
     const island = mainIsland(proj);
     if (!island) return null;
     const CMD_KIL = 0x1E, CMD_HOP = 0x1B, CMD_GRV = 0x1A;
@@ -2411,14 +2418,28 @@ const PT = (() => {
       const steps = (proj.grooves[g] || []).filter(v => v > 0 && v <= 0x80);
       return steps.length ? steps : [6];
     };
+    const instrOf = new Map(proj.instruments.map(i => [i.id, i]));
+    const midiMeta = id => {
+      const i = instrOf.get(id);
+      if (!i || i.type !== 'MIDI') return null;
+      const q = i.params || {};
+      const ch = parseInt(q.channel, 10);
+      const len = parseInt(q['note length'], 10);
+      return { ch: Number.isFinite(ch) ? Math.max(0, Math.min(15, ch)) : 0,
+               len: Number.isFinite(len) && len > 0 ? len : 0 };
+    };
 
     const tracks = [];
     for (let t = 0; t < CHANNELS; t++) {
       const ev = [];
-      let tick = 0, open = null;
+      let tick = 0, open = null, openOffAt = 0, lastInstr = EMPTY;
       // per-channel groove state (GRV switches it; position resets)
       let gSteps = grooveOf(0), gPos = 0, trackHopEntry = 0;
-      const noteOff = at => { if (open !== null) { ev.push({tick: at, data: [0x80 | t, open, 0x40]}); open = null; } };
+      const noteOff = at => {
+        if (open !== null) { ev.push({tick: at, data: [0x80 | open.mch, open.note, 0x40]}); open = null; openOffAt = 0; }
+      };
+      // a MIDI instrument's note length ends the note early, mid-step
+      const dueOff = at => { if (open !== null && openOffAt && openOffAt <= at) noteOff(openOffAt); };
       let started = false;
       // The export walks the MAIN island (the longest contiguous block of
       // rows), the same section the preview plays — one linear pass.
@@ -2451,24 +2472,50 @@ const PT = (() => {
             }
             const dur = gSteps[gPos % gSteps.length];
             gPos++;
+            dueOff(tick);
             if (st.cmd1 === CMD_KIL || st.cmd2 === CMD_KIL || st.note === NOTE_OFF) noteOff(tick);
             if (st.note !== EMPTY && st.note !== NOTE_OFF && st.note <= 119) {
+              if (st.instr !== EMPTY) lastInstr = st.instr;
               const note = st.note + transpose + proj.transpose;
               if (note >= 0 && note <= 127) {
+                const mm = midiMeta(lastInstr);
                 noteOff(tick);
-                ev.push({tick, data: [0x90 | t, note, 100]});
-                open = note;
+                const mch = mm ? mm.ch : t & 0xF;
+                ev.push({tick, data: [0x90 | mch, note, mm ? 0x7F : 100]});
+                open = { note, mch };
+                openOffAt = mm && mm.len ? tick + mm.len : 0;
               }
             }
             tick += dur;
           }
         }
       }
+      dueOff(tick);
       noteOff(tick);
       if (ev.length) tracks.push({idx: t, ev});
     }
-    if (!tracks.length) return null;
+    return tracks.length ? tracks : null;
+  }
 
+  function buildMidi(proj, name) {
+    const tracks = buildMidiTracks(proj);
+    if (!tracks) return null;
+    return encodeSmf(name, tracks, proj.tempo);
+  }
+
+  // One SMF per channel that plays something — the MIDI counterpart of
+  // the audio stems. Each file is a type-1 SMF (tempo track + the
+  // channel's track) so DAWs pick the tempo up file by file.
+  function buildMidiStems(proj, name) {
+    const tracks = buildMidiTracks(proj);
+    if (!tracks) return null;
+    return tracks.map(tr => ({
+      name: `ch${tr.idx + 1}.mid`,
+      bytes: encodeSmf(`${name || 'PT PROJECT'} ch${tr.idx + 1}`, [tr], proj.tempo),
+    }));
+  }
+
+  function encodeSmf(name, tracks, tempo) {
     const enc = typeof TextEncoder !== 'undefined' ? new TextEncoder() : { encode: s => Uint8Array.from(s, ch => ch.charCodeAt(0)) };
     // note: concat-based (no spread of whole tracks) — spreading a large
     // track as call arguments overflows the stack on note-dense songs
@@ -2492,7 +2539,7 @@ const PT = (() => {
       body.push(0x00, 0xFF, 0x2F, 0x00);
       return chunk('MTrk', body);
     }
-    const bpm = proj.tempo && proj.tempo > 0 ? proj.tempo : 120;
+    const bpm = tempo && tempo > 0 ? tempo : 120;
     const usPerQ = Math.round(60000000 / bpm);
     const t0 = [
       {tick: 0, data: meta(0x03, [...enc.encode(name || 'PT PROJECT')])},
@@ -3122,7 +3169,7 @@ const PT = (() => {
     rewriteInstrumentSlices, rewriteInstrumentParams, detectOnsets, snapZeroCross,
     parseProject, parsePti, parseTheme, parseConfig, parseInstrumentEl,
     parseWavHeader, rewriteSampleRef,
-    noteStr, cmdName, fxStr, hx2, hx4, colorHex, detectScales, buildMidi,
+    noteStr, cmdName, fxStr, hx2, hx4, colorHex, detectScales, buildMidi, buildMidiStems,
     geom, gridCell, chainStep, phraseStep, lastSongRow, usedChains, usedPhrases, usedInstrumentIds,
     SONG_ROWS, CHANNELS, CHAIN_COUNT, PHRASE_COUNT, STEPS, TABLE_COUNT, GROOVE_COUNT,
     EMPTY, NOTE_OFF, CMD_NONE, SLICE_NOTE_BASE, MAX_SLICES,
@@ -10463,6 +10510,28 @@ const UI = (() => {
     a.download = `${modalProj.name}.mid`;
     a.click(); URL.revokeObjectURL(a.href);
   }
+  async function exportMidiStems() {
+    if (!modalProj) return;
+    let parsed = fullCache.get(modalProj.dirName);
+    if (!parsed) { try { parsed = (await readProjectFull(modalProj)).parsed; } catch { return; } }
+    const safe = modalProj.name.replace(/[^\w.-]+/g, '_');
+    const files = PT.buildMidiStems(parsed, modalProj.name);
+    if (!files) { setCacheBar('Nothing to export — the song grid is empty.', false); return; }
+    const parts = [];
+    const sink = { write: async u8 => { parts.push(u8); } };
+    const zip = new Zip.Writer(sink);
+    for (const f of files) await zip.add(`${safe}_${f.name}`, f.bytes);
+    await zip.finish();
+    const blob = new Blob(parts, { type: 'application/zip' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${safe}_midi_stems.zip`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    const midiCount = parsed.instruments.filter(i => i.type === 'MIDI').length;
+    setCacheBar(`Exported ${files.length} MIDI stem${files.length > 1 ? 's' : ''}` +
+      (midiCount ? ` — MIDI instruments keep their configured channels.` : '.'), true);
+  }
 
   // ── Compare / diff ─────────────────────────────────────
   function startDiff(p) {
@@ -12965,6 +13034,7 @@ const UI = (() => {
     $('btn-modal-tables').addEventListener('click', toggleTablesView);
     $('btn-modal-map').addEventListener('click', toggleMapView);
     $('btn-modal-midi').addEventListener('click', exportMidi);
+    $('btn-modal-midistems').addEventListener('click', exportMidiStems);
     $('btn-modal-diff').addEventListener('click', () => modalProj && startDiff(modalProj));
 
     // Diff

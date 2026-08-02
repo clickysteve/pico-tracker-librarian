@@ -300,7 +300,7 @@ function readSmf(u8) {
       let st = u8[p];
       if (st & 0x80) { p++; run = st; } else st = run;
       if (st === 0xFF) { const ty = u8[p++]; let l = 0; do { b = u8[p++]; l = (l<<7)|(b&0x7F); } while (b & 0x80); p += l; evs.push({tick, meta:ty}); }
-      else if ((st & 0xF0) === 0x90 || (st & 0xF0) === 0x80) { evs.push({tick, st: st & 0xF0, note: u8[p], vel: u8[p+1]}); p += 2; }
+      else if ((st & 0xF0) === 0x90 || (st & 0xF0) === 0x80) { evs.push({tick, st: st & 0xF0, ch: st & 0x0F, note: u8[p], vel: u8[p+1]}); p += 2; }
       else if ((st & 0xF0) === 0xC0 || (st & 0xF0) === 0xD0) p += 1;
       else p += 2;
     }
@@ -975,6 +975,59 @@ t('midi: the export walks the main island, matching the preview', () => {
   const proj = islandFixtureProj();
   const bytes = PT.buildMidi(proj, 'ISLANDS');
   ok(bytes && bytes.length > 30, 'an island song must export');
+});
+
+// ── v1.0.1: MIDI instruments and MIDI stems ────────────
+function midiFixtureProj() {
+  const proj = loopFixtureProj();
+  proj.grid.fill(PT.EMPTY);
+  proj.grid[0 * 8 + 0] = 0;   // ch0 → chain 0 → phrase 0 (note 60, instr 0: MIDI)
+  proj.grid[0 * 8 + 1] = 1;   // ch1 → chain 1 → phrase 1 (note 64, instr 1: SAMPLE)
+  proj.phrases.instr[16] = 1;
+  proj.instruments = [
+    { id: 0, type: 'MIDI', params: { channel: '5', 'note length': '4' } },
+    { id: 1, type: 'SAMPLE', params: {} },
+  ];
+  return proj;
+}
+t('midi: a MIDI instrument exports on ITS channel, fw velocity, note length', () => {
+  const smf = readSmf(PT.buildMidi(midiFixtureProj(), 'M'));
+  const evs = smf.tracks.flat();
+  const on5 = evs.find(e => e.st === 0x90 && e.ch === 5);
+  ok(on5, 'MIDI instrument note-on lands on its configured channel 5');
+  eq(on5.vel, 0x7F, 'firmware initial velocity');
+  const off5 = evs.find(e => e.st === 0x80 && e.ch === 5);
+  ok(off5 && off5.tick - on5.tick === 4,
+     `note length 4 device ticks (got ${off5 ? off5.tick - on5.tick : 'no off'})`);
+  const onSmp = evs.find(e => e.st === 0x90 && e.ch === 1);
+  ok(onSmp && onSmp.vel === 100, 'sample instrument stays on its track channel at vel 100');
+});
+t('midi: a step without an instrument keeps the channel\'s last one', () => {
+  const proj = midiFixtureProj();
+  // phrase 0: second note at step 4 with NO instrument — still the MIDI one
+  proj.phrases.notes[4] = 62;
+  const evs = readSmf(PT.buildMidi(proj, 'M')).tracks.flat();
+  const ons5 = evs.filter(e => e.st === 0x90 && e.ch === 5);
+  eq(ons5.length, 2, 'both notes ride the MIDI instrument channel');
+});
+t('midi stems: one type-1 file per playing channel, same division', () => {
+  const files = PT.buildMidiStems(midiFixtureProj(), 'M');
+  ok(files && files.length === 2, `expected 2 stems, got ${files && files.length}`);
+  eq(files.map(f => f.name), ['ch1.mid', 'ch2.mid']);
+  for (const f of files) {
+    const smf = readSmf(f.bytes);
+    eq(smf.ntrks, 2, 'tempo track + the channel track');
+    eq(smf.div, 24);
+  }
+  const a = readSmf(files[0].bytes).tracks.flat().filter(e => e.st === 0x90);
+  const b = readSmf(files[1].bytes).tracks.flat().filter(e => e.st === 0x90);
+  ok(a.length && a.every(e => e.ch === 5), 'stem 1 carries only the MIDI-channel notes');
+  ok(b.length && b.every(e => e.ch === 1), 'stem 2 carries only the sample-track notes');
+});
+t('midi stems: null for an empty grid', () => {
+  const proj = loopFixtureProj();
+  proj.grid.fill(PT.EMPTY);
+  eq(PT.buildMidiStems(proj, 'X'), null);
 });
 
 // ── v0.8: chain colours grouped by high nibble ─────────

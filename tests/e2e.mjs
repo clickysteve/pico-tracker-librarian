@@ -2489,6 +2489,38 @@ check('stems: one zip comes down, not a burst of wavs',
   dl.length === 1 && /_stems\.zip$/.test(dl[0]));
 check('stems: the button returns to its idle label', await page.evaluate(() =>
   document.getElementById('btn-modal-stems').textContent.includes('Stems')));
+
+// MIDI stems: the same split as the audio stems, as .mid files in a zip.
+// Capture the blob rather than the download, then walk the zip's local
+// headers: store-method entries put the SMF bytes right after the name.
+check('midi stems: the zip holds one MThd-led .mid per playing channel', await page.evaluate(async () => {
+  const real = URL.createObjectURL;
+  const realClick = HTMLAnchorElement.prototype.click;
+  let captured = null;
+  URL.createObjectURL = b => { captured = b; return 'blob:midistemtest'; };
+  HTMLAnchorElement.prototype.click = function () {};   // no navigation to the fake URL
+  try {
+    document.getElementById('btn-modal-midistems').click();
+    await new Promise(r => setTimeout(r, 800));
+  } finally { URL.createObjectURL = real; HTMLAnchorElement.prototype.click = realClick; }
+  if (!captured) return false;
+  const u8 = new Uint8Array(await captured.arrayBuffer());
+  const files = [];
+  for (let i = 0; i + 30 < u8.length; ) {
+    if (!(u8[i] === 0x50 && u8[i+1] === 0x4B && u8[i+2] === 3 && u8[i+3] === 4)) break;
+    const nlen = u8[i+26] | (u8[i+27] << 8);
+    const xlen = u8[i+28] | (u8[i+29] << 8);
+    const csize = u8[i+18] | (u8[i+19] << 8) | (u8[i+20] << 16) | (u8[i+21] << 24);
+    const name = String.fromCharCode(...u8.slice(i+30, i+30+nlen));
+    const head = String.fromCharCode(...u8.slice(i+30+nlen+xlen, i+30+nlen+xlen+4));
+    files.push({ name, head });
+    i += 30 + nlen + xlen + csize;
+  }
+  // however many channels this project plays, each stem is a real SMF
+  // (the exact per-channel split is unit-tested in parser.test.mjs)
+  return files.length >= 1 &&
+         files.every(f => /\.mid$/.test(f.name) && f.head === 'MThd');
+}));
 await closeProjectModal();
 await page.waitForTimeout(300);
 
