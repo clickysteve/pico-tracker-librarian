@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.0.0 Beta — into the wild
+
+No new features: v0.9.18 promoted to beta, on Steve's call. The version
+string, the service-worker cache and the README's warning move from
+alpha to beta, and the README gains a plain statement of what the
+player deliberately does not do (SID/OPAL voices, most FX, Advance amp
+envelopes, remote input) so expectations are set before the first bug
+report rather than after.
+
+Where 1.0 stands, for the record: every write is backed up to the card
+and verified byte-for-byte with rollback; deletes go through an on-card
+trash; playback follows the firmware's own loop semantics, verified
+against the source, with island arrangements, endless device-style
+looping and true pingpong loops; and the suites stand at 187 unit
+tests, 2,315 fuzz parses, 14 offline-audio checks and 309 browser
+checks, all green.
+
+
 ## v0.9.18 — from the pattern editor to the instrument
 
 - **Jump to an instrument's edit screen from the pattern editor.** Three

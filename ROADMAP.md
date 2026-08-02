@@ -2,8 +2,8 @@
 
 Gathered from real-device testing feedback. Roughly in priority order.
 
-**1.0 is gated on Steve's say-so** — versions stay in the `0.9.x` range
-until then, however substantial a round turns out to be.
+**1.0.0 Beta shipped** on Steve's call (2026-08-02). Versions now move
+normally; this file keeps tracking what's known to be missing.
 
 ## Next
 

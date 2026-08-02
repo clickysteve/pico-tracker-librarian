@@ -8,9 +8,9 @@ Sibling project to [M8 Librarian](https://m8librarian.allmyfriendsaresynths.com)
 
 Requires Chrome or Edge (it uses the File System Access API to read your card; Firefox and Safari don't support it).
 
-> ## ⚠ Experimental — back up your projects first
+> ## ⚠ Beta — back up your projects first
 >
-> This is alpha software that **writes to your SD card**. Reading and browsing are safe and well exercised; the editing features (arrangement, phrases, slice points, instrument parameters, themes) are newer and have had far less real-world use.
+> This is beta software that **writes to your SD card**. Reading and browsing are safe and well exercised; the editing features (arrangement, phrases, slice points, instrument parameters, themes) have been through many rounds of real-card use and review, but they are younger than the browsing side.
 >
 > Every write backs the original up to `PTLibrarian_Backups/` on the card, verifies the result byte-for-byte and rolls back on failure, and deletions go to a trash folder rather than vanishing. That is not a substitute for your own backup. **Copy your card, or at least the projects you care about, before editing anything.** Use at your own risk.
 
@@ -147,8 +147,10 @@ The USB mirror's font is the 8x8 Wide face and special-glyph page by nILS (publi
 
 The mirror's output effects are a reimplementation of the filter set from [DMG Darkroom](https://github.com/clickysteve/dmg-darkroom) (MIT, same author): the effect list, parameter ranges and many of the tuned constants are carried over, but the filters themselves are rewritten from 2D-canvas passes over a still image into one WebGL shader pass that runs at video rate.
 
-## Status
+## Status and known limitations
 
-Alpha, and versioned accordingly — see the warning at the top before you edit anything. `CHANGELOG.md` records what changed and why, including the bugs found and how they were caught; `ROADMAP.md` lists what's known to be missing, including where playback still differs from the device.
+Beta, as of v1.0.0 — see the warning at the top before you edit anything. `CHANGELOG.md` records what changed and why, including the bugs found and how they were caught; `ROADMAP.md` lists what's known to be missing.
+
+What the player deliberately does not do, so nobody has to discover it the hard way: it is an honest sketch of the song, not an emulation of the device. Synth voices (SID/OPAL) are silent, most FX commands beyond `VOL`/`PAN`/`KIL`/`GRV`/`HOP` are ignored, and Advance `SAMPLESOURCE` amp envelopes are not applied, so notes on the Advance sustain where the device would let them decay. Remote input over USB stays disabled until the protocol question is settled with the firmware side (the mirror is view-only). Card access while the device is plugged in waits on firmware support.
 
 Not affiliated with xiphonics. Use at your own risk — the read-only default, backup-first writes and automatic rollback exist precisely so that risk stays near zero.

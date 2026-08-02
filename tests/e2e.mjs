@@ -1461,7 +1461,7 @@ check('header: the logo is a home button', await page.evaluate(async () => {
 }));
 check('header: the version number links to the repo', await page.evaluate(() => {
   const a = [...document.querySelectorAll('.logo a')].find(x => /github\.com/.test(x.href));
-  return !!a && a.target === '_blank' && /v0\.9\./.test(a.textContent);
+  return !!a && a.target === '_blank' && /v\d+\.\d+\./.test(a.textContent);
 }));
 
 await closeProjectModal();
