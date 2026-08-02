@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.9.18 — from the pattern editor to the instrument
+
+- **Jump to an instrument's edit screen from the pattern editor.** Three
+  ways, all landing on that instrument's parameter panel (with ✎ Edit
+  params and the slice editor where they apply): the phrase toolbar's
+  **✎ Instr** button opens the instrument at the cursor step; **⌥-click
+  any instrument cell** opens that one; and **⌥↓ at the bottom of the
+  drill-down** (grid → chain → phrase) now goes one level further, into
+  the instrument. The Patterns tab brings you straight back.
+- Instrument cells in the phrase editor carry a tooltip naming the
+  instrument and the shortcut.
+
+
 ## v0.9.17 — the real-card silence fix
 
 **Playback died after a second on real songs — fixed.** The 0.9.15

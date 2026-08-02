@@ -1119,7 +1119,7 @@
     <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
       <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
          title="Source, issues and release notes on GitHub"
-         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v0.9.17 Alpha</a>
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v0.9.18 Alpha</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -7583,6 +7583,21 @@ const UI = (() => {
         host.querySelector('.ipwrap'), () => showInstrParams(p, id)));
   }
 
+  // From the pattern editor straight to an instrument's edit screen:
+  // flip the modal to Overview and open that instrument's param panel.
+  function jumpToInstrument(id) {
+    const p = modalProj;
+    if (!p) return;
+    if (!p.instruments.some(x => x.id === id)) {
+      setCacheBar(`Instrument ${PT.hx2(id)} is not in this project's bank.`, false);
+      return;
+    }
+    setModalTab('overview');
+    showInstrParams(p, id);
+    requestAnimationFrame(() =>
+      $('modal-instr-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+
   function updateModalNav() {
     const idx = modalList.indexOf(modalProj);
     $('btn-modal-prev').disabled = idx <= 0;
@@ -7742,7 +7757,7 @@ const UI = (() => {
     host.innerHTML = `
       <div class="pv-hdr">
         <span class="pv-hdr-title">Song grid — ${last+1} rows</span>
-        <span class="pv-hint">arrows move · <b>⌥↓/⌥↑</b> drill in / out · <b>shift+arrows</b> or shift+click select a block · <b>Enter</b> pick a chain ·
+        <span class="pv-hint">arrows move · <b>⌥↓/⌥↑</b> drill in / out (down to the instrument) · <b>shift+arrows</b> or shift+click select a block · <b>Enter</b> pick a chain ·
           <b>Del</b> clear · <b>⌘/Ctrl+C/V</b> copy &amp; paste · <b>⌘/Ctrl+A</b> all · ▶ plays a whole row
           <span id="pv-selinfo"></span></span>
         <button class="btn ghost sm" id="btn-pv-jump" title="Open any chain or phrase, placed in the song or not (⌘/Ctrl+G)">⤳ Go to…</button>
@@ -9603,7 +9618,8 @@ const UI = (() => {
             || ((f === 'cmd2' || f === 'param2') && st.cmd2 === PT.CMD_NONE);
           const out = f === 'note' && sc && !PT.inScale(st.note, sc.mask);
           return `<span class="pe-c pe-${f}${dim ? ' dim' : ''}${out ? ' pe-out' : ''}" data-f="${f}" data-col="${c}"${
-            out ? ` title="${esc(PT.noteStr(st.note))} is outside ${esc(sc.root + ' ' + sc.name)}"` : ''
+            out ? ` title="${esc(PT.noteStr(st.note))} is outside ${esc(sc.root + ' ' + sc.name)}"` :
+            f === 'instr' && st.instr !== PT.EMPTY ? ` title="Instrument ${PT.hx2(st.instr)} — ⌥-click to open its editor"` : ''
           } tabindex="${editable ? 0 : -1}">${esc(v)}</span>`;
         }).join('')}
         ${editable ? `<span class="pe-rowclear" data-step="${s}" title="Clear step ${PT.hx2(s)}">✕</span>` : '<span></span>'}
@@ -9620,6 +9636,7 @@ const UI = (() => {
         ${crumb}
         <span>Phrase ${PT.hx2(ph)}</span>
         <button class="btn ghost sm" id="btn-ph-play" title="Audition this phrase">▶</button>
+        <button class="btn ghost sm" id="btn-ph-instr" title="Open the editor for the instrument at the cursor step (also ⌥↓ here, or ⌥-click any instrument cell)">✎ Instr</button>
         ${editable ? `
           <span class="pe-sep"></span>
           <span id="pe-selinfo" class="pe-selinfo"></span>
@@ -9688,6 +9705,14 @@ const UI = (() => {
         Edits stay in memory until you press “Save edits to card”.</div>` : ''}`;
 
     det.querySelector('#btn-ph-play')?.addEventListener('click', e => previewPhrase(parsed, ph, e.currentTarget));
+    det.querySelector('#btn-ph-instr')?.addEventListener('click', () => {
+      // The instrument at the cursor step; failing that, the first one
+      // this phrase names anywhere.
+      let iv = PT.phraseStep(parsed, ph, peCursor.step).instr;
+      for (let s2 = 0; s2 < PT.STEPS && iv === PT.EMPTY; s2++) iv = PT.phraseStep(parsed, ph, s2).instr;
+      if (iv === PT.EMPTY) { setCacheBar('No step in this phrase names an instrument.', false); return; }
+      jumpToInstrument(iv);
+    });
     det.querySelector('[data-crumb="chain"]')?.addEventListener('click', () => {
       if (jumpPhraseFrom) showChain(parsed, jumpPhraseFrom.chain, host);
     });
@@ -9928,6 +9953,10 @@ const UI = (() => {
       cell.addEventListener('mousedown', ev => {
         const st = parseInt(cell.closest('.pe-row').dataset.step, 10);
         const co = parseInt(cell.dataset.col, 10);
+        if (ev.altKey && cell.dataset.f === 'instr') {
+          const iv = PT.phraseStep(parsed, ph, st).instr;
+          if (iv !== PT.EMPTY) { ev.preventDefault(); jumpToInstrument(iv); return; }
+        }
         if (ev.shiftKey) { ev.preventDefault(); extendPeSel(st, co); }
         else { peCursor = { step: st, col: co }; clearPeSel(); }
       });
@@ -13100,7 +13129,12 @@ const UI = (() => {
           const phraseOpen = phEl && phEl.style.display !== 'none' && phEl.dataset.phrase !== undefined;
           const chainOpen = chEl && chEl.style.display !== 'none' && chEl.dataset.chain !== undefined;
           if (e.key === 'ArrowDown') {
-            if (phraseOpen) return;                     // already at the bottom
+            if (phraseOpen) {
+              // bottom of the pattern hierarchy — one more ⌥↓ opens the
+              // editor of the instrument named at the cursor step
+              phEl.querySelector('#btn-ph-instr')?.click();
+              return;
+            }
             if (chainOpen) {
               // The first step that actually has a phrase — step 00 can
               // be empty, and its placeholder span opens nothing.

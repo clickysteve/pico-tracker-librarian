@@ -1352,6 +1352,13 @@ check('loop: the transport length is one pass of the longest channel', await pag
 
 // Alt-arrow drill: grid → chain → phrase and back.
 check('altnav: ⌥↓ drills from the active cell into its chain', await page.evaluate(async () => {
+  // The marker tests above leave a chain panel open; ⌥↓ now drills all
+  // the way to the instrument editor from an open phrase, so start the
+  // sequence from a clean grid by climbing out first.
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', altKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 200));
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', altKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 200));
   const c = document.querySelector('.pv-cell.chain');
   c.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
   c.focus();
@@ -1374,6 +1381,41 @@ check('altnav: ⌥↑ climbs back out to the grid', await page.evaluate(async ()
   const chEl = document.querySelector('#pv-chain-detail');
   return !chEl || chEl.style.display === 'none';
 }));
+
+// From the pattern editor to the instrument's edit screen: the phrase
+// toolbar's ✎ Instr (also ⌥↓ at the bottom of the hierarchy, and
+// ⌥-click on any instrument cell) opens that instrument's params.
+check('instr jump: ✎ Instr opens the named instrument\'s edit screen', await page.evaluate(async () => {
+  const sec = document.querySelector('#modal-pattern-section');
+  // drill back down: grid cell → chain → phrase
+  const c = sec.querySelector('.pv-cell.chain');
+  c.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  c.focus();
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 250));
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }));
+  await new Promise(r => setTimeout(r, 300));
+  const btn = document.querySelector('#btn-ph-instr');
+  if (!btn) return false;
+  btn.click();
+  await new Promise(r => setTimeout(r, 300));
+  const det = document.getElementById('modal-instr-detail');
+  return sec.style.display === 'none' &&
+         !!det && /—/.test(det.textContent) && !!det.querySelector('.ipwrap') &&
+         !!det.querySelector('#btn-modal-pedit');
+}));
+check('instr jump: the params panel offers the editor', await page.evaluate(async () => {
+  document.getElementById('btn-modal-pedit').click();
+  await new Promise(r => setTimeout(r, 250));
+  const wrap = document.querySelector('#modal-instr-detail .ipwrap');
+  const editing = wrap?.dataset.mode === 'edit' && !!wrap.querySelector('.pe-param');
+  wrap?.querySelector('.btn-param-cancel')?.click();
+  await new Promise(r => setTimeout(r, 250));
+  return editing;
+}));
+// back to the patterns view for the save-bar checks that follow
+await page.click('#btn-modal-patterns');
+await page.waitForTimeout(400);
 
 // One save bar however many kinds of edit are pending.
 check('savebar: grid + groove edits share a single bar', await page.evaluate(async () => {
