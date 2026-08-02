@@ -2,8 +2,6 @@
 
 A librarian and arrangement editor for [picoTracker](https://xiphonics.com/) SD cards that runs entirely in your browser — pico and Advance cards alike. Browse and audit your projects, instruments, samples and themes; hear a song without leaving the page; edit the arrangement, phrases, slice points and instrument parameters; find and repair broken sample references; build ordered setlists; export MIDI — whole song or per-channel stems, with MIDI instruments on their configured channels. One HTML file, no install, no server, and no data ever leaves your machine.
 
-Sibling project to [M8 Librarian](https://m8librarian.allmyfriendsaresynths.com), same architecture and safety model.
-
 ![The Projects screen](screenshots/projects-screen.png)
 
 Requires Chrome or Edge (it uses the File System Access API to read your card; Firefox and Safari don't support it).
@@ -21,7 +19,7 @@ Requires Chrome or Edge (it uses the File System Access API to read your card; F
 
 No card handy? Hit **Try with demo data** on the landing screen — a synthetic card, generated audio included, loads entirely in memory so you can explore every tab, the pattern editor, playback and the repair flow without touching hardware.
 
-Unlike the M8, picoTracker projects are self-contained (each project folder carries its own `samples/` pool), so missing-sample detection works instantly with no cataloguing step. The library is cached in IndexedDB, so reopening the same card is instant and rescans are incremental — a warm rescan reads no sample data at all.
+picoTracker projects are self-contained — each project folder carries its own `samples/` pool — so missing-sample detection works instantly, with no cataloguing step. The library is cached in IndexedDB, so reopening the same card is instant and rescans are incremental — a warm rescan reads no sample data at all.
 
 Cards that have been near a Mac collect AppleDouble junk (`._kick.wav`, `.DS_Store`, `.Spotlight-V100`). These are skipped everywhere — scans, listings, exports — so they never appear as phantom samples.
 
@@ -138,7 +136,7 @@ Tests are zero-dependency Node scripts that extract modules straight out of `ind
 node tests/parser.test.mjs   # 191 unit tests: formats, MIDI timing, slice/loop units, islands, pingpong, round-trips, generators, scales, audio analysis
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
 node tests/audio.test.mjs    # renders the mix and a WAV export offline: no clipping, correct slice offsets, valid stems
-node tests/e2e.mjs           # 312 browser checks (needs: npm i -D playwright)
+node tests/e2e.mjs           # 313 browser checks (needs: npm i -D playwright)
 ```
 
 The parser tests run round-trip checks against real Advance project files when they're present locally; those files are not in this repository.
@@ -146,6 +144,8 @@ The parser tests run round-trip checks against real Advance project files when t
 The USB mirror's font is the 8x8 Wide face and special-glyph page by nILS (public domain), as shipped in the picoTracker firmware. The firmware's other two fonts are not redistributable and are intentionally not embedded.
 
 The mirror's output effects are a reimplementation of the filter set from [DMG Darkroom](https://github.com/clickysteve/dmg-darkroom) (MIT, same author): the effect list, parameter ranges and many of the tuned constants are carried over, but the filters themselves are rewritten from 2D-canvas passes over a still image into one WebGL shader pass that runs at video rate.
+
+The single-file architecture and the backup-first safety model were first proven in [M8 Librarian](https://m8librarian.allmyfriendsaresynths.com), this project's sibling for the Dirtywave M8.
 
 ## Status and known limitations
 

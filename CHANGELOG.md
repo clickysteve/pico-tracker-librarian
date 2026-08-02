@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.0.3 — the missing waveform, diagnosed
+
+The instrument screen's waveform not appearing on the mirror. The
+protocol says it should: in the open firmware the sample editor draws
+its waveform as 1px `DrawRect` columns, and those are remoted (with a
+`SETCOLOR` ahead of each) exactly like text. So either this client
+mishandles `DRAWRECT`, or the device never sends it.
+
+- **The client is now proven correct**: a browser check feeds a
+  synthetic device stream of waveform-style columns — escaped 16-bit
+  coordinates and all — and asserts the pixels land scaled and coloured
+  on the mirror. The `DRAWRECT` path passes.
+- **The status chip now counts received opcodes** while live
+  (`T` text · `R` rects · `C` clears · `F` fonts · `?` unknown). Open
+  the instrument screen on the device and watch `R`: if it does not
+  climb while the waveform is on the device's screen, the firmware
+  never transmitted it — a firmware-side gap to raise with xiphonics,
+  not something any client can paint. If `?` climbs instead, the device
+  is using an opcode this client does not know yet, which would be an
+  easy add once seen.
+
+
 ## v1.0.2 — screen text on the live mirror
 
 - **The mirror's Text now works on a connected device, not just the

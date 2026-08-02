@@ -1598,6 +1598,29 @@ await page.click('.tab-btn[data-tab="device"]');
 await page.waitForTimeout(200);
 await page.click('#btn-usb-connect');
 await page.waitForTimeout(400);
+// While the fake device is attached, prove the DRAWRECT path end to
+// end: a SETCOLOR then 1px-wide waveform-style columns, with values
+// that need escaping (0xFE/0xFD), exactly as the firmware sends them.
+check('drawrect: waveform-style columns land scaled and coloured', await page.evaluate(async () => {
+  const esc = v => (v === 0xFE || v === 0xFD) ? [0xFD, v ^ 0x20] : [v];
+  const u16 = v => [...esc(v & 0xFF), ...esc((v >> 8) & 0xFF)];
+  const stream = [];
+  stream.push(0xFE, 0x04, ...esc(255), ...esc(0), ...esc(0));       // SETCOLOR red (255 needs no escape? 0xFF != 0xFE/0xFD — but test 0xFE too below)
+  // three columns like GraphField sends: x, y, w=1, h
+  for (const x of [100, 101, 0xFE & 0xFF]) {                        // x=254 exercises the escape
+    stream.push(0xFE, 0x06, ...u16(x), ...u16(50), ...u16(1), ...u16(80));
+  }
+  const before = USB.opCounts();
+  USB.feed(new Uint8Array(stream));
+  await new Promise(r => setTimeout(r, 100));
+  const after = USB.opCounts();
+  const c = USB.sourceCanvas(), g = c.getContext('2d');
+  // x=100 → 300px, y=50 → 150px, 1×80 → 3×240 red column
+  const d1 = g.getImageData(300, 150 + 120, 3, 1).data;
+  const d2 = g.getImageData(254 * 3, 150 + 120, 3, 1).data;
+  return after.rect - before.rect === 3 && after.color - before.color === 1 &&
+         d1[0] > 200 && d1[1] < 50 && d2[0] > 200 && d2[1] < 50;
+}));
 await page.evaluate(() => USB.disconnect());
 await page.waitForTimeout(200);
 // The connect cleared the screen waiting for frames the fake device never

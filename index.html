@@ -1119,7 +1119,7 @@
     <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
       <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
          title="Source, issues and release notes on GitHub"
-         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.0.2 Beta</a>
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.0.3 Beta</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -5755,6 +5755,11 @@ const USB = (() => {
   // (their payloads are NOT escaped); escape-decoded payloads for
   // SETCOLOR (3 values) and DRAWRECT (8 values).
   let buf = [];
+  // Per-opcode counters (and unknown-opcode count), so "the mirror does
+  // not show X" can be answered with data: if the count for DRAWRECT
+  // stays at zero while X is on the device's screen, the firmware never
+  // sent it and there is nothing a client can do.
+  const opCounts = { text: 0, clear: 0, color: 0, font: 0, rect: 0, unknown: 0 };
   function feed(bytes) {
     for (const b of bytes) buf.push(b);
     for (;;) {
@@ -5764,15 +5769,18 @@ const USB = (() => {
       if (op === 0x02) {            // TEXT — 6 raw bytes
         if (buf.length < 6) return;
         const [, , ch, cx, cy, inv] = buf;
+        opCounts.text++;
         drawChar(ch, cx - OFFSET, cy - OFFSET, inv === 0x7F);
         buf = buf.slice(6);
       } else if (op === 0x03) {     // CLEAR — 5 raw bytes
         if (buf.length < 5) return;
         bg = [buf[2], buf[3], buf[4]];
+        opCounts.clear++;
         clearScreen();
         buf = buf.slice(5);
       } else if (op === 0x05) {     // SETFONT — 3 raw bytes
         if (buf.length < 3) return;
+        opCounts.font++;
         buf = buf.slice(3);
       } else if (op === 0x04 || op === 0x06) { // escaped payloads
         const want = op === 0x04 ? 3 : 8;
@@ -5789,11 +5797,15 @@ const USB = (() => {
           }
         }
         if (vals.length < want) return;
-        if (op === 0x04) fg = vals;
-        else drawRect(vals[0] | (vals[1] << 8), vals[2] | (vals[3] << 8),
-                      vals[4] | (vals[5] << 8), vals[6] | (vals[7] << 8));
+        if (op === 0x04) { fg = vals; opCounts.color++; }
+        else {
+          opCounts.rect++;
+          drawRect(vals[0] | (vals[1] << 8), vals[2] | (vals[3] << 8),
+                   vals[4] | (vals[5] << 8), vals[6] | (vals[7] << 8));
+        }
         buf = buf.slice(i);
       } else {
+        opCounts.unknown++;
         buf.shift(); // unknown opcode — resync
       }
     }
@@ -5936,7 +5948,7 @@ const USB = (() => {
   const isConnected = () => !!port;
   return { connect, disconnect, requestRefresh, isConnected, feed, setKeyBit,
            releaseAllKeys, sourceCanvas, takeDirty, setDemo,
-           setOverlay, stampOverlay,
+           setOverlay, stampOverlay, opCounts: () => ({ ...opCounts }),
            FONT_FACES, setFont, currentFont };
 })();
 
@@ -13312,7 +13324,17 @@ const UI = (() => {
     // Device (USB Remote UI)
     let usbInput = false;
     const usbStatus = (msg, connected) => {
+      // While live, the chip carries what the device has actually SENT,
+      // by opcode: T text, R rects, C clears, F fonts, ? unknown. A
+      // screen element that never shows on the mirror while its opcode
+      // count sits at zero was never transmitted by the firmware.
+      if (connected && /live/.test(msg)) {
+        const o = USB.opCounts();
+        msg += ` · T${o.text} R${o.rect} C${o.clear}` +
+               (o.font ? ` F${o.font}` : '') + (o.unknown ? ` ?${o.unknown}` : '');
+      }
       $('usb-status').textContent = msg;
+      $('usb-status').title = 'Received opcodes: T text · R rectangles (waveforms, meters) · C clears · F font switches · ? unknown';
       $('btn-usb-refresh').disabled = !connected;
       $('btn-usb-input').disabled = !connected;
       Mirror.invalidate();
