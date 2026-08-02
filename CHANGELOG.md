@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.9.17 — the real-card silence fix
+
+**Playback died after a second on real songs — fixed.** The 0.9.15
+looping scheduler worked in windows of whole passes, sized for the demo
+card's seconds-long loops. A real song's single pass runs for minutes,
+so ~200ms after pressing play it tried to build ten passes of the
+timeline and schedule eight of them — on a measured stress song (512s
+pass, 16,384 notes per pass) that is ~147,000 audio nodes created in one
+synchronous burst, which chokes the audio thread into silence right
+after the first moments play. Scheduling is now windowed by TIME: ~45
+seconds of notes stay scheduled, topped up when 15 remain (measured:
+1,440 nodes on the same stress song, playback stays alive). A new
+browser check plays a song and fails if more than about a minute of
+notes is ever scheduled ahead, so pass-sized bursts cannot come back.
+Demo-card testing missed this for a round; sorry, Steve — you were
+right, and an eight-minute-pass stress fixture is now part of the drill.
+
+
 ## v0.9.16 — instrument previews
 
 - **Instruments page: linked samples are playable.** Every instrument row

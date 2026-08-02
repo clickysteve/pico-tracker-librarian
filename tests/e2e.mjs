@@ -1272,6 +1272,7 @@ await page.waitForTimeout(400);
 
 // Play from a mid-song row: the transport must say "from row", and the
 // timeline in the player must be the FULL song, not one row of it.
+await page.evaluate(() => { window.__srcBase = SongPlayer._srcCount(); });
 await page.evaluate(() => document.querySelector('.pv-rowplay[data-row="1"]')?.click());
 // Sample decode can take a moment under a loaded test run.
 await page.waitForFunction(() => SongPlayer.isPlaying(), null, { timeout: 10000 }).catch(() => {});
@@ -1287,6 +1288,16 @@ check('row play: the timeline is the whole song, not one row', await page.evalua
 // a composite (forward + mirrored) buffer rather than a plain loop.
 check('pingpong: a composite loop buffer was built for the demo pad', await page.evaluate(() =>
   SongPlayer._ppBuilt() >= 1));
+// The scheduler must window by TIME: a song whose pass runs for minutes
+// must never have whole passes of notes scheduled up front (that burst
+// of nodes chokes the audio thread — the real-card silence bug).
+check('scheduler: only ~a minute of notes is scheduled ahead, not whole passes', await page.evaluate(() => {
+  const tl = SongPlayer.timeline();
+  const scheduled = SongPlayer._srcCount() - window.__srcBase;
+  const onePass = tl.events.filter(e => e.type === 'on').length;
+  const bound = Math.max(onePass, onePass / tl.duration * 65) + 8;
+  return scheduled > 0 && scheduled <= bound;
+}));
 await page.evaluate(() => SongPlayer.stop());
 await page.waitForTimeout(300);
 
