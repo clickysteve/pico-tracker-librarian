@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.9.16 — instrument previews
+
+- **Instruments page: linked samples are playable.** Every instrument row
+  whose sample resolves on the card gets a ▶ — project instruments play
+  their own pool copy, library `.pti`s resolve by name (the `samples/`
+  library first, then any project pool). The expanded detail panel
+  carries the same preview next to the sample name. MIDI/SID/OPAL rows,
+  and sampled instruments whose WAV is missing, offer nothing rather
+  than a dead button.
+- Also confirmed: the "plays a second then stops" report was the
+  deployed v0.9.14 — the endless looping and island handling shipped in
+  v0.9.15 are the fix, and they arrive with this push.
+
+
 ## v0.9.15 — islands, endless looping, real pingpong, and a leaner mirror
 
 Straight from playing v0.9.14 on real songs: the loop semantics were

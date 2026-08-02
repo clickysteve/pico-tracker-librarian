@@ -1502,6 +1502,34 @@ check('trash: restore puts the library file back in samples/drums/', await page.
   [...document.querySelectorAll('#sampbr-list .sb-trash[data-lib]')]
     .some(b => b.dataset.lib === 'drums/snare_alt.wav')));
 
+// ── 28ab. instruments page: linked samples preview ─────
+await page.click('.tab-btn[data-tab="instruments"]');
+await page.waitForTimeout(500);
+check('instruments: rows with a resolvable sample offer a play button', await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.instr-item')];
+  const withBtn = rows.filter(r => r.querySelector('.instr-row .play-btn'));
+  // sampled instruments with a present WAV get one; MIDI/SID never do
+  return withBtn.length > 0 && withBtn.every(r => /SMP|SRC/.test(r.querySelector('.tb')?.textContent || ''));
+}));
+check('instruments: a library .pti resolves its sample by name', await page.evaluate(() => {
+  const r = [...document.querySelectorAll('.instr-item')].find(x => /Deep Kick/.test(x.textContent));
+  const b = r?.querySelector('.instr-row .play-btn');
+  return !!b && /kick\.wav$/.test(b.dataset.path);
+}));
+check('instruments: the play button previews without expanding the row', await page.evaluate(async () => {
+  const r = [...document.querySelectorAll('.instr-item')].find(x => x.querySelector('.instr-row .play-btn'));
+  const wasOpen = r.classList.contains('open');
+  r.querySelector('.instr-row .play-btn').click();
+  await new Promise(res => setTimeout(res, 500));
+  return r.classList.contains('open') === wasOpen;
+}));
+check('instruments: the detail panel offers the same preview', await page.evaluate(async () => {
+  const r = [...document.querySelectorAll('.instr-item')].find(x => x.querySelector('.instr-row .play-btn'));
+  if (!r.classList.contains('open')) r.querySelector('.instr-row').click();
+  await new Promise(res => setTimeout(res, 300));
+  return !!r.querySelector('.det-samp-play');
+}));
+
 // The reload above wiped the fake serial device from section 5, which the
 // fx write-safety check depends on. Reinstall it and reconnect.
 await page.evaluate(() => {

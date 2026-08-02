@@ -272,7 +272,7 @@
     /* INSTRUMENTS */
     .instr-item { border-bottom:1px solid var(--border); }
     .instr-row { display:grid;
-      grid-template-columns:16px 60px minmax(130px,1fr) minmax(120px,180px) 170px 110px;
+      grid-template-columns:16px 22px 60px minmax(130px,1fr) minmax(120px,180px) 170px 110px;
       align-items:center; gap:0 14px; padding:9px 20px;
       cursor:pointer; user-select:none; transition:background .1s; }
     .instr-row:hover { background:var(--surface); }
@@ -1119,7 +1119,7 @@
     <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
       <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
          title="Source, issues and release notes on GitHub"
-         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v0.9.15 Alpha</a>
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v0.9.16 Alpha</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -10520,6 +10520,23 @@ const UI = (() => {
     // library pti: sample must exist somewhere (any pool or library) to be importable
     return sampleNameMap.has(inst.sample.toLowerCase()) ? 'ok' : 'miss';
   }
+  // Card path of the WAV an instrument refers to, for previewing. A
+  // project instrument plays its own pool copy; a library .pti resolves
+  // by name — the samples/ library first, then any project pool.
+  function instrSamplePath(inst) {
+    if (!inst.sample) return null;
+    if (inst.source === 'project')
+      return inst.proj.pool.some(s => s.name === inst.sample)
+        ? `projects/${inst.proj.dirName}/samples/${inst.sample}` : null;
+    const ent = sampleNameMap.get(inst.sample.toLowerCase());
+    if (!ent) return null;
+    if (ent.library.length) return `samples/${ent.library[0]}`;
+    for (const x of ent.projects) {
+      const p = lib.projects.find(pp => pp.name === x.proj);
+      if (p) return `projects/${p.dirName}/samples/${inst.sample}`;
+    }
+    return null;
+  }
   function renderInstruments() {
     if (!lib) return;
     let list = allInstruments();
@@ -10540,10 +10557,12 @@ const UI = (() => {
     const rowHtml = (i, idx) => {
       const ss = instrSampleState(i);
       const usage = instrUsage(i);
+      const spath = instrSamplePath(i);
       return `
       <div class="instr-item" data-idx="${idx}">
         <div class="instr-row">
           <span class="i-chev">▶</span>
+          ${spath ? `<button class="play-btn" data-path="${esc(spath)}" title="Preview ${esc(i.sample)}">▶</button>` : '<span></span>'}
           <span><span class="tb ${esc(i.type)}">${esc(i.typeShort)}</span></span>
           <span class="i-lname">${esc(i.name)}${dupeNameMap.has(i.name.toLowerCase()) && i.source==='library' ? ' <span title="duplicate name" style="color:var(--warn)">⚠</span>':''}</span>
           <span class="i-src">${esc(i.srcLabel)}</span>
@@ -10556,21 +10575,30 @@ const UI = (() => {
     renderChunked(host, list.map((i, idx) => ({i, idx})), o => rowHtml(o.i, o.idx), host2 => {
     host2.querySelectorAll('.instr-item:not([data-wired])').forEach(el => {
       el.dataset.wired = '1';
+      el.querySelector('.play-btn')?.addEventListener('click', e => {
+        e.stopPropagation();
+        AudioPlayer.playPath(sd, e.currentTarget.dataset.path, e.currentTarget);
+      });
       el.querySelector('.instr-row').addEventListener('click', () => {
         const wasOpen = el.classList.contains('open');
         el.classList.toggle('open');
         if (wasOpen) return;
         const i = list[parseInt(el.dataset.idx, 10)];
         const usage = instrUsage(i);
+        const dpath = instrSamplePath(i);
         el.querySelector('.instr-det').innerHTML = `
           <div class="drow"><span class="dlabel">Params</span>
             <div class="ipwrap" data-mode="view">${paramPanelHtml(i)}
             ${i.source === 'project' && Object.keys(i.params).length ? '<button class="btn ghost sm btn-param-edit" style="margin-top:8px">✎ Edit params</button>' : ''}
             </div></div>
-          ${i.sample ? `<div class="drow"><span class="dlabel">Sample</span><span class="dval ${instrSampleState(i)==='miss'?'miss':'dim'}">${esc(i.sample)}${instrSampleState(i)==='miss'?' — not found':''}</span></div>` : ''}
+          ${i.sample ? `<div class="drow"><span class="dlabel">Sample</span><span class="dval ${instrSampleState(i)==='miss'?'miss':'dim'}" style="display:flex;align-items:center;gap:8px">${dpath ? `<button class="play-btn det-samp-play" data-path="${esc(dpath)}" title="Preview">▶</button>` : ''}${esc(i.sample)}${instrSampleState(i)==='miss'?' — not found':''}</span></div>` : ''}
           <div class="drow"><span class="dlabel">Used in</span><span class="dval dim">${usage.length ? usage.map(p => `<span style="cursor:pointer;color:var(--accent)" class="use-link" data-proj="${esc(p.dirName)}">${esc(p.name)}</span>`).join(' · ') : 'nowhere'}</span></div>
           ${i.version ? `<div class="drow"><span class="dlabel">Firmware</span><span class="dval dim">${esc(i.version)}</span></div>` : ''}
           ${i.source === 'project' ? `<div class="drow"><span class="dlabel"></span><span style="display:flex;gap:6px"><button class="btn ghost sm btn-export-pti">⬇ Extract as .pti</button>${i.sample && instrSampleState(i)==='ok' ? '<button class="btn ghost sm btn-slice-open">✂ Slice editor</button>' : ''}</span></div>` : ''}`;
+        el.querySelector('.det-samp-play')?.addEventListener('click', e => {
+          e.stopPropagation();
+          AudioPlayer.playPath(sd, e.currentTarget.dataset.path, e.currentTarget);
+        });
         el.querySelectorAll('.use-link').forEach(l =>
           l.addEventListener('click', e => { e.stopPropagation(); switchTab('projects'); openProjModal(l.dataset.proj); }));
         el.querySelector('.btn-export-pti')?.addEventListener('click', e => {

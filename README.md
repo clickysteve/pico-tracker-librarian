@@ -32,7 +32,7 @@ Cards that have been near a Mac collect AppleDouble junk (`._kick.wav`, `.DS_Sto
 ![Samples across the card, with preview and the slice editor a click away](screenshots/samples-screen.png)
 
 - **Projects** — list and grid views, filtered and sorted by name, date, missing samples, instrument count, BPM or size. Each row plays, opens the pattern editor, or compares directly; expanding it shows the instrument bank, the sample pool with missing/unused markers, project settings, and similar projects by shared samples. An `autosave` badge flags projects where the device would load newer unsaved state.
-- **Instruments** — every `.pti` in `instruments/` plus every project's instrument bank, decoded in full (all parameters, slice points), with type filters (SAMPLE / SAMPLESOURCE / MIDI / SID / OPAL), sample status and usage tracking. Parameters are grouped into Sample / Tuning / Mix / Filter / Crush / Amp / LFO / Table cards with level bars, note names for root note and L/R for pan.
+- **Instruments** — every `.pti` in `instruments/` plus every project's instrument bank, decoded in full (all parameters, slice points), with type filters (SAMPLE / SAMPLESOURCE / MIDI / SID / OPAL), sample status, usage tracking and a ▶ on every row whose sample is on the card. Parameters are grouped into Sample / Tuning / Mix / Filter / Crush / Amp / LFO / Table cards with level bars, note names for root note and L/R for pan.
 - **Samples** — the `samples/` library tree plus every project pool, with duration, sample rate and bit depth per WAV, used/unused badges, and up/down arrow-key audition.
 ![The theme editor, with a live device-screen preview](screenshots/theme-editor.png)
 
@@ -138,7 +138,7 @@ Tests are zero-dependency Node scripts that extract modules straight out of `ind
 node tests/parser.test.mjs   # 187 unit tests: formats, MIDI timing, slice/loop units, islands, pingpong, round-trips, generators, scales, audio analysis
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
 node tests/audio.test.mjs    # renders the mix and a WAV export offline: no clipping, correct slice offsets, valid stems
-node tests/e2e.mjs           # 302 browser checks (needs: npm i -D playwright)
+node tests/e2e.mjs           # 306 browser checks (needs: npm i -D playwright)
 ```
 
 The parser tests run round-trip checks against real Advance project files when they're present locally; those files are not in this repository.
