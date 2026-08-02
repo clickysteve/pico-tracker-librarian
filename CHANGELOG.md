@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.0.4 — the Advance gets mirrored as an Advance
+
+The missing-waveform mystery is solved, and the answer was on our side
+after all. With a pointer from the picoTracker dev to the Advance
+adapter sources and the official client, the picture snapped into
+focus: the Advance is not a pico with a different lid. It is a
+**720×720 square panel** with **22×30 antialiased Ubuntu Mono glyphs**
+(the pico: 320×240, 10×10 bitmap cells). Both are a 32×24 text grid,
+which is why text always looked plausible on the mirror — but
+`DRAWRECT` arrives in the panel's own pixel space, and this client was
+scaling Advance rectangles as if they were pico ones, throwing the
+waveform (and every other rect) clean off the canvas. The v1.0.3
+opcode counters were about to prove the rects were arriving all along.
+
+- **Advance model support**: detected at connect by USB IDs (0x1D50 /
+  0x6192, as the official client does), with a backstop that upgrades
+  mid-stream the moment a rectangle exceeds pico bounds. The mirror
+  becomes a true 720×720 square, glyphs come from the firmware's
+  Ubuntu Mono-derived atlas (Ubuntu Font Licence 1.0 — licence text now
+  in the repo), tinted to the device's own colours, and rects — the
+  instrument screen's waveform and its slice markers included — land
+  1:1 where the device drew them.
+- The effects pipeline letterboxes from the live source size, so the
+  square Advance screen pillarboxes correctly into every output size.
+- The custom-face font picker now labels itself as applying to the
+  classic pico face; an Advance mirrors with its own face.
+- Credit where due: the diagnosis started with the dev's nudge toward
+  `sources/Adapters/adv/display/font.h` and the
+  [picotracker_client](https://github.com/xiphonics/picotracker_client)
+  Flutter app, whose Advance handling confirmed the geometry, the font
+  atlas, and the USB IDs.
+
+
 ## v1.0.3 — the missing waveform, diagnosed
 
 The instrument screen's waveform not appearing on the mirror. The

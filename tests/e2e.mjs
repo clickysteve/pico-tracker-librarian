@@ -1621,6 +1621,47 @@ check('drawrect: waveform-style columns land scaled and coloured', await page.ev
   return after.rect - before.rect === 3 && after.color - before.color === 1 &&
          d1[0] > 200 && d1[1] < 50 && d2[0] > 200 && d2[1] < 50;
 }));
+// ── Advance model: square canvas, atlas glyphs, 1:1 rects ──
+check('advance: switching model gives the 720x720 square screen', await page.evaluate(() => {
+  USB.setModel('adv');
+  const c = USB.sourceCanvas();
+  return USB.model() === 'adv' && c.width === 720 && c.height === 720;
+}));
+check('advance: text renders from the Ubuntu Mono atlas at 22x30 cells', await page.evaluate(async () => {
+  // SETCOLOR white, then TEXT 'A' at cell (1,1) — raw char, offset coords
+  USB.feed(new Uint8Array([0xFE, 0x04, 250, 250, 250]));
+  const deadline = Date.now() + 3000;
+  const probe = () => {
+    USB.feed(new Uint8Array([0xFE, 0x02, 65, 1 + 0xF, 1 + 0xF, 0]));
+    const g = USB.sourceCanvas().getContext('2d');
+    const d = g.getImageData(8 + 22, 30, 22, 30).data;   // cell (1,1): x = offX+22
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] > 150) lit++;
+    return lit > 20;
+  };
+  while (Date.now() < deadline) {          // atlas decodes async once
+    if (probe()) return true;
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return false;
+}));
+check('advance: rects land 1:1 in 720-space', await page.evaluate(async () => {
+  const u16 = v => [v & 0xFF, (v >> 8) & 0xFF];
+  USB.feed(new Uint8Array([0xFE, 0x04, 0, 250, 0]));      // green
+  USB.feed(new Uint8Array([0xFE, 0x06, ...u16(400), ...u16(600), ...u16(20), ...u16(20)]));
+  await new Promise(r => setTimeout(r, 100));
+  const g = USB.sourceCanvas().getContext('2d');
+  const d = g.getImageData(405, 605, 4, 4).data;
+  return d[1] > 150 && d[0] < 80;
+}));
+check('advance: out-of-range rects auto-upgrade a pico-mode mirror', await page.evaluate(async () => {
+  USB.setModel('pico');
+  const u16 = v => [v & 0xFF, (v >> 8) & 0xFF];
+  USB.feed(new Uint8Array([0xFE, 0x06, ...u16(500), ...u16(100), ...u16(10), ...u16(10)]));
+  await new Promise(r => setTimeout(r, 100));
+  return USB.model() === 'adv';
+}));
+await page.evaluate(() => { USB.setModel('pico'); });
 await page.evaluate(() => USB.disconnect());
 await page.waitForTimeout(200);
 // The connect cleared the screen waiting for frames the fake device never

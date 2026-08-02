@@ -136,12 +136,12 @@ Tests are zero-dependency Node scripts that extract modules straight out of `ind
 node tests/parser.test.mjs   # 191 unit tests: formats, MIDI timing, slice/loop units, islands, pingpong, round-trips, generators, scales, audio analysis
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
 node tests/audio.test.mjs    # renders the mix and a WAV export offline: no clipping, correct slice offsets, valid stems
-node tests/e2e.mjs           # 313 browser checks (needs: npm i -D playwright)
+node tests/e2e.mjs           # 317 browser checks (needs: npm i -D playwright)
 ```
 
 The parser tests run round-trip checks against real Advance project files when they're present locally; those files are not in this repository.
 
-The USB mirror's font is the 8x8 Wide face and special-glyph page by nILS (public domain), as shipped in the picoTracker firmware. The firmware's other two fonts are not redistributable and are intentionally not embedded.
+The USB mirror renders each model with its own face: the classic picoTracker with the 8x8 Wide face and special-glyph page by nILS (public domain), and the Advance with the firmware's Ubuntu Mono-derived bitmap font (Ubuntu Font Licence 1.0 — see `Ubuntu-Font-Licence-1.0.txt`), on its native 720×720 square screen. The model is detected from the device's USB IDs at connect. The classic firmware's other two fonts are not redistributable and are intentionally not embedded. The [official Flutter client](https://github.com/xiphonics/picotracker_client) was the reference for the Advance geometry.
 
 The mirror's output effects are a reimplementation of the filter set from [DMG Darkroom](https://github.com/clickysteve/dmg-darkroom) (MIT, same author): the effect list, parameter ranges and many of the tuned constants are carried over, but the filters themselves are rewritten from 2D-canvas passes over a still image into one WebGL shader pass that runs at video rate.
 

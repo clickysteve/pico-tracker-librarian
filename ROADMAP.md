@@ -38,12 +38,10 @@ actually audible rather than theoretical:
 
 ## USB / Remote UI
 
-- **Instrument-screen waveform on the mirror** — the client's `DRAWRECT`
-  path is verified against a synthetic stream (1.0.3), and the live
-  status chip counts received opcodes. If the device's `R` count stays
-  flat while its waveform animates, the firmware isn't remoting those
-  draws; needs raising upstream. If unknown opcodes (`?`) show up
-  instead, add the opcode.
+- ~~Instrument-screen waveform on the mirror~~ — solved in 1.0.4: the
+  Advance draws in a 720×720 pixel space and the client was scaling its
+  rects as pico ones, off the canvas. The mirror now has a real Advance
+  model (geometry, Ubuntu Mono atlas, USB-ID detection).
 
 - **Remote input** — the client half is written but disabled: the Advance
   visibly reacts to the proposed `FE 03` opcode (screen flicker), which
