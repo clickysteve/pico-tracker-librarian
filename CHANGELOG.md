@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.0.2 — screen text on the live mirror
+
+- **The mirror's Text now works on a connected device, not just the
+  stand-in.** It stamps over whatever the screen shows, right before
+  each frame reaches the effects — so the device redrawing its own
+  title never wins the race. **Top** covers the SONG screen's title
+  region (replace the project name for capture); **Bottom** writes
+  along the last row. A colour picker sets the glyph colour; the cell
+  background stays the device theme's own CLEAR colour, so the stamp
+  sits on the screen like it belongs there. Blank shows the device's
+  own text again. Position and colour persist alongside the text.
+- **Syphon output**: not addable — a browser page cannot publish a
+  Syphon feed (it is a native macOS surface-sharing API with no web
+  equivalent). The supported route is the one the mirror is built for:
+  pop the mirror out and capture that window in OBS, then republish
+  from OBS with a Syphon-server plugin (or use a window-to-Syphon
+  utility directly on the pop-out). The Device tab copy now says so.
+
+
 ## v1.0.1 — MIDI stems, and MIDI instruments treated as MIDI
 
 The first from-the-wild request: proper MIDI export for MIDI

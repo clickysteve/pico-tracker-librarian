@@ -1119,7 +1119,7 @@
     <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
       <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
          title="Source, issues and release notes on GitHub"
-         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.0.1 Beta</a>
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.0.2 Beta</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -1398,7 +1398,9 @@
           and Remote UI set to On in the device config.
           <br>The output effects run on the GPU and are applied to the mirror only — nothing is
           ever sent to the device. Pop the mirror out into its own window and capture that window
-          in OBS (or any screen recorder) to record it. The screen above is a stand-in until a
+          in OBS (or any screen recorder) to record it — and for Syphon workflows on macOS,
+          feed that captured window out through a Syphon server (OBS has community server
+          plugins; window-to-Syphon utilities work too — the browser itself cannot publish Syphon). The screen above is a stand-in until a
           device is connected, so a look can be dialled in ahead of time.
         </div>
       </div><!-- /usb-main -->
@@ -1412,7 +1414,9 @@
             <label class="fx-mini">Output <select id="fx-output" title="Size of the canvas that OBS or a capture card sees"></select></label>
             <label class="fx-mini" title="0% fits the 4:3 screen inside the frame; 100% fills the frame and crops the sides">Fill <input type="range" id="fx-zoom" min="0" max="100" step="1"><span id="fx-zoom-v" class="fx-pval"></span></label>
             <label class="fx-mini" title="Colour of the letterbox bars and the bezel">Bars <input type="color" id="fx-bg" value="#000000"></label>
-            <label class="fx-mini" title="The header text on the stand-in screen. Blank removes it. A connected device draws its own screen, so this only affects the demo.">Text <input type="text" id="fx-demo-text" class="search" maxlength="27" placeholder="PT LIBRARIAN" style="width:110px;padding:3px 7px;font-size:11px"></label>
+            <label class="fx-mini" title="Text stamped on the mirror — on the stand-in AND over a connected device's screen, so the song title can be replaced for capture. Top covers the title area; Bottom writes along the last row. Blank shows the device's own text.">Text <input type="text" id="fx-demo-text" class="search" maxlength="27" placeholder="PT LIBRARIAN" style="width:110px;padding:3px 7px;font-size:11px"></label>
+            <select id="fx-text-pos" title="Where the text sits: over the title area, or along the bottom row"><option value="top">Top</option><option value="bottom">Bottom</option></select>
+            <input type="color" id="fx-text-color" value="#79b5e3" title="Colour of the stamped text — the background stays the device theme's own">
             <label class="fx-mini" title="The face the mirror draws text with — the device's own bitmap font, or one built from a font your system already has. The special glyphs (meters, note icons) always use the device face.">Font <select id="fx-font"></select></label>
             <span class="fx-sep"></span>
             <button class="btn ghost sm" id="fx-random" title="Roll a random look — curated, so it stays watchable. Roll again until something sticks.">🎲 Random</button>
@@ -5719,6 +5723,34 @@ const USB = (() => {
     ctx.fillRect(l * SCALE, t * SCALE, w * SCALE, h * SCALE);
   }
 
+  // ── Screen text overlay ─────────────────────────────────
+  // Text stamped over whatever is on screen — the stand-in AND a live
+  // device. 'top' covers the title region of the SONG screen (so a
+  // project name can be replaced for capture); 'bottom' writes along the
+  // last row. Stamped by the mirror right before each texture upload, so
+  // the device redrawing its own title never wins the race. Cell
+  // backgrounds use the device's own CLEAR colour, so the overlay sits
+  // on the theme background; only the glyph colour is the user's.
+  let overlay = null;   // {text, pos, color:[r,g,b]}
+  function setOverlay(o) { overlay = o && o.text ? o : null; }
+  function stampOverlay() {
+    if (!overlay) return;
+    const d = dirty, savedFg = fg;
+    fg = overlay.color || [121, 181, 227];
+    if (overlay.pos === 'bottom') {
+      const txt = overlay.text.slice(0, COLS).toUpperCase();
+      for (let i = 0; i < txt.length; i++) drawChar(txt.charCodeAt(i), i, ROWS - 1, false);
+    } else {
+      const start = 5, end = COLS - 2;                    // the title region
+      const txt = overlay.text.slice(0, end - start).toUpperCase();
+      const col = Math.max(start, end - txt.length);
+      for (let c = start; c < col; c++) drawChar(0x20, c, 0, false);
+      for (let i = 0; i < txt.length; i++) drawChar(txt.charCodeAt(i), col + i, 0, false);
+    }
+    fg = savedFg;
+    dirty = d;          // an overlay stamp is not a reason to re-render
+  }
+
   // Streaming frame parser. Fixed-length frames for TEXT/CLEAR/SETFONT
   // (their payloads are NOT escaped); escape-decoded payloads for
   // SETCOLOR (3 values) and DRAWRECT (8 values).
@@ -5904,6 +5936,7 @@ const USB = (() => {
   const isConnected = () => !!port;
   return { connect, disconnect, requestRefresh, isConnected, feed, setKeyBit,
            releaseAllKeys, sourceCanvas, takeDirty, setDemo,
+           setOverlay, stampOverlay,
            FONT_FACES, setFont, currentFont };
 })();
 
@@ -6045,6 +6078,7 @@ const Mirror = (() => {
   }
 
   function draw(tSec, upload) {
+    USB.stampOverlay();       // over whatever the device (or demo) drew
     if (renderer) renderer.render(USB.sourceCanvas(), state, tSec, upload !== false);
     else blit();
     const o = FX.OUTPUTS.find(x => x.id === state.output) || FX.OUTPUTS[0];
@@ -6254,20 +6288,45 @@ const Mirror = (() => {
       state.bg = e.target.value;
       save(); invalidate();
     });
-    // The stand-in screen's header. Stored separately from the effects
-    // blob because it survives Reset — it is labelling, not a look.
-    const demoTxt = $('fx-demo-text');
-    try {
-      const t = JSON.parse(localStorage.getItem('ptMirrorText') || 'null');
-      if (t && typeof t.header === 'string') demoTxt.value = t.header;
-    } catch {}
-    demoTxt.addEventListener('input', () => {
+    // The mirror's screen text. Stored separately from the effects blob
+    // because it survives Reset — it is labelling, not a look. The same
+    // text names the stand-in's header and stamps over a live device.
+    const demoTxt = $('fx-text-pos') && $('fx-demo-text');
+    const readText = () => {
       let t = {};
       try { t = JSON.parse(localStorage.getItem('ptMirrorText') || '{}') || {}; } catch {}
+      return t && typeof t === 'object' ? t : {};
+    };
+    const writeText = t => { try { localStorage.setItem('ptMirrorText', JSON.stringify(t)); } catch {} };
+    const syncOverlay = () => {
+      const t = readText();
+      const hex = typeof t.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(t.color) ? t.color : '#79b5e3';
+      USB.setOverlay({
+        text: String(t.header || '').trim(),
+        pos: t.pos === 'bottom' ? 'bottom' : 'top',
+        color: [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)),
+      });
+    };
+    {
+      const t = readText();
+      if (typeof t.header === 'string') demoTxt.value = t.header;
+      if (t.pos === 'bottom') $('fx-text-pos').value = 'bottom';
+      if (typeof t.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(t.color)) $('fx-text-color').value = t.color;
+      syncOverlay();
+    }
+    const onTextChange = () => {
+      const t = readText();
       t.header = demoTxt.value;
-      try { localStorage.setItem('ptMirrorText', JSON.stringify(t)); } catch {}
-      if (!USB.isConnected()) { USB.setDemo(); invalidate(); }
-    });
+      t.pos = $('fx-text-pos').value;
+      t.color = $('fx-text-color').value;
+      writeText(t);
+      syncOverlay();
+      if (!USB.isConnected()) USB.setDemo();
+      invalidate();
+    };
+    demoTxt.addEventListener('input', onTextChange);
+    $('fx-text-pos').addEventListener('change', onTextChange);
+    $('fx-text-color').addEventListener('input', onTextChange);
 
     // ── Font ──
     const fontSel = $('fx-font');

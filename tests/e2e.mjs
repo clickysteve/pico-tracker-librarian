@@ -2355,6 +2355,51 @@ check('mirror text: blank removes it entirely', await page.evaluate(async () => 
   return lit === 0;
 }));
 
+// The text is an OVERLAY now: it stamps over whatever the screen shows,
+// so a connected device's song title can be replaced. Prove it beats a
+// device-drawn title: paint fake title text into the region, stamp, and
+// the user's colour must win.
+check('mirror text: the overlay covers device-drawn text in the title area', await page.evaluate(async () => {
+  // a fake "device" title in the overlay region, drawn in green
+  const c = USB.sourceCanvas(), g = c.getContext('2d');
+  g.fillStyle = 'rgb(0,255,0)';
+  g.fillRect(500, 0, 460, 30);
+  const inp = document.getElementById('fx-demo-text');
+  const col = document.getElementById('fx-text-color');
+  col.value = '#ff0000';
+  inp.value = 'MY TITLE';
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 250));
+  USB.stampOverlay();
+  const d = g.getImageData(150, 0, 810, 30).data;
+  let red = 0, green = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i] > 180 && d[i+1] < 80) red++;
+    if (d[i+1] > 180 && d[i] < 80) green++;
+  }
+  return red > 50 && green === 0;
+}));
+check('mirror text: Bottom writes along the last row instead', await page.evaluate(async () => {
+  const pos = document.getElementById('fx-text-pos');
+  pos.value = 'bottom';
+  pos.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 250));
+  USB.setDemo();
+  USB.stampOverlay();
+  const c = USB.sourceCanvas(), g = c.getContext('2d');
+  const d = g.getImageData(0, c.height - 30, 300, 30).data;
+  let red = 0;
+  for (let i = 0; i < d.length; i += 4) if (d[i] > 180 && d[i+1] < 80) red++;
+  // put everything back for later sections
+  pos.value = 'top';
+  pos.dispatchEvent(new Event('change', { bubbles: true }));
+  const inp = document.getElementById('fx-demo-text');
+  inp.value = '';
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 200));
+  return red > 30;
+}));
+
 // Back to the projects for grid behaviour. The fx corrupt-settings test
 // reloaded into USB-only mode, so there is no card open — load the demo
 // card again first. The row expander is a toggle, so only click it when
