@@ -1,5 +1,65 @@
 # Changelog
 
+## v0.9.15 — islands, endless looping, real pingpong, and a leaner mirror
+
+Straight from playing v0.9.14 on real songs: the loop semantics were
+right, but the way songs are actually arranged wasn't understood yet.
+
+**Islands.** Songs are commonly arranged as sections — contiguous runs of
+rows with blank rows between them, each looped live on the device. The
+librarian now models this: the main Play button plays the **longest
+island** rather than declining because row 00 is blank, and a row's
+gutter ▶ plays from that row and **loops between the blank rows around
+it**. WAV renders and the MIDI export follow the same rule, so what you
+export is what the preview plays. (Chain `FE` — the last valid chain,
+which the device draws in its accent colour — was checked end to end
+along the way; the grid runs `00`–`FE`, only `FF` is empty.)
+
+**Playback loops endlessly, as the device does.** The device never stops
+in song mode, and now neither does the preview: the transport's ↻ is on
+by default (turn it off for a single pass). Under the hood playback is
+scheduled in windows of whole passes, extended ahead of the playhead
+from the same deterministic walk, so looping is seamless rather than a
+restart with a gap. The scrub bar and live grid marks cycle within one
+pass.
+
+**Pingpong loops actually pingpong.** Web Audio only loops forward, so a
+`pingpong` instrument now plays through a composite buffer: the sample
+up to the loop end, then the loop region mirrored (interior only —
+the firmware flips direction without repeating boundary samples, and so
+does this). Built once per instrument per play, in the live player and
+in offline renders alike. The demo's Galazio Pad carries a pingpong loop
+so the path is always exercised.
+
+**Delete from the sample browser.** Every file row in Browse — library
+tree and project pools — now has a 🗑 that moves the file to
+`PTLibrarian_Trash/` on the card. Library files are mirrored with their
+subfolder into `PTLibrarian_Trash/_library/…`, and the Trash tab lists
+them with their `samples/…` origin and restores them to exactly where
+they came from. Trashing a pool sample a project still uses warns loudly
+first; nothing is ever deleted without going through the trash.
+
+**Recording removed.** The mirror's MediaRecorder capture (MP4/WebM) is
+gone: OBS against the pop-out window does the job better everywhere, and
+Chrome's recorder was the weakest link in the chain. The pop-out remains
+the capture surface.
+
+**Found by review, before shipping**
+- Endless looping made two old habits into leaks: finished notes now
+  free their audio nodes, and schedule extensions grow their window size
+  so the rebuild cost stays bounded over hours, not quadratic.
+- Editing a project while it looped could splice a changed timeline onto
+  the old schedule — desynced audio and marks. A timing-affecting edit
+  now restarts playback cleanly from the new timeline; deleting the last
+  playable row stops instead of spinning.
+- The pingpong composite was assigned to `AudioBufferSourceNode.buffer`
+  after the plain buffer — a write-once property, so Chrome threw and
+  the note fell silent. Caught by the offline-render test suite.
+- Two stale messages: stems still blamed "row 00" for songs the island
+  model now handles, and row previews still promised "playing to the
+  end" while looping forever.
+
+
 ## v0.9.14 — the loop round: firmware playback semantics, and eight bits of polish
 
 **Playback now loops the way the device does.** Verified line by line

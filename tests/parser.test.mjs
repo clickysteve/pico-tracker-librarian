@@ -876,6 +876,107 @@ t('buildEventTimeline songRow does not disturb chain or phrase modes', () => {
   eq(PT.buildEventTimeline(p, { phrase: 0x00 }).events.filter(e => e.type === 'on').length, 1);
 });
 
+// ── v0.9.15: islands, multi-pass emission, pingpong buffers ──
+function islandFixtureProj() {
+  // rows 0-1 blank · island A rows 2-3 · blank · island B row 5 (chain FE)
+  const proj = loopFixtureProj();
+  proj.grid.fill(PT.EMPTY);
+  proj.grid[2 * 8 + 0] = 0;
+  proj.grid[3 * 8 + 0] = 1;
+  proj.grid[5 * 8 + 0] = 0xFE;
+  proj.chains[0xFE * 16 + 0] = 1;     // chain FE is the LAST valid chain
+  return proj;
+}
+t('island: mainIsland finds the longest contiguous block', () => {
+  const isl = PT.mainIsland(islandFixtureProj());
+  eq({ start: isl.start, end: isl.end }, { start: 2, end: 3 });
+});
+t('island: a fully blank grid has no island', () => {
+  const proj = loopFixtureProj();
+  proj.grid.fill(PT.EMPTY);
+  eq(PT.mainIsland(proj), null);
+});
+t('island: an unbroken song is one island from row 0', () => {
+  const isl = PT.mainIsland(loopFixtureProj());
+  eq({ start: isl.start, end: isl.end }, { start: 0, end: 5 });
+});
+t('island: the default preview starts at the longest island, not row 00', () => {
+  const tl = PT.buildEventTimeline(islandFixtureProj(), {});
+  ok(tl, 'blank leading rows must not kill the preview');
+  const rows = [...new Set(tl.marks.map(m => m.row))].sort((a, b) => a - b);
+  eq(rows, [2, 3], 'the preview plays island A and nothing else');
+});
+t('island: an explicit startRow still wins (device cursor semantics)', () => {
+  const tl = PT.buildEventTimeline(islandFixtureProj(), { startRow: 5 });
+  const rows = [...new Set(tl.marks.map(m => m.row))];
+  eq(rows, [5], 'row play loops between the blank rows around it');
+});
+t('island: chain FE (the last valid chain) is playable', () => {
+  const tl = PT.buildEventTimeline(islandFixtureProj(), { startRow: 5 });
+  ok(tl && tl.events.some(e => e.type === 'on'), 'chain 0xFE must resolve, 0xFF is empty');
+});
+t('passes: a 3-pass emission is the one-pass stream repeated', () => {
+  const proj = islandFixtureProj();
+  const one = PT.buildEventTimeline(proj, {});
+  const three = PT.buildEventTimeline(proj, { passes: 3 });
+  eq(three.duration, one.duration, 'duration stays a single pass');
+  ok(Math.abs(three.span - one.duration * 3) < 1e-9, 'span covers all passes');
+  const ons = tl => tl.events.filter(e => e.type === 'on');
+  eq(ons(three).length, ons(one).length * 3);
+  // pass 2 is pass 1 shifted by exactly one duration
+  const a = ons(one), b = ons(three).slice(a.length, a.length * 2);
+  for (let i = 0; i < a.length; i++) {
+    ok(Math.abs(b[i].time - (a[i].time + one.duration)) < 1e-6, `event ${i} misaligned`);
+    eq(b[i].note, a[i].note);
+  }
+});
+t('pingpong: the composite mirrors the loop interior without doubling endpoints', () => {
+  const actx = { createBuffer: (ch, len, rate) => {
+    const data = Array.from({ length: ch }, () => new Float32Array(len));
+    return { numberOfChannels: ch, length: len, sampleRate: rate,
+             duration: len / rate, getChannelData: c => data[c] };
+  } };
+  const src = Float32Array.from([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  const buf = { numberOfChannels: 1, length: 10, sampleRate: 10,
+                duration: 1, getChannelData: () => src };
+  const pp = PT.pingpongBuffer(actx, buf, 3 / 10, 8 / 10);
+  ok(pp, 'a 5-frame region must build');
+  eq([...pp.buf.getChannelData(0)], [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4]);
+  ok(Math.abs(pp.loopStart - 0.3) < 1e-9 && Math.abs(pp.loopEnd - 1.1) < 1e-9,
+     `loop points ${pp.loopStart}..${pp.loopEnd}`);
+});
+t('pingpong: a too-short region falls back (returns null)', () => {
+  const actx = { createBuffer: () => { throw new Error('must not build'); } };
+  const src = Float32Array.from([0, 1, 2, 3]);
+  const buf = { numberOfChannels: 1, length: 4, sampleRate: 10, duration: .4, getChannelData: () => src };
+  eq(PT.pingpongBuffer(actx, buf, 0.1, 0.2), null);
+});
+t('pingpong: loop end past the buffer is clamped', () => {
+  const actx = { createBuffer: (ch, len, rate) => {
+    const data = Array.from({ length: ch }, () => new Float32Array(len));
+    return { numberOfChannels: ch, length: len, sampleRate: rate,
+             duration: len / rate, getChannelData: c => data[c] };
+  } };
+  const src = Float32Array.from([0, 1, 2, 3, 4]);
+  const buf = { numberOfChannels: 1, length: 5, sampleRate: 10, duration: .5, getChannelData: () => src };
+  const pp = PT.pingpongBuffer(actx, buf, 0, 2);   // asks past the end
+  ok(pp && pp.buf.length === 5 + 3, 'mirror of the clamped region');
+  eq([...pp.buf.getChannelData(0)], [0, 1, 2, 3, 4, 3, 2, 1]);
+});
+t('passes: eventsOnly skips marks but emits identical events', () => {
+  const proj = islandFixtureProj();
+  const a = PT.buildEventTimeline(proj, { passes: 2 });
+  const b = PT.buildEventTimeline(proj, { passes: 2, eventsOnly: true });
+  eq(b.marks.length, 0, 'no marks in a scheduling walk');
+  eq(b.events.length, a.events.length);
+  eq(b.duration, a.duration);
+});
+t('midi: the export walks the main island, matching the preview', () => {
+  const proj = islandFixtureProj();
+  const bytes = PT.buildMidi(proj, 'ISLANDS');
+  ok(bytes && bytes.length > 30, 'an island song must export');
+});
+
 // ── v0.8: chain colours grouped by high nibble ─────────
 t('groupChainColor gives each nibble group its own hue family', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');

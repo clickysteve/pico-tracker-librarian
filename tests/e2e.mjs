@@ -64,7 +64,7 @@ const health = await page.evaluate(() => ({
   projects: +document.getElementById('h-projects').textContent,
   broken: +document.getElementById('h-broken').textContent,
 }));
-check('demo: 4 projects (incl. the legacy fixture)', health.projects === 4);
+check('demo: 5 projects (incl. the legacy and island fixtures)', health.projects === 5);
 check('demo: 2 missing samples', health.broken === 2);
 
 
@@ -1283,6 +1283,10 @@ const fromRow = await page.evaluate(() => ({
 check('row play: starts playback from that row', fromRow.playing && /from row 01/.test(fromRow.title));
 check('row play: the timeline is the whole song, not one row', await page.evaluate(() =>
   !!SongPlayer.timeline() && SongPlayer.timeline().marks.some(mk => mk.row > 1)));
+// The demo pad carries loopmode=pingpong; scheduling it must have built
+// a composite (forward + mirrored) buffer rather than a plain loop.
+check('pingpong: a composite loop buffer was built for the demo pad', await page.evaluate(() =>
+  SongPlayer._ppBuilt() >= 1));
 await page.evaluate(() => SongPlayer.stop());
 await page.waitForTimeout(300);
 
@@ -1409,6 +1413,94 @@ check('header: the version number links to the repo', await page.evaluate(() => 
 
 await closeProjectModal();
 await page.waitForTimeout(300);
+
+// ── 28z. islands: preview, endless looping, chain FE ───
+// PERFORMA is arranged as islands: rows 00-01 blank, the main section on
+// rows 02-03, and a one-row section on row 05 played by chain FE (the
+// last valid chain — the grid runs 00-FE, FF is empty).
+await page.click('.tab-btn[data-tab="projects"]');
+await page.waitForTimeout(250);
+await page.evaluate(() => {
+  // by data-proj, not textContent — an expanded NIGHTDRIVE detail panel
+  // lists PERFORMA under similar projects and would match first
+  document.querySelector('.proj-item[data-proj="PERFORMA"] .proj-play')?.click();
+});
+await page.waitForFunction(() => SongPlayer.isPlaying(), null, { timeout: 10000 }).catch(() => {});
+check('island: the projects-screen preview plays a song with blank top rows', await page.evaluate(() =>
+  SongPlayer.isPlaying()));
+check('island: the preview starts at the longest island, not row 00', await page.evaluate(() => {
+  const tl = SongPlayer.timeline();
+  if (!tl) return false;
+  const rows = [...new Set(tl.marks.map(m => m.row))].sort((a, b) => a - b);
+  return rows.length === 2 && rows[0] === 2 && rows[1] === 3;
+}));
+check('loop: the transport loop toggle defaults to on', await page.evaluate(() =>
+  SongPlayer.isLooping() && document.getElementById('tr-loop').classList.contains('on')));
+// The money check for "it won't loop": still playing well past one pass.
+check('loop: playback keeps going after a full pass, as the device does', await page.evaluate(async () => {
+  const dur = SongPlayer.timeline().duration;
+  await new Promise(r => setTimeout(r, (dur + 1.5) * 1000));
+  return SongPlayer.isPlaying();
+}));
+await page.evaluate(() => SongPlayer.stop());
+await page.waitForTimeout(300);
+
+// Row play on the chain-FE island loops between the blank rows around it.
+await page.evaluate(() => {
+  const row = document.querySelector('.proj-item[data-proj="PERFORMA"]');
+  if (row && !row.querySelector('.btn-det-open')) row.querySelector('.proj-row').click();
+});
+await page.waitForTimeout(300);
+await page.evaluate(() =>
+  document.querySelector('.proj-item[data-proj="PERFORMA"] .btn-det-open')?.click());
+await page.waitForTimeout(900);
+await page.click('#btn-modal-patterns');
+await page.waitForTimeout(400);
+await page.evaluate(() => document.querySelector('.pv-rowplay[data-row="5"]')?.click());
+await page.waitForFunction(() => SongPlayer.isPlaying(), null, { timeout: 10000 }).catch(() => {});
+check('island: row play on the chain-FE row plays and loops only that island', await page.evaluate(() => {
+  if (!SongPlayer.isPlaying()) return false;
+  const rows = [...new Set(SongPlayer.timeline().marks.map(m => m.row))];
+  return rows.length === 1 && rows[0] === 5;
+}));
+await page.evaluate(() => SongPlayer.stop());
+await closeProjectModal();
+await page.waitForTimeout(300);
+
+// ── 28aa. sample browser: trash from the browser ───────
+await page.click('.tab-btn[data-tab="samples"]');
+await page.waitForTimeout(500);
+check('sampbr: every file row offers a trash button', await page.evaluate(() => {
+  const rows = document.querySelectorAll('#sampbr-list .sb-file-row[data-row]');
+  const btns = document.querySelectorAll('#sampbr-list .sb-trash');
+  return rows.length > 0 && btns.length === rows.length;
+}));
+const libTrashBefore = await page.evaluate(() =>
+  document.querySelectorAll('#sampbr-list .sb-trash[data-lib]').length);
+await page.evaluate(() => {
+  [...document.querySelectorAll('#sampbr-list .sb-trash[data-lib]')]
+    .find(b => /snare_alt/.test(b.dataset.lib))?.click();
+});
+await page.waitForTimeout(2500);
+check('sampbr: a library file moves to the card trash', await page.evaluate(n =>
+  document.querySelectorAll('#sampbr-list .sb-trash[data-lib]').length === n - 1, libTrashBefore));
+await page.click('.tab-btn[data-tab="problems"]');
+await page.waitForTimeout(300);
+await page.evaluate(() => document.querySelector('[data-psec="trash"]').click());
+await page.waitForTimeout(800);
+check('trash: the library file is listed with its samples/ origin', await page.evaluate(() =>
+  [...document.querySelectorAll('#prob-content .prob-row')].some(r =>
+    /snare_alt/.test(r.textContent) && /samples\/drums\/ \(library\)/.test(r.textContent))));
+await page.evaluate(() => {
+  [...document.querySelectorAll('#prob-content .prob-row')]
+    .find(r => /snare_alt/.test(r.textContent))?.querySelector('.btn-trash-restore')?.click();
+});
+await page.waitForTimeout(2500);
+await page.click('.tab-btn[data-tab="samples"]');
+await page.waitForTimeout(500);
+check('trash: restore puts the library file back in samples/drums/', await page.evaluate(() =>
+  [...document.querySelectorAll('#sampbr-list .sb-trash[data-lib]')]
+    .some(b => b.dataset.lib === 'drums/snare_alt.wav')));
 
 // The reload above wiped the fake serial device from section 5, which the
 // fx write-safety check depends on. Reinstall it and reconnect.
@@ -2182,29 +2274,6 @@ check('mirror text: blank removes it entirely', await page.evaluate(async () => 
   return lit === 0;
 }));
 
-// Recording container preference: when the browser claims MP4 support,
-// the recorder must choose it and name the file .mp4; when it does not,
-// the WebM fallback still works. Probed by patching isTypeSupported and
-// starting a real (tiny) recording each way.
-check('recording: MP4 is chosen and named .mp4 when supported', await page.evaluate(async () => {
-  const real = MediaRecorder.isTypeSupported.bind(MediaRecorder);
-  const seen = [];
-  MediaRecorder.isTypeSupported = m => { seen.push(m); return m.startsWith('video/webm'); };
-  try {
-    // The preference list must ASK for mp4 before webm even when the
-    // answer is no, or "prefers mp4" is fiction.
-    Mirror.toggleRecord();
-    await new Promise(r => setTimeout(r, 400));
-    const startedWebm = Mirror.isRecording();
-    Mirror.toggleRecord();
-    await new Promise(r => setTimeout(r, 400));
-    const askedMp4First = seen.findIndex(m => m.startsWith('video/mp4')) === 0;
-    return askedMp4First && startedWebm;
-  } finally {
-    MediaRecorder.isTypeSupported = real;
-  }
-}));
-
 // Back to the projects for grid behaviour. The fx corrupt-settings test
 // reloaded into USB-only mode, so there is no card open — load the demo
 // card again first. The row expander is a toggle, so only click it when
@@ -2491,22 +2560,9 @@ check('look: import round-trips through the sanitiser', await page.evaluate(asyn
   return st.on && st.enabled.trails && st.enabled.tint &&
          st.params.tint.colour === 'green' && st.react.bloom.length === 1;
 }, lookFile));
-check('look: import is held while recording, like the other size controls', await page.evaluate(async () => {
-  // A look file carries an output size; applying one mid-recording would
-  // resize the canvas under the capture track.
-  const real = MediaRecorder.isTypeSupported.bind(MediaRecorder);
-  MediaRecorder.isTypeSupported = m => m.startsWith('video/webm');
-  try {
-    Mirror.toggleRecord();
-    await new Promise(r => setTimeout(r, 350));
-    if (!Mirror.isRecording()) return false;
-    const held = document.getElementById('fx-import').disabled &&
-                 document.getElementById('fx-output').disabled;
-    Mirror.toggleRecord();
-    await new Promise(r => setTimeout(r, 350));
-    return held && !document.getElementById('fx-import').disabled;
-  } finally { MediaRecorder.isTypeSupported = real; }
-}));
+check('recording is gone: no record button, no recorder API on Mirror', await page.evaluate(() =>
+  !document.getElementById('fx-record') &&
+  Mirror.toggleRecord === undefined && Mirror.isRecording === undefined));
 check('look: a hostile file is rejected politely', await page.evaluate(async () => {
   const file = new File(['{"evil":true}'], 'x.json', { type: 'application/json' });
   const input = document.getElementById('fx-import-file');

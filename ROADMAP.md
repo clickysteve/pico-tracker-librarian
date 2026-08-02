@@ -10,10 +10,8 @@ until then, however substantial a round turns out to be.
 - **Card access over USB** — blocked on firmware (issues #1430 mass
   storage / #1432 data protocol); the librarian will work while the device
   is connected the day either lands.
-- **Delete from the sample browser** — the Trash tab (0.9.6) handles
-  restore and permanent delete for files already trashed; trashing
-  directly from the sample browser and preview flows would save a trip
-  through Problems.
+- ~~Delete from the sample browser~~ — done in 0.9.15: every Browse row
+  trashes to the card, library files restore to their exact subfolder.
 - **Waveform view + trim** in the sample browser.
 - **MIDI clock out** was considered and dropped: the MIDI export already
   covers the case people hit, and clock out only helps if the browser
@@ -24,8 +22,8 @@ until then, however substantial a round turns out to be.
 The player is a sketch, not an emulation, and these are the gaps that are
 actually audible rather than theoretical:
 
-- **`pingpong` loops play forward.** Web Audio has no ping-pong loop mode;
-  it needs manual scheduling or a reversed buffer.
+- ~~`pingpong` loops play forward~~ — fixed in 0.9.15 with mirrored
+  composite buffers, bouncing exactly where the firmware bounces.
 - ~~Song-grid group looping~~ — fixed in 0.9.14: channels loop their
   contiguous blocks exactly as Player.cpp does, verified against the
   firmware source.
@@ -82,4 +80,9 @@ progress, insert-paste and row clears on the grids, the tables layout,
 MP4 recording and the editable mirror text; and 0.9.12's six new effects
 (trails, pixelate, hue cycle, kaleidoscope, refresh bar, invert), seven
 new presets, the random-look button, switchable mirror fonts and
-shareable look files. See `CHANGELOG.md` for the detail.
+shareable look files; 0.9.14's firmware-accurate group looping, the
+consolidated save bar, the buffered set ZIP and alt-arrow drill-down;
+and 0.9.15's island arrangements, endless device-style looping, true
+pingpong loops, sample-browser delete, and the removal of the built-in
+recorder in favour of OBS against the pop-out. See `CHANGELOG.md` for
+the detail.

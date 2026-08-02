@@ -344,6 +344,11 @@
     .sb-badge.used   { background:#1c2f1c; color:var(--c-found); border:1px solid #2a4a2a; cursor:pointer; }
     .sb-badge.unused { background:var(--surface2); color:var(--muted); border:1px solid var(--border); cursor:pointer; }
     .sb-file-row.sel { background:var(--accent-dim); box-shadow:inset 3px 0 0 var(--accent); }
+    .sb-trash { background:none; border:none; color:var(--muted); cursor:pointer; font-size:12px;
+      padding:1px 5px; border-radius:4px; flex-shrink:0; opacity:0; transition:opacity .12s; }
+    .sb-file-row:hover .sb-trash, .sb-file-row.sel .sb-trash { opacity:.75; }
+    .sb-trash:hover { opacity:1 !important; background:var(--surface2); color:var(--c-miss); }
+    .sb-trash:disabled { opacity:.3 !important; cursor:default; }
     .play-btn { background:transparent; cursor:pointer;
       font-size:10px; color:var(--muted); line-height:1; transition:color .1s,border-color .1s; flex-shrink:0; }
     .play-btn:hover,.play-btn.playing { color:var(--accent); }
@@ -1053,7 +1058,6 @@
     .fx-sep { width:1px; height:20px; background:var(--border2); }
     .fx-panel input[type=range] { accent-color:var(--accent); height:16px; cursor:pointer; }
     #fx-zoom { width:74px; }
-    #fx-record.on { color:#fff; background:var(--c-miss); border-color:var(--c-miss); }
     .fx-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(258px,1fr)); gap:8px; }
     .fx-card { background:var(--surface); border:1px solid var(--border); border-radius:8px;
       padding:8px 10px; display:flex; flex-direction:column; gap:5px; }
@@ -1115,7 +1119,7 @@
     <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
       <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
          title="Source, issues and release notes on GitHub"
-         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v0.9.14 Alpha</a>
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v0.9.15 Alpha</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -1394,7 +1398,7 @@
           and Remote UI set to On in the device config.
           <br>The output effects run on the GPU and are applied to the mirror only — nothing is
           ever sent to the device. Pop the mirror out into its own window and capture that window
-          in OBS, or record straight to a video file here. The screen above is a stand-in until a
+          in OBS (or any screen recorder) to record it. The screen above is a stand-in until a
           device is connected, so a look can be dialled in ahead of time.
         </div>
       </div><!-- /usb-main -->
@@ -1411,7 +1415,6 @@
             <label class="fx-mini" title="The header text on the stand-in screen. Blank removes it. A connected device draws its own screen, so this only affects the demo.">Text <input type="text" id="fx-demo-text" class="search" maxlength="27" placeholder="PT LIBRARIAN" style="width:110px;padding:3px 7px;font-size:11px"></label>
             <label class="fx-mini" title="The face the mirror draws text with — the device's own bitmap font, or one built from a font your system already has. The special glyphs (meters, note icons) always use the device face.">Font <select id="fx-font"></select></label>
             <span class="fx-sep"></span>
-            <button class="btn ghost sm" id="fx-record">● Record</button>
             <button class="btn ghost sm" id="fx-random" title="Roll a random look — curated, so it stays watchable. Roll again until something sticks.">🎲 Random</button>
             <button class="btn ghost sm" id="fx-export" title="Save this look (effects, routings, output settings) as a small file to share or keep">⇩ Look</button>
             <button class="btn ghost sm" id="fx-import" title="Load a look from a file">⇪ Look</button>
@@ -1460,7 +1463,7 @@
 <!-- Transport: what is playing, where it is, and how to stop it -->
 <div id="transport" aria-live="polite">
   <button class="btn sm" id="tr-stop" title="Stop playback (Space)">■</button>
-  <button class="btn ghost sm" id="tr-loop" title="Loop what is playing">↻</button>
+  <button class="btn ghost sm on" id="tr-loop" title="Loop what is playing — on by default, as the device loops. Off plays a single pass">↻</button>
   <div id="tr-info">
     <div id="tr-title"></div>
     <div id="tr-sub"></div>
@@ -2401,8 +2404,8 @@ const PT = (() => {
   // its first gap (content below a gap is a separate loop-block the
   // device only reaches when started there).
   function buildMidi(proj, name) {
-    const last = lastSongRow(proj);
-    if (last < 0) return null;
+    const island = mainIsland(proj);
+    if (!island) return null;
     const CMD_KIL = 0x1E, CMD_HOP = 0x1B, CMD_GRV = 0x1A;
     const grooveOf = g => {
       const steps = (proj.grooves[g] || []).filter(v => v > 0 && v <= 0x80);
@@ -2417,14 +2420,15 @@ const PT = (() => {
       let gSteps = grooveOf(0), gPos = 0, trackHopEntry = 0;
       const noteOff = at => { if (open !== null) { ev.push({tick: at, data: [0x80 | t, open, 0x40]}); open = null; } };
       let started = false;
-      for (let row = 0; row <= last; row++) {
+      // The export walks the MAIN island (the longest contiguous block of
+      // rows), the same section the preview plays — one linear pass.
+      for (let row = island.start; row <= island.end; row++) {
         const c = gridCell(proj, row, t);
         if (c === EMPTY) {
-          if (started) break;     // a gap ends this channel's reachable run
-          continue;               // leading blanks: strictly the device never
-        }                         // starts this channel, but silently dropping
-        if (!started) started = true;   // it from a DAW export helps nobody —
-                                        // its first block is exported in place
+          if (started) break;     // a gap in this channel ends its run
+          continue;               // a late-entering channel starts where
+        }                         // its first chain sits
+        if (!started) started = true;
         for (let cs = 0; cs < STEPS; cs++) {
           const { phrase, transpose } = chainStep(proj, c, cs);
           if (phrase === EMPTY || phrase >= geom(proj).phraseCount) break;   // first empty step ends the chain
@@ -2803,11 +2807,41 @@ const PT = (() => {
   // A timeline needs an end, so: every channel is simulated to its first
   // loop-back (one full pass of its group), the longest pass sets the
   // song length, and shorter channels keep looping until that point.
+  // Songs are often arranged as ISLANDS: contiguous runs of rows with
+  // blank rows between them (each island a section, looped live). A row
+  // belongs to an island when any channel is playable on it. The device
+  // plays from its cursor; a librarian preview has no cursor, so "play
+  // this project" means the longest island (first wins a tie).
+  function mainIsland(proj) {
+    const last = lastSongRow(proj);
+    const rows = geom(proj).songRows;
+    const live = row => {
+      for (let t = 0; t < CHANNELS; t++) {
+        const c = gridCell(proj, row, t);
+        if (c !== EMPTY && chainStep(proj, c, 0).phrase !== EMPTY) return true;
+      }
+      return false;
+    };
+    let best = null, run = null;
+    for (let r = 0; r <= Math.min(last, rows - 1); r++) {
+      if (live(r)) { if (run) run.end = r; else run = { start: r, end: r }; }
+      else if (run) {
+        if (!best || run.end - run.start > best.end - best.start) best = run;
+        run = null;
+      }
+    }
+    if (run && (!best || run.end - run.start > best.end - best.start)) best = run;
+    return best;
+  }
+
   function buildEventTimeline(proj, opts = {}) {
     const last = lastSongRow(proj);
     const solo = opts.chain != null || opts.phrase != null;   // single-chain / single-phrase preview
     if (!solo && last < 0) return null;
-    const startRow = solo ? 0 : Math.max(0, opts.startRow ?? 0);
+    // No explicit start row = the main preview: start at the longest
+    // island rather than row 00, which may be blank by arrangement.
+    const startRow = solo ? 0
+      : Math.max(0, opts.startRow ?? (mainIsland(proj)?.start ?? 0));
     if (!solo && startRow > last) return null;
     const CMD_KIL = 0x1E, CMD_HOP = 0x1B, CMD_GRV = 0x1A, CMD_PAN = 0x2A;
     const bpm = proj.tempo && proj.tempo > 0 ? proj.tempo : 120;
@@ -2871,7 +2905,9 @@ const PT = (() => {
               const time = tick * tickSec;
               // Position marks let the UI show what is playing where:
               // grid cell, chain step, phrase and phrase step, per channel.
-              marks.push({ time, ch: t, row, chain: c, step: cs, phrase, pstep: ps });
+              // (Skipped for the player's scheduling walks, which only
+              // need events — marks are per-step and dominate the garbage.)
+              if (!opts.eventsOnly) marks.push({ time, ch: t, row, chain: c, step: cs, phrase, pstep: ps });
               if (st.cmd1 === CMD_KIL || st.cmd2 === CMD_KIL || st.note === NOTE_OFF)
                 events.push({ time, ch: t, type: 'off' });
               for (const [cmd, param] of [[st.cmd1, st.param1], [st.cmd2, st.param2]]) {
@@ -2900,15 +2936,19 @@ const PT = (() => {
     let endTick = 0;
     for (let t = 0; t < chanCount; t++) endTick = Math.max(endTick, walk(t, null));
     if (endTick <= 0) return null;
+    // opts.passes > 1 emits several consecutive passes of the loop, so a
+    // live player can schedule continuous playback in windows. duration
+    // stays ONE pass (the transport's length); span is the whole emit.
+    const passes = Math.max(1, Math.floor(opts.passes || 1));
     // Phase 2's step budget: every step advances at least one tick, so
-    // endTick steps is a true upper bound however short the loop is.
-    for (let t = 0; t < chanCount; t++) walk(t, endTick - 1, endTick + 1000);
+    // the emitted tick count is a true upper bound however short the loop.
+    for (let t = 0; t < chanCount; t++) walk(t, endTick * passes - 1, endTick * passes + 1000);
     events.sort((a, b) => a.time - b.time);
     marks.sort((a, b) => a.time - b.time);
     // Drop anything past the end (a loop pass can overshoot by a step).
-    const dur = endTick * tickSec;
-    return { events: events.filter(e => e.time < dur), marks: marks.filter(m => m.time < dur),
-             duration: dur, bpm };
+    const dur = endTick * tickSec, span = dur * passes;
+    return { events: events.filter(e => e.time < span), marks: marks.filter(m => m.time < span),
+             duration: dur, span, passes, bpm };
   }
 
   // ── Rewrite an instrument's slice points in project XML ──
@@ -3023,6 +3063,31 @@ const PT = (() => {
     return { start, end };
   }
 
+  // Web Audio only loops forward, so a pingpong loop is faked with a
+  // composite buffer: the original up to the loop end, then the loop
+  // region mirrored (interior only, so neither boundary frame plays
+  // twice — the firmware flips direction, it does not repeat samples).
+  // Looping [loopStart .. end-of-composite] then plays
+  // forward, backward, forward … exactly like SILM_LOOP_PINGPONG.
+  // Returns null when the region is too short to bounce; the caller
+  // falls back to a plain forward loop.
+  function pingpongBuffer(actx, buf, startSec, endSec) {
+    const rate = buf.sampleRate;
+    const ls = Math.round(startSec * rate);
+    const le = Math.min(Math.round(endSec * rate), buf.length);
+    const L = le - ls;
+    if (L < 3) return null;
+    const total = le + (L - 2);
+    const out = actx.createBuffer(buf.numberOfChannels, total, rate);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const src = buf.getChannelData(c);
+      const dst = out.getChannelData(c);
+      dst.set(src.subarray(0, le));
+      for (let i = 0; i < L - 2; i++) dst[le + i] = src[le - 2 - i];
+    }
+    return { buf: out, loopStart: ls / rate, loopEnd: total / rate };
+  }
+
   // ── Rewrite existing instrument PARAM values in project XML ──
   // Only updates PARAMs that already exist in the block (the firmware
   // writes every non-default parameter, and inventing new elements risks
@@ -3049,10 +3114,10 @@ const PT = (() => {
 
   return {
     parseXml, decodeHexBuffer, u16leFrom, buildPti, buildPtt, rewriteConfigTheme, defaultConfigXml,
-    noteFromStr, encodeHexBuffer, rewriteSongSections, buildEventTimeline,
+    noteFromStr, encodeHexBuffer, rewriteSongSections, buildEventTimeline, mainIsland,
     SCALES, NOTE_NAMES, scaleMask, projectScale, inScale, snapToScale, transposeInScale,
     CHORDS, ARP_PATTERNS, rng, euclid, arpSequence, varyNotes, humaniseVols, CMD_VOL,
-    sliceWindow, loopWindow, slicePadCount,
+    sliceWindow, loopWindow, pingpongBuffer, slicePadCount,
     rewriteGrooves, rewriteTable, buildEmptyProject, rebuildGrooveDigest,
     rewriteInstrumentSlices, rewriteInstrumentParams, detectOnsets, snapZeroCross,
     parseProject, parsePti, parseTheme, parseConfig, parseInstrumentEl,
@@ -4044,7 +4109,7 @@ const Demo = (() => {
         { name: 'Hat Closed', type: 'SAMPLE', sample: 'hat_closed.wav', params: { volume: 90, pan: 150 } },
         { name: 'Hat Open', type: 'SAMPLE', sample: 'hat_open.wav', params: { volume: 84, pan: 104 } },
         { name: 'Night Bass', type: 'SAMPLESOURCE', sample: 'bass_a.wav', params: { level: 118, 'voice filter cut': 180, 'lfo1 target': 'filter cut', 'lfo1 depth': 40, SL01: 2205, SL02: 5512 } },
-        { name: 'Galazio Pad', type: 'SAMPLESOURCE', sample: 'pad_am.wav', params: { level: 96, 'voice amp atk': 30, 'voice amp rel': 90 } },
+        { name: 'Galazio Pad', type: 'SAMPLESOURCE', sample: 'pad_am.wav', params: { level: 96, 'voice amp atk': 30, 'voice amp rel': 90, loopmode: 'pingpong', loopstart: 11025, end: 22050 } },
         { name: 'Ext Synth', type: 'MIDI', params: { channel: 3, volume: 200, 'note length': 12 } },
       ],
       pool: { 'kick.wav': smp.kick, 'snare.wav': smp.snare, 'hat_closed.wav': smp.hatC,
@@ -4081,6 +4146,27 @@ const Demo = (() => {
       ],
       pool: { 'kick_909.wav': smp.kick },
       mtime: days(400),
+    });
+    // Arranged the way people play live: sections ("islands") separated
+    // by blank rows, each looped on the device until the next is
+    // launched. Rows 00-01 deliberately empty; one section uses chain FE
+    // (the last valid chain — the grid runs 00-FE, FF is empty).
+    const performa = project({
+      version: '3.1.1', tempo: 120, advance: true,
+      grid: [[2,0,0],[2,1,2],[3,0,1],[3,1,2],[5,0,254],[5,1,3]],
+      chains: [[0,0,0],[1,0,1],[2,0,2],[3,0,3],[254,0,1]],
+      notes: [
+        [0,0,48,0],[0,4,48,0],[0,8,48,0],[0,12,48,0],
+        [1,0,48,0],[1,8,48,0],[1,12,50,1],
+        [2,4,52,1],[2,12,52,1],
+        [3,0,36,1],[3,6,38,1],[3,12,36,1],
+      ],
+      instruments: [
+        { name: 'Perf Kick', type: 'SAMPLE', sample: 'kick.wav', params: { volume: 128, 'root note': 36 } },
+        { name: 'Perf Snare', type: 'SAMPLE', sample: 'snare.wav', params: { volume: 110 } },
+      ],
+      pool: { 'kick.wav': smp.kick, 'snare.wav': smp.snare },
+      mtime: days(5),
     });
     const first = project({
       version: '2.3.1', tempo: 138,
@@ -4132,6 +4218,7 @@ const Demo = (() => {
       'perc_unused.wav': smp.hatO,
     }, days(2));
     addProject('BREAKS-90', breaks90, { 'sub_bass.wav': smp.bassA }, days(30), true);
+    addProject('PERFORMA', performa, { 'kick.wav': smp.kick, 'snare.wav': smp.snare }, days(5));
     addProject('FIRSTSONG', first, { 'pad_am.wav': smp.pad }, days(140));
     addProject('ZX-LEGACY', legacy, { 'kick_909.wav': smp.kick }, days(400));
     return cardRoot;
@@ -5545,7 +5632,7 @@ const USB = (() => {
 
   // The device screen is painted here and nowhere else. Mirror owns the
   // visible canvas and decides how these pixels reach the screen, so the
-  // effect chain, the pop-out and the recorder all see the same frame.
+  // effect chain and the pop-out all see the same frame.
   const canvas = Object.assign(document.createElement('canvas'),
     { width: COLS * CELLW * SCALE, height: ROWS * CELLH * SCALE });
   const ctx = canvas.getContext('2d');
@@ -5777,13 +5864,13 @@ const USB = (() => {
 // ══════════════════════════════════════════════════════════
 // MIRROR — owns the visible output canvas for the USB screen
 // mirror: the render loop, the effects state, the settings UI,
-// the pop-out window and WebM recording.
+// the pop-out window.
 //
 // USB paints the device screen into an offscreen 960x720 canvas and
 // never touches anything visible; everything the user sees comes out
 // of here, so effects, output size and letterboxing are decided in one
-// place and the same pixels feed the preview, the pop-out, the PNG
-// snapshot and the recorder.
+// place and the same pixels feed the preview, the pop-out and the PNG
+// snapshot.
 // ══════════════════════════════════════════════════════════
 const Mirror = (() => {
   const LS_KEY = 'ptlib-fx-v1';
@@ -5792,7 +5879,6 @@ const Mirror = (() => {
   let out = null, renderer = null, ctx2d = null;
   let state = null, raf = 0, started = 0, needsDraw = true;
   let popWin = null, popCtx = null, popRaf = 0;
-  let recorder = null, recChunks = [], recStream = null, recTimer = 0, recMimeUsed = '';
   let frames = 0, fpsAt = 0, lastStep = -1;
   let built = false, lost = false;
 
@@ -5926,11 +6012,10 @@ const Mirror = (() => {
     }
   }
 
-  // The loop runs while the Device tab is visible, while a pop-out is
-  // open, or while recording — an idle background tab should not be
-  // burning a GPU on a screen nobody is looking at.
+  // The loop runs while the Device tab is visible or while a pop-out is
+  // open — an idle background tab should not be burning a GPU on a
+  // screen nobody is looking at.
   function wanted() {
-    if (recorder) return true;
     if (popWin && !popWin.closed) return true;
     const pane = $('tab-device');
     return !!(pane && pane.classList.contains('active'));
@@ -5963,11 +6048,7 @@ const Mirror = (() => {
     const moving = (state.on && (state.animate || state.enabled.trails)) || reacting;
     // takeDirty() clears the flag, so read it exactly once per step.
     const dirty = USB.takeDirty();
-    // captureStream only emits a frame when the canvas is drawn to, so a
-    // recording of a still screen with the effects off has to keep
-    // drawing or it comes out as a single frame — or as nothing at all.
-    const force = !!recorder;
-    if (!moving && !dirty && !needsDraw && !force) { reportFps(ts, false); return; }
+    if (!moving && !dirty && !needsDraw) { reportFps(ts, false); return; }
     const upload = dirty || needsDraw;
     needsDraw = false;
     draw(state.on && state.animate ? (ts - started) / 1000 : 0, upload);
@@ -5981,7 +6062,7 @@ const Mirror = (() => {
 
   function invalidate() { needsDraw = true; }
 
-  // ── Snapshot / pop-out / recording ──────────────────────
+  // ── Snapshot / pop-out ──────────────────────────────────
   function download(blob, name) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -6046,122 +6127,8 @@ const Mirror = (() => {
   window.addEventListener('pagehide', () => {
     try { if (popWin && !popWin.closed) popWin.close(); } catch {}
     closePop();
-    if (recorder) { try { recorder.stop(); } catch {} }
-    releaseStream();
     AudioReact.stop();
   });
-
-  function recMime() {
-    // MP4/H.264 first: it opens everywhere (QuickTime, iOS, editors),
-    // where a WebM often reads as "unreadable file" outside the browser.
-    // Chrome has recorded MediaRecorder MP4 since mid-2024; anything
-    // older falls back to WebM, and the filename follows the container.
-    const want = [
-      'video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1', 'video/mp4',
-      'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm',
-    ];
-    for (const m of want)
-      if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
-    return '';
-  }
-  const recExt = mime => (mime || '').startsWith('video/mp4') ? 'mp4' : 'webm';
-
-  // A capture track keeps the output canvas registered as a frame source
-  // for as long as it lives, so every un-stopped stream is a permanent
-  // tax on the mirror's frame rate.
-  function releaseStream() {
-    if (!recStream) return;
-    try { recStream.getTracks().forEach(t => t.stop()); } catch {}
-    recStream = null;
-  }
-
-  function finishRecording() {
-    clearInterval(recTimer); recTimer = 0;
-    const blob = new Blob(recChunks, { type: recMimeUsed || 'video/webm' });
-    recChunks = [];
-    recorder = null;
-    releaseStream();
-    lockOutputControls(false);
-    paintRecordBtn();
-    if (blob.size) {
-      download(blob, `picotracker-mirror-${stamp()}.${recExt(recMimeUsed)}`);
-      setNote(recExt(recMimeUsed) === 'mp4' ? ''
-        : 'Saved as WebM — this browser cannot record MP4. VLC or a current Chrome plays it.');
-    } else {
-      setNote('Recording produced no data. Try again and give it a second or two.');
-    }
-  }
-
-  function toggleRecord() {
-    if (recorder) { stopRecord(); return; }
-    if (!out || !out.captureStream || !window.MediaRecorder) {
-      setNote('Recording needs a browser with MediaRecorder and canvas capture (Chrome or Edge).');
-      return;
-    }
-    recMimeUsed = recMime();
-    setNote('');
-    try { recStream = out.captureStream(60); } catch { recStream = null; }
-    if (!recStream) { setNote('Could not capture the output canvas for recording.'); return; }
-    try {
-      recorder = new MediaRecorder(recStream,
-        recMimeUsed ? { mimeType: recMimeUsed, videoBitsPerSecond: 12_000_000 } : undefined);
-    } catch (e) {
-      recorder = null;
-      releaseStream();
-      setNote('Recording failed to start: ' + (e.message || e));
-      return;
-    }
-    recChunks = [];
-    recorder.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
-    recorder.onstop = finishRecording;
-    recorder.onerror = e => {
-      setNote('Recording stopped on an error: ' + ((e && e.error && e.error.name) || 'unknown'));
-      try { recorder.stop(); } catch { finishRecording(); }
-    };
-    try {
-      recorder.start(250);
-    } catch (e) {
-      recorder = null;
-      releaseStream();
-      setNote('Recording failed to start: ' + (e.message || e));
-      return;
-    }
-    // Resizing the canvas mid-stream changes the track's frame size
-    // after the container header is written, so the size controls are
-    // held until the recording stops.
-    lockOutputControls(true);
-    // Best effort for a backgrounded tab: rAF is suspended when the
-    // document is hidden, and a frozen canvas records as a still image.
-    clearInterval(recTimer);
-    recTimer = setInterval(() => step(performance.now()), 33);
-    setNote('Recording. Keep this tab (or the popped-out window) visible — a hidden tab stops producing frames.');
-    paintRecordBtn();
-  }
-
-  function stopRecord() {
-    if (!recorder) return;
-    try { recorder.stop(); }
-    catch { finishRecording(); }          // never strand the captured chunks
-  }
-
-  function lockOutputControls(lock) {
-    // fx-import is here because a look file carries an output size, and
-    // resizing the canvas mid-recording corrupts the stream — the exact
-    // thing this lock exists to prevent.
-    for (const id of ['fx-output', 'fx-zoom', 'fx-reset', 'fx-import']) {
-      const el = $(id);
-      if (el) el.disabled = lock;
-    }
-  }
-
-  function paintRecordBtn() {
-    const b = $('fx-record');
-    if (!b) return;
-    b.classList.toggle('on', !!recorder);
-    b.textContent = recorder ? '■ Stop recording' : '● Record';
-    const ext = recExt(recorder ? recMimeUsed : recMime());
-    b.title = recorder ? `Stop and download the .${ext}` : `Record the output canvas to an .${ext} file`;
-  }
 
   function setNote(msg) {
     const n = $('fx-note');
@@ -6322,7 +6289,6 @@ const Mirror = (() => {
       state = Object.assign(blankState(), keep);
       syncUI(); save(); invalidate();
     });
-    $('fx-record').addEventListener('click', toggleRecord);
 
     grid.addEventListener('change', e => {
       const cb = e.target.closest('.fx-en');
@@ -6413,7 +6379,7 @@ const Mirror = (() => {
       // otherwise picking "CRT monitor" lights up five cards and ticks
       // the master checkbox while the picture never changes.
       setNote('WebGL is not available in this browser, so effects are off. The mirror still works, ' +
-              'and output size, fill, pop-out and recording all still apply.');
+              'and output size, fill and pop-out all still apply.');
       $('fx-on').disabled = true;
       pre.disabled = true;
       grid.querySelectorAll('input,button').forEach(el => { el.disabled = true; });
@@ -6549,7 +6515,6 @@ const Mirror = (() => {
     $('fx-react-on').disabled = !renderer;
     $('fx-meters').style.opacity = live && reacting ? '1' : '.35';
     paintMeters();
-    paintRecordBtn();
   }
 
   // ── Init ────────────────────────────────────────────────
@@ -6595,8 +6560,8 @@ const Mirror = (() => {
     raf = requestAnimationFrame(tick);
   }
 
-  return { init, invalidate, snapshotPng, popOut, outputCanvas, toggleRecord,
-           isRecording: () => !!recorder, hasEffects: () => !!renderer,
+  return { init, invalidate, snapshotPng, popOut, outputCanvas,
+           hasEffects: () => !!renderer,
            getState: () => state, syncUI };
 })();
 
@@ -6610,7 +6575,11 @@ const Mirror = (() => {
 // ══════════════════════════════════════════════════════════
 const SongPlayer = (() => {
   let ctx = null, timer = null, state = null;
-  let loopMode = false;   // when set, playback restarts instead of ending
+  // The device NEVER stops in song mode: every channel loops its group
+  // forever. Loop is therefore the default; toggling it off gives a
+  // single pass for auditioning.
+  let loopMode = true;
+  let ppBuilt = 0;        // composite pingpong buffers built (test hook)
 
   let bufCache = { key: null, ctx: null, buffers: null };
   async function loadBuffers(sd, projDirName, parsed, isDemoPool) {
@@ -6706,41 +6675,55 @@ const SongPlayer = (() => {
     master.connect(limiter);
     limiter.connect(ctx.destination);
     const instr = new Map(parsed.instruments.map(i => [i.id, instrMeta(i)]));
+    // Pingpong composites are shared across every note of an instrument;
+    // built once per play, keyed by sample + loop points.
+    const ppCache = new Map();
     const chans = [];
     for (let c = 0; c < 8; c++) {
       const g = ctx.createGain();
       const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       if (pan) { g.connect(pan); pan.connect(master); } else g.connect(master);
-      chans.push({ g, pan, sources: [] });
+      chans.push({ g, pan });
     }
     const seek = Math.max(0, opts?.startAt || 0);
     const t0 = ctx.currentTime + 0.15 - seek;   // shift the whole schedule back to start mid-song
+    const passDur = tl.duration;
+    const solo = opts?.chain != null || opts?.phrase != null;
 
-    // per-channel: compute each note's stop time (next on/off on channel)
-    const byCh = Array.from({ length: 8 }, () => []);
-    for (const e of tl.events) byCh[e.ch].push(e);
-    for (let c = 0; c < 8; c++) {
-      const evs = byCh[c];
-      for (let i = 0; i < evs.length; i++) {
-        const e = evs[i];
-        // VOL param is 0..255 → 0..1. The old 1.4x boost had no basis and
-        // pushed full-volume channels straight into clipping.
-        // gain/pan before the seek point still apply, just immediately
-        const at = Math.max(ctx.currentTime, t0 + e.time);
-        if (e.type === 'vol') chans[c].g.gain.setValueAtTime(e.value, at);
-        else if (e.type === 'pan' && chans[c].pan) chans[c].pan.pan.setValueAtTime(e.value, at);
-        else if (e.type === 'on') {
+    // Playback is scheduled in windows of whole passes. Song timelines
+    // are periodic streams (every channel loops its group, as on the
+    // device), so PT.buildEventTimeline(…, {passes: N}) extends the SAME
+    // deterministic walk — window K schedules events in [K·pass, end)
+    // with note stops looked up across the window boundary.
+    let scheduledPasses = 0;
+    const BLOCK = 8;                     // passes added per extension
+    function scheduleWindow(look, winStart, winEnd) {
+      const spanEnd = t0 + (look.span ?? look.duration);
+      const byCh = Array.from({ length: 8 }, () => []);
+      for (const e of look.events) byCh[e.ch].push(e);
+      for (let c = 0; c < 8; c++) {
+        const evs = byCh[c];
+        for (let i = 0; i < evs.length; i++) {
+          const e = evs[i];
+          if (e.time < winStart || e.time >= winEnd) continue;
+          // VOL param is 0..255 → 0..1. The old 1.4x boost had no basis and
+          // pushed full-volume channels straight into clipping.
+          // gain/pan before the seek point still apply, just immediately
+          const at = Math.max(ctx.currentTime, t0 + e.time);
+          if (e.type === 'vol') chans[c].g.gain.setValueAtTime(e.value, at);
+          else if (e.type === 'pan' && chans[c].pan) chans[c].pan.pan.setValueAtTime(e.value, at);
+          else if (e.type === 'on') {
           const m = instr.get(e.instr);
           if (!m || !m.sample) continue;
           const ent = buffers.get(m.sample);
           if (!ent) continue;
           const buf = ent.buf, srcRate = ent.srcRate;
           if (e.time < seek) continue;              // already past when seeking
-          let stopAt = t0 + tl.duration;
+          let stopAt = spanEnd;
           for (let j = i + 1; j < evs.length; j++)
             if (evs[j].type === 'on' || evs[j].type === 'off') { stopAt = t0 + evs[j].time; break; }
           const src = ctx.createBufferSource();
-          src.buffer = buf;
+          let useBuf = buf;      // set once at the end — the property is write-once
           const vg = ctx.createGain();
           vg.gain.value = m.gain;
           src.connect(vg); vg.connect(chans[c].g);
@@ -6761,29 +6744,78 @@ const SongPlayer = (() => {
             }
             if (m.loopMode !== 'none') {
               const lw = PT.loopWindow(m.loopStart, m.loopEnd, srcRate, buf.duration);
-              if (lw) { src.loop = true; src.loopStart = lw.start; src.loopEnd = lw.end; }
+              if (lw) {
+                let pp = null;
+                if (m.loopMode === 'pingpong') {
+                  const key = m.sample + '|' + lw.start + '|' + lw.end;
+                  if (ppCache.has(key)) pp = ppCache.get(key);
+                  else { pp = PT.pingpongBuffer(ctx, buf, lw.start, lw.end); ppCache.set(key, pp); if (pp) ppBuilt++; }
+                }
+                if (pp) { useBuf = pp.buf; src.loop = true; src.loopStart = pp.loopStart; src.loopEnd = pp.loopEnd; }
+                else { src.loop = true; src.loopStart = lw.start; src.loopEnd = lw.end; }
+              }
             }
           }
+          src.buffer = useBuf;
           src.playbackRate.value = rate;
           const start = t0 + e.time;
           vg.gain.setValueAtTime(m.gain, Math.max(start, stopAt - 0.006));
           vg.gain.linearRampToValueAtTime(0, stopAt);   // declick
+          // Looping playback runs indefinitely now, so finished notes must
+          // free themselves or the graph grows a node per note forever.
+          src.onended = () => { try { src.disconnect(); vg.disconnect(); } catch {} };
           try {
             if (dur !== null && !src.loop) src.start(start, offset, Math.min(dur, stopAt - start + 0.01));
             else { src.start(start, offset); src.stop(stopAt); }
           } catch {}
-          chans[c].sources.push(src);
+          }
         }
       }
     }
-    state = { onEnd, duration: tl.duration, t0, tl, label: proj?.name || '',
+    function extendSchedule() {
+      const from = scheduledPasses;
+      // Each extension re-walks the timeline from pass 0 (the stream is
+      // deterministic but not pass-periodic, so there is no shortcut).
+      // Growing the block keeps that quadratic in check: extensions double
+      // until one covers ~10 minutes of audio, then stay that size — so
+      // rebuild cost per extension is bounded and extensions become rare.
+      const step = Math.max(1, Math.min(Math.max(BLOCK, from), Math.ceil(600 / passDur)));
+      const to = from + (from === 0 ? 1 : step);
+      // One pass of lookahead past the window, so the stop of a note near
+      // the boundary is found rather than defaulted.
+      const look = PT.buildEventTimeline(parsed, { ...(opts || {}), passes: to + 1, eventsOnly: true });
+      // The editors mutate `parsed` in place, and windows spliced from a
+      // CHANGED walk would desync against what is already scheduled. If
+      // the pass length moved (rows/grooves/hops edited) — or nothing is
+      // playable any more — restart cleanly from the new timeline instead
+      // of splicing.
+      if (!look || Math.abs(look.duration - passDur) > 1e-9) {
+        const a = state.ctxArgs;
+        play(a.sd, a.proj, a.parsed, a.onProgress, a.onEnd, { ...(a.opts || {}), startAt: 0, internal: true });
+        return;
+      }
+      scheduleWindow(look, from * passDur, to * passDur);
+      scheduledPasses = to;
+    }
+    // First pass. When looping a song, keep one window ahead of the
+    // playhead from the timer; solo previews restart instead (their walk
+    // is a single chain, it does not extend).
+    if (loopMode && !solo) { scheduleWindow(PT.buildEventTimeline(parsed, { ...(opts || {}), passes: 2 }) || tl, 0, passDur); scheduledPasses = 1; }
+    else { scheduleWindow(tl, 0, passDur); scheduledPasses = 1; }
+    state = { onEnd, duration: passDur, t0, tl, label: proj?.name || '',
               ctxArgs: { sd, proj, parsed, onProgress, onEnd, opts } };
-    onProgress?.(0, tl.duration);
+    onProgress?.(0, passDur);
     timer = setInterval(() => {
       if (!ctx) return;
       const t = ctx.currentTime - t0;
-      onProgress?.(Math.max(0, t), state.duration);
-      if (t >= state.duration + 0.3) {
+      // The reported position cycles within one pass, so the scrubber and
+      // the live marks show where in the loop playback is.
+      onProgress?.(Math.max(0, loopMode && !solo ? t % passDur : t), state.duration);
+      if (loopMode && !solo) {
+        if (t > (scheduledPasses - 1) * passDur - 2) extendSchedule();
+        return;
+      }
+      if (t >= scheduledPasses * passDur + 0.3) {
         if (loopMode && state.ctxArgs) {
           const a = state.ctxArgs;
           play(a.sd, a.proj, a.parsed, a.onProgress, a.onEnd, { ...(a.opts || {}), startAt: 0, internal: true });
@@ -6806,7 +6838,8 @@ const SongPlayer = (() => {
     play(a.sd, a.proj, a.parsed, a.onProgress, a.onEnd, { ...(a.opts || {}), startAt: at, internal: true });
     return true;
   }
-  return { play, stop, isPlaying, timeline, label, setLoop, isLooping, seekTo };
+  return { play, stop, isPlaying, timeline, label, setLoop, isLooping, seekTo,
+           _ppBuilt: () => ppBuilt };
 })();
 
 
@@ -7249,6 +7282,8 @@ const UI = (() => {
       btn.classList.add('playing');
       item?.classList.add('playing');
       showTransport(p.name, `${p.tempo ?? '—'} BPM · preview`);
+    } else {
+      setCacheBar(`${p.name}: nothing to play — no row of the song grid has a playable chain.`, false);
     }
   }
 
@@ -8082,7 +8117,7 @@ const UI = (() => {
       { startRow: row })
       .then(ok => {
         el.textContent = ok ? '■' : '▶';
-        if (ok) showTransport(`${p.name} — from row ${PT.hx2(row)}`, 'playing to the end');
+        if (ok) showTransport(`${p.name} — from row ${PT.hx2(row)}`, SongPlayer.isLooping() ? 'looping, as the device plays — ■ stops it' : 'playing one pass');
         else el.classList.remove('playing');
       });
   }
@@ -8757,7 +8792,7 @@ const UI = (() => {
   async function renderProject(p, parsed, opts = {}) {
     const RATE = 44100;
     const tl = PT.buildEventTimeline(parsed, {});
-    if (!tl || !(tl.duration > 0)) throw new Error('nothing to render — no channel is playable from row 00 (blanks at the top of a column keep that channel silent, as on the device)');
+    if (!tl || !(tl.duration > 0)) throw new Error('nothing to render — no row of the song grid has a playable chain');
     const tail = 2;
     const off = new OfflineAudioContext(2, Math.ceil((tl.duration + tail) * RATE), RATE);
     // load and decode every pool sample into this context
@@ -8787,6 +8822,7 @@ const UI = (() => {
       chans.push({ g, pan });
     }
     const instrOf = new Map(parsed.instruments.map(i => [i.id, i]));
+    const ppCache = new Map();   // pingpong composites, shared across notes
     const meta = i => {
       const q = i.params || {};
       const num = (k, d) => { const v = parseInt(q[k], 10); return isNaN(v) ? d : v; };
@@ -8818,7 +8854,7 @@ const UI = (() => {
         for (let j = i + 1; j < evs.length; j++)
           if (evs[j].type === 'on' || evs[j].type === 'off') { stopAt = evs[j].time; break; }
         const src = off.createBufferSource();
-        src.buffer = buf;
+        let useBuf = buf;        // set once at the end — the property is write-once
         const vg = off.createGain();
         vg.gain.value = m.gain;
         src.connect(vg); vg.connect(chans[c].g);
@@ -8832,9 +8868,19 @@ const UI = (() => {
           if (m.start > 0 && m.start / srcRate < buf.duration) offset = m.start / srcRate;
           if (m.loopMode !== 'none') {
             const lw = PT.loopWindow(m.loopStart, m.loopEnd, srcRate, buf.duration);
-            if (lw) { src.loop = true; src.loopStart = lw.start; src.loopEnd = lw.end; }
+            if (lw) {
+              let pp = null;
+              if (m.loopMode === 'pingpong') {
+                const key = m.sample + '|' + lw.start + '|' + lw.end;
+                if (ppCache.has(key)) pp = ppCache.get(key);
+                else { pp = PT.pingpongBuffer(off, buf, lw.start, lw.end); ppCache.set(key, pp); }
+              }
+              if (pp) { useBuf = pp.buf; src.loop = true; src.loopStart = pp.loopStart; src.loopEnd = pp.loopEnd; }
+              else { src.loop = true; src.loopStart = lw.start; src.loopEnd = lw.end; }
+            }
           }
         }
+        src.buffer = useBuf;
         src.playbackRate.value = rate;
         vg.gain.setValueAtTime(m.gain, Math.max(e.time, stopAt - 0.006));
         vg.gain.linearRampToValueAtTime(0, stopAt);
@@ -8887,7 +8933,7 @@ const UI = (() => {
       // One file per channel that actually plays something, delivered as
       // a single zip rather than a browser-fighting burst of downloads.
       const probeTl = PT.buildEventTimeline(parsed, {});
-      if (!probeTl) throw new Error('nothing is playable from row 00 — on the device, blanks at the top of a column keep that channel silent');
+      if (!probeTl) throw new Error('nothing to render — no row of the song grid has a playable chain');
       const used = new Set(probeTl.events.filter(e => e.type === 'on').map(e => e.ch));
       if (!used.size) throw new Error('no channels play anything');
       const files = [];
@@ -10589,6 +10635,7 @@ const UI = (() => {
           <span class="sb-fname" style="cursor:pointer" title="click to copy card path" data-copy="samples/${esc(s.path)}">${esc(s.name)}</span>
           <span class="sb-fmeta">${s.meta ? `${fmtDur(s.meta.duration)} · ${s.meta.sampleRate}Hz ${s.meta.bits}bit ${s.meta.channels===2?'st':'mo'}` : ''} · ${fmtBytes(s.size)}</span>
           <span class="sb-badge ${usedIn?'used':'unused'}" data-name="${esc(s.name)}">${usedIn ? 'in '+usedIn+' proj' : 'unused'}</span>
+          <button class="sb-trash" data-lib="${esc(s.path)}" title="Move to PTLibrarian_Trash/ on the card — reversible from Problems → Trash">🗑</button>
         </div>`;
       }
       if (shown.length < files.length)
@@ -10611,6 +10658,7 @@ const UI = (() => {
           <span class="sb-fname" style="cursor:pointer" title="click to copy card path" data-copy="projects/${esc(p.dirName)}/samples/${esc(s.name)}">${esc(s.name)}</span>
           <span class="sb-fmeta">${s.meta ? `${fmtDur(s.meta.duration)} · ${s.meta.sampleRate}Hz ${s.meta.bits}bit` : ''} · ${fmtBytes(s.size)}</span>
           <span class="sb-badge ${unused?'unused':'used'}" data-name="${esc(s.name)}">${unused?'unused':'used'}</span>
+          <button class="sb-trash" data-proj="${esc(p.dirName)}" data-name="${esc(s.name)}"${unused?'':' data-used="1"'} title="Move to PTLibrarian_Trash/ on the card — reversible from Problems → Trash">🗑</button>
         </div>`;
       }
       html += `</div></div>`;
@@ -10633,6 +10681,23 @@ const UI = (() => {
         const t = el.textContent;
         el.textContent = '✓ path copied';
         setTimeout(() => { el.textContent = t; }, 900);
+      }));
+    host.querySelectorAll('.sb-trash').forEach(b =>
+      b.addEventListener('click', async e => {
+        e.stopPropagation();
+        const isPool = !!b.dataset.proj;
+        const label = isPool ? `projects/${b.dataset.proj}/samples/${b.dataset.name}` : `samples/${b.dataset.lib}`;
+        // A used pool sample deserves a louder warning: the project keeps
+        // referencing it and will show up under Problems as missing.
+        const warn = b.dataset.used
+          ? '\n\nThis project still USES this sample — it will play silent and show as a missing-sample problem until you restore it.'
+          : '';
+        if (!confirm(`Move ${label} to PTLibrarian_Trash/ on the card?${warn}\n\nNothing is deleted — restore it any time from Problems → Trash.`)) return;
+        b.disabled = true;
+        const ok = isPool ? await trashPoolSample(b.dataset.proj, b.dataset.name)
+                          : await trashLibrarySample(b.dataset.lib);
+        if (ok) { setCacheBar('Moved to trash — rescanning…', true); await rescan(lib); }
+        else b.disabled = false;
       }));
   }
 
@@ -11110,15 +11175,24 @@ const UI = (() => {
     const out = [];
     let root;
     try { root = await sd.getDirectoryHandle('PTLibrarian_Trash'); } catch { return out; }
-    for await (const [projName, dir] of root) {
-      if (dir.kind !== 'directory') continue;
+    // _library/ mirrors the samples/ tree (arbitrary depth); everything
+    // else is one project directory of flat files.
+    async function walk(dir, projName, rel, depth) {
       for await (const [name, fh] of dir) {
-        if (fh.kind !== 'file' || !/\.wav$/i.test(name)) continue;
+        if (fh.kind === 'directory') {
+          if (depth < 6) await walk(fh, projName, rel ? `${rel}/${name}` : name, depth + 1);
+          continue;
+        }
+        if (!/\.wav$/i.test(name)) continue;
         try {
           const f = await fh.getFile();
-          out.push({ proj: projName, name, size: f.size, lastModified: f.lastModified });
+          out.push({ proj: projName, rel, name, size: f.size, lastModified: f.lastModified });
         } catch {}
       }
+    }
+    for await (const [projName, dir] of root) {
+      if (dir.kind !== 'directory') continue;
+      await walk(dir, projName, '', 0);
     }
     out.sort((a, b) => b.lastModified - a.lastModified);
     return out;
@@ -11139,10 +11213,10 @@ const UI = (() => {
       items.map((i, idx) => `<div class="prob-row" data-i="${idx}">
         <span class="prob-icon">🗑</span>
         <div class="prob-main"><div class="prob-name">${esc(i.name)}</div>
-          <div class="prob-sub">from ${esc(i.proj)} · ${fmtDate(i.lastModified)}</div></div>
+          <div class="prob-sub">from ${i.proj === '_library' ? 'samples/' + (i.rel ? esc(i.rel) + '/' : '') + ' (library)' : esc(i.proj)} · ${fmtDate(i.lastModified)}</div></div>
         <span class="prob-right" style="display:flex;gap:6px;align-items:center">
           ${fmtBytes(i.size)}
-          <button class="btn ghost sm btn-trash-restore" data-i="${idx}" title="Put this file back in its project's sample pool">↩ Restore</button>
+          <button class="btn ghost sm btn-trash-restore" data-i="${idx}" title="${i.proj === '_library' ? 'Put this file back in the samples/ library' : "Put this file back in its project's sample pool"}">↩ Restore</button>
           <button class="btn ghost sm btn-trash-del" data-i="${idx}" title="Delete permanently — this cannot be undone">✕ Delete</button>
         </span></div>`).join('');
     host.querySelectorAll('.btn-trash-restore').forEach(b =>
@@ -11157,20 +11231,29 @@ const UI = (() => {
       renderTrash(host);
     });
   }
+  // Known edge: a project literally named "_library" would collide with
+  // the library namespace below and restore to samples/ instead of its
+  // pool. No data is lost and the name cannot be set from the device.
+  const trashItemDir = item =>
+    `PTLibrarian_Trash/${item.proj}` + (item.rel ? `/${item.rel}` : '');
   async function restoreFromTrash(item, host) {
     if (!await ensureWrite()) return false;
     try {
-      const bytes = await (await readCardFile(`PTLibrarian_Trash/${item.proj}`, item.name)).arrayBuffer();
-      const poolPath = `projects/${item.proj}/samples`;
-      // don't clobber a file that has reappeared in the pool since
+      const bytes = await (await readCardFile(trashItemDir(item), item.name)).arrayBuffer();
+      // Library files go back to the samples/ subfolder they came from;
+      // pool files back to their project's pool.
+      const destPath = item.proj === '_library'
+        ? 'samples' + (item.rel ? `/${item.rel}` : '')
+        : `projects/${item.proj}/samples`;
+      // don't clobber a file that has reappeared at the destination since
       let exists = false;
-      try { await (await getPathDir(poolPath, false)).getFileHandle(item.name); exists = true; } catch {}
-      if (exists) throw new Error(`${item.name} is already in that pool — remove it there first`);
-      await writeCardFile(poolPath, item.name, bytes);
-      const back = await readCardFile(poolPath, item.name);
+      try { await (await getPathDir(destPath, false)).getFileHandle(item.name); exists = true; } catch {}
+      if (exists) throw new Error(`${item.name} is already in ${destPath}/ — remove it there first`);
+      await writeCardFile(destPath, item.name, bytes);
+      const back = await readCardFile(destPath, item.name);
       if (back.size !== bytes.byteLength) throw new Error('restore verification failed');
-      await (await getPathDir(`PTLibrarian_Trash/${item.proj}`, false)).removeEntry(item.name);
-      logRepair(true, 'restore-sample', `${item.proj}: ${item.name} restored from trash (${fmtBytes(item.size)})`);
+      await (await getPathDir(trashItemDir(item), false)).removeEntry(item.name);
+      logRepair(true, 'restore-sample', `${item.proj === '_library' ? 'library' : item.proj}: ${item.name} restored to ${destPath}/ (${fmtBytes(item.size)})`);
       await persist();
       setCacheBar(`Restored ${item.name} — rescanning…`, true);
       await rescan(lib);
@@ -11186,8 +11269,8 @@ const UI = (() => {
     if (!await ensureWrite()) return false;
     if (host && !confirm(`Permanently delete ${item.name}?\n\nIt is already out of your project. This cannot be undone.`)) return false;
     try {
-      await (await getPathDir(`PTLibrarian_Trash/${item.proj}`, false)).removeEntry(item.name);
-      logRepair(true, 'delete-sample', `${item.proj}: ${item.name} deleted permanently (${fmtBytes(item.size)})`);
+      await (await getPathDir(trashItemDir(item), false)).removeEntry(item.name);
+      logRepair(true, 'delete-sample', `${item.proj === '_library' ? 'library' : item.proj}: ${item.name} deleted permanently (${fmtBytes(item.size)})`);
       await persist();
       if (host) { setCacheBar(`Deleted ${item.name} permanently.`, true); renderTrash(host); }
       return true;
@@ -12391,6 +12474,38 @@ const UI = (() => {
     } catch(e) {
       logRepair(false, 'trash-sample', `${p.name}: ${sampleName}: ${e.message || e}`);
       setCacheBar(`Cleanup failed: ${e.message || e}`, false);
+      return false;
+    }
+  }
+  // Library files under samples/ are copy sources, never referenced by a
+  // project at play time (projects play from their own pools), so trashing
+  // one cannot silence anything. Mirrored into PTLibrarian_Trash/_library/
+  // with the same subfolder, so restore knows where it came from.
+  async function trashLibrarySample(relPath) {
+    if (!await ensureWrite()) return false;
+    const slash = relPath.lastIndexOf('/');
+    const sub = slash >= 0 ? relPath.slice(0, slash) : '';
+    const name = slash >= 0 ? relPath.slice(slash + 1) : relPath;
+    try {
+      const srcDir = await getPathDir('samples' + (sub ? '/' + sub : ''), false);
+      const f = await (await srcDir.getFileHandle(name)).getFile();
+      const bytes = await f.arrayBuffer();
+      const trashDir = 'PTLibrarian_Trash/_library' + (sub ? '/' + sub : '');
+      let destName = name, free = false;
+      const tDir = await getPathDir(trashDir, true);
+      for (let n = 2; n < 200 && !free; n++) {
+        try { await tDir.getFileHandle(destName); destName = name.replace(/\.wav$/i, '') + n + '.wav'; }
+        catch { free = true; }
+      }
+      await writeCardFile(trashDir, destName, bytes);
+      const verify = await readCardFile(trashDir, destName);
+      if (verify.size !== bytes.byteLength) throw new Error('trash copy verification failed — library untouched');
+      await srcDir.removeEntry(name);
+      logRepair(true, 'trash-sample', `library: samples/${relPath} → ${trashDir}/${destName} (${fmtBytes(bytes.byteLength)})`);
+      return true;
+    } catch (e) {
+      logRepair(false, 'trash-sample', `library: samples/${relPath}: ${e.message || e}`);
+      setCacheBar(`Trash failed: ${e.message || e}`, false);
       return false;
     }
   }
