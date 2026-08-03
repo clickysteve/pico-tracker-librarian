@@ -2020,8 +2020,8 @@ const fxBase = await page.evaluate(() => ({
   outputs: document.querySelectorAll('#fx-output option').length,
 }));
 check('fx: WebGL renderer came up', fxBase.hasGl);
-check('fx: one card per effect definition', fxBase.cards === fxBase.defs && fxBase.cards === 31);
-check('fx: preset list has every preset plus Custom', fxBase.presets === FXPRESETS + 1 && FXPRESETS === 22);
+check('fx: one card per effect definition', fxBase.cards === fxBase.defs && fxBase.cards === 32);
+check('fx: preset list has every preset plus Custom', fxBase.presets === FXPRESETS + 1 && FXPRESETS === 23);
 check('fx: output list is populated', fxBase.outputs === 5);   // four presets + Custom
 
 // Every preset must render without raising a GL error, and must actually
@@ -2199,7 +2199,7 @@ check('fx: a stand-in screen is painted with no device connected', await page.ev
 // ── 31. audio-reactive effects ─────────────────────────
 check('fx: a react row for every effect that can be driven', await page.evaluate(() =>
   document.querySelectorAll('.fx-react').length === FX.DEFS.filter(d => d.react).length &&
-  document.querySelectorAll('.fx-react').length === 30));
+  document.querySelectorAll('.fx-react').length === 31));
 check('fx: react rows are hidden until audio-reactive is switched on', await page.evaluate(() =>
   getComputedStyle(document.querySelector('.fx-react')).display === 'none'));
 
@@ -2350,12 +2350,21 @@ check('drawer: the effects live in a right-hand drawer', await page.evaluate(() 
          document.getElementById('tab-device').classList.contains('fx-open');
 }));
 check('drawer: the toggle actually hides it', await page.evaluate(async () => {
+  // poll: the hide is a CSS transition whose duration must not be a
+  // test assumption (the panel has grown a lot of cards)
+  const vis = () => getComputedStyle(document.getElementById('fx-drawer')).visibility;
+  const waitFor = async want => {
+    for (let i = 0; i < 30; i++) {
+      if (vis() === want) return true;
+      await new Promise(r => setTimeout(r, 100));
+    }
+    return false;
+  };
   document.getElementById('btn-usb-fx').click();
-  await new Promise(r => setTimeout(r, 250));
-  const hidden = getComputedStyle(document.getElementById('fx-drawer')).visibility === 'hidden';
+  const hidden = await waitFor('hidden');
   document.getElementById('btn-usb-fx').click();
-  await new Promise(r => setTimeout(r, 250));
-  return hidden && getComputedStyle(document.getElementById('fx-drawer')).visibility === 'visible';
+  const shown = await waitFor('visible');
+  return hidden && shown;
 }));
 check('drawer: the mirror is not inside it', await page.evaluate(() =>
   !document.getElementById('fx-drawer').contains(document.getElementById('usb-canvas'))));
@@ -2746,6 +2755,44 @@ check('output: custom dims are clamped to sane GPU sizes', await page.evaluate((
   return d.w === 3840 && d.h === 240;
 }));
 
+// Lottes CRT: the beam modulates rows (a bright row's vertical profile
+// dips between scanlines), and the three masks render distinctly.
+check('lottes: the beam draws real scanlines and the masks differ', await page.evaluate(async () => {
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const st = Mirror.getState();
+  const off = FX.presetState('off');
+  st.enabled = off.enabled; st.params = off.params; st.react = FX.blankReact();
+  st.on = true; st.enabled.lottes = true;
+  st.params.lottes = { beam: 60, sharp: 40, mask: 'none', maskamt: 0 };
+  const frame = async () => { Mirror.invalidate(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); };
+  Mirror.syncUI(); await frame(); await frame();
+  // vertical luma profile down a lit column: scanline gaps = variance
+  const profile = () => {
+    const px = new Uint8Array(4 * 120);
+    gl.readPixels(480, 300, 1, 120, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const vals = [];
+    for (let i = 0; i < px.length; i += 4) vals.push(px[i] + px[i+1] + px[i+2]);
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const varc = vals.reduce((a, b) => a + (b - mean) * (b - mean), 0) / vals.length;
+    return { mean, varc };
+  };
+  const withBeam = profile();
+  const sig = async mask => {
+    st.params.lottes.mask = mask; st.params.lottes.maskamt = 80;
+    Mirror.syncUI(); await frame();
+    const px = new Uint8Array(4 * 400);
+    gl.readPixels(400, 360, 100, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    return [...px].join(',');
+  };
+  const a = await sig('grille'), b = await sig('tv'), c = await sig('vga');
+  const err = gl.getError();
+  st.enabled.lottes = false;
+  Mirror.syncUI(); await frame();
+  return err === 0 && withBeam.mean > 20 && withBeam.varc > 40 &&
+         new Set([a, b, c]).size === 3;
+}));
+
 // Background feedback: the bars come alive, the picture shrinks with
 // inset, and the loop actually evolves frame over frame.
 check('bgfeed: the letterbox region lights up and keeps evolving', await page.evaluate(async () => {
@@ -2882,9 +2929,14 @@ const hostileDiag = await page.evaluate(async () => {
   input.files = dt.files;
   const before = JSON.stringify(Mirror.getState().enabled);
   input.dispatchEvent(new Event('change', { bubbles: true }));
-  await new Promise(r => setTimeout(r, 250));
-  return { same: JSON.stringify(Mirror.getState().enabled) === before,
-           note: document.getElementById('fx-note').textContent };
+  // Poll: the rejection note can be overwritten moments later by an
+  // unrelated async status update, so catch it whenever it appears.
+  let sawNote = '';
+  for (let i = 0; i < 15 && !/not a saved look/.test(sawNote); i++) {
+    await new Promise(r => setTimeout(r, 100));
+    sawNote = document.getElementById('fx-note').textContent || sawNote;
+  }
+  return { same: JSON.stringify(Mirror.getState().enabled) === before, note: sawNote };
 });
 if (!hostileDiag.same || !/not a saved look/.test(hostileDiag.note))
   console.log('HOSTILE DIAG:', JSON.stringify(hostileDiag));

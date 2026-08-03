@@ -39,6 +39,11 @@ actually audible rather than theoretical:
 
 ## USB / Remote UI
 
+- **Advance font refresh** — the embedded atlas is byte-identical to
+  picotracker_client's `font_adv.png` at commit 9daa7c7. The dev has a
+  couple of new extended characters coming for the v3 release; re-derive
+  the atlas when that lands.
+
 - ~~Instrument-screen waveform on the mirror~~ — solved in 1.0.4: the
   Advance draws in a 720×720 pixel space and the client was scaling its
   rects as pico ones, off the canvas. The mirror now has a real Advance

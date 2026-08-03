@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.3.0 — Lottes CRT, and the background loop learns to move
+
+- **CRT (Lottes)** (32nd effect): a port of Timothy Lottes'
+  public-domain CRT shader — the RetroArch `crt-lottes`. A gaussian
+  beam is drawn per scanline in linear light (beam hardness and pixel
+  sharpness exposed), through his shadow masks: aperture **grille**,
+  compressed **TV** shadow mask, or stretched **VGA** mask, with a
+  depth control. It replaces the plain sampler while on (RGB offset /
+  planes pause; everything else composes), runs in device-pixel space
+  so the beam sits on real scanlines at any output size, and pairs with
+  the existing curve, glow and vignette — see the new **Lottes CRT**
+  preset (23 total).
+- **Background feedback grows motion.** Two new ways to keep the loop
+  alive, from real enhancer-rig practice: **Drift** wanders the
+  feedback resample point on a slow genlocked Lissajous, so the loop
+  never settles into a fixed attractor; **Screen echo** rescans last
+  frame's finished picture — every effect included — into the loop at
+  wandering offsets, so whatever the display is doing (glitches,
+  rainbows, Lottes beam and all) smears into the background. Both are
+  audio-routable and in the Enhancer loop preset.
+- **Advance font verified current**: the embedded atlas is
+  byte-identical to `picotracker_client`'s `font_adv.png` at its latest
+  commit. The dev's upcoming v3 extended characters are noted on the
+  roadmap for a refresh when published.
+
+
 ## v1.2.0 — background feedback: the bars come alive
 
 - **Background feedback** (31st effect): the letterbox region becomes a
