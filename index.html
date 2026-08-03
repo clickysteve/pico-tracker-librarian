@@ -1119,7 +1119,7 @@
     <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
       <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
          title="Source, issues and release notes on GitHub"
-         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.3.0 Beta</a>
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.4.0 Beta</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -4512,6 +4512,12 @@ const FX = (() => {
       { key:'corner', label:'Corner radius',def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'spec',   label:'Glass glare',  def:25, min:0, max:100, step:1, fmt:v=>`${v}%` },
     ]},
+    { id:'lottes', label:'CRT (Lottes)', react:'beam', hint:'Timothy Lottes\' public-domain CRT shader: a gaussian beam drawn per scanline in linear light, with his shadow masks. Replaces the plain sampler while on.', params:[
+      { key:'beam', label:'Beam hardness',  def:33, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'sharp', label:'Pixel sharpness', def:40, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'mask', type:'seg', label:'Mask', def:'grille', opts:[['none','None'],['grille','Grille'],['tv','TV'],['vga','VGA']] },
+      { key:'maskamt', label:'Mask depth', def:60, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
     { id:'warp', label:'Wave warp', react:'amplitude', hint:'Rolling horizontal ripple, like a mistracked signal.', params:[
       { key:'amplitude', label:'Amplitude', def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'frequency', label:'Frequency', def:40, min:1, max:100, step:1, fmt:v=>`${v}%` },
@@ -4549,10 +4555,12 @@ const FX = (() => {
       { key:'contrast',   label:'Contrast',   def:100, min:0, max:200, step:1, fmt:v=>`${v}%` },
       { key:'saturation', label:'Saturation', def:100, min:0, max:300, step:1, fmt:v=>`${v}%` },
       { key:'gamma',      label:'Gamma',      def:100, min:40, max:200, step:1, fmt:v=>(v/100).toFixed(2) },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'tint', label:'Phosphor tint', react:'amount', hint:'Recolour the whole picture through a single phosphor.', params:[
       { key:'colour', type:'seg', label:'Phosphor', def:'green', opts:[['green','Green'],['amber','Amber'],['blue','Blue'],['red','Red'],['white','White']] },
       { key:'amount', label:'Amount', def:80, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'bloom', label:'Phosphor glow', react:'intensity', hint:'Bright pixels bleed outward. The single biggest win on a projector.', params:[
       { key:'intensity', label:'Intensity',   def:55, min:0, max:150, step:1, fmt:v=>`${v}%` },
@@ -4564,19 +4572,23 @@ const FX = (() => {
       { key:'variant', type:'seg', label:'Weight', def:'medium', opts:[['fine','Fine'],['medium','Medium'],['thick','Thick'],['wide','Wide']] },
       { key:'pitch', label:'Line pitch', def:1, min:1, max:4, step:1, fmt:v=>v===1?'Every row':`${v} rows` },
       { key:'mix',   label:'Depth',      def:70, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'lcd', label:'LCD panel', react:'bleed', hint:'Sub-pixel tint columns and backlight bleed.', params:[
       { key:'subpixel', label:'Sub-pixel tint',  def:30, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'bleed',    label:'Backlight bleed', def:15, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'grid', label:'Pixel grid', react:'opacity', hint:'A line on every device-pixel boundary.', params:[
       { key:'opacity', label:'Grid opacity', def:30, min:1, max:100, step:1, fmt:v=>`${v}%` },
       { key:'weight',  label:'Line weight',  def:1,  min:0.5, max:4, step:0.5, fmt:v=>`${v}px` },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'dot', label:'Dot matrix', react:'halation', hint:'Each device pixel becomes a round dot with gaps between.', params:[
       { key:'radius',   label:'Dot size', def:44, min:15, max:80, step:1, fmt:v=>`${v}%` },
       { key:'depth',    label:'Gap darkness', def:80, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'halation', label:'Halation', def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'interlace', label:'Interlace', react:'intensity', hint:'Alternate field offset and darkening, like broadcast video.', params:[
       { key:'intensity', label:'Intensity', def:50, min:1, max:100, step:1, fmt:v=>`${v}%` },
@@ -4585,13 +4597,16 @@ const FX = (() => {
     { id:'noise', label:'Noise', react:'amount', hint:'Film grain, static or horizontal banding.', params:[
       { key:'amount', label:'Amount', def:25, min:1, max:100, step:1, fmt:v=>`${v}%` },
       { key:'type', type:'seg', label:'Type', def:'film', opts:[['film','Film'],['static','Static'],['bands','Bands']] },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'vignette', label:'Vignette', react:'falloff', hint:'Darkened edges, round through to square.', params:[
       { key:'falloff', label:'Intensity', def:45, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'shape',   label:'Shape',     def:0,  min:0, max:100, step:1, fmt:v=>v<=5?'Round':v>=95?'Square':`${v}%` },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'dither', label:'Posterise / dither', react:'levels', hint:'Ordered Bayer dithering down to a few tones per channel.', params:[
       { key:'levels', label:'Tones', def:4, min:2, max:12, step:1, fmt:v=>v===2?'2 (1-bit)':`${v}` },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'trails', label:'Trails / rescan', react:'decay', hint:'What moved a moment ago is still faintly there — and the past can be zoomed, rotated and hue-spun as it decays, video-feedback style.', params:[
       { key:'decay', label:'Persistence', def:60, min:5, max:97, step:1, fmt:v=>`${v}%` },
@@ -4615,9 +4630,11 @@ const FX = (() => {
       { key:'intensity', label:'Brightness', def:35, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'width', label:'Band height', def:30, min:5, max:80, step:1, fmt:v=>`${v}%` },
       { key:'speed', label:'Speed', def:25, min:1, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'invert', label:'Invert / solarise', react:'amount', hint:'Negative at full, solarised part-way.', params:[
       { key:'amount', label:'Amount', def:100, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'composite', label:'Composite signal', react:'bleed', hint:'The picture through a composite cable: chroma bleeding sideways, NTSC rainbows on edges, dot crawl, ringing.', params:[
       { key:'bleed',   label:'Chroma bleed', def:35, min:0, max:100, step:1, fmt:v=>`${v}%` },
@@ -4646,6 +4663,7 @@ const FX = (() => {
       { key:'amount', label:'Amount',  def:60, min:0, max:100, step:1, fmt:v=>`${v}%` },
       { key:'bands',  label:'Bands',   def:30, min:5, max:100, step:1, fmt:v=>`${v}%` },
       { key:'sweep',  label:'Sweep',   def:15, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Still' },
+      { key:'scope', type:'seg', label:'Apply to', def:'pic', opts:[['pic','Picture'],['bg','Backdrop'],['both','Both']] },
     ]},
     { id:'bgfeed', label:'Background feedback', react:'bleed', hint:'The bars become a live enhancer feedback loop — swirling analogue colour fed by the screen\'s own glow, with the display floating on top. Inset shrinks the picture so more background shows.', params:[
       { key:'gain',   label:'Loop gain',    def:96, min:60, max:104, step:1, fmt:v=>`${v}%` },
@@ -4657,12 +4675,6 @@ const FX = (() => {
       { key:'drift',  label:'Drift',        def:25, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Off' },
       { key:'echo',   label:'Screen echo',  def:30, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Off' },
       { key:'inset',  label:'Picture inset',def:0,  min:0, max:60, step:1, fmt:v=>v?`${v}%`:'Full size' },
-    ]},
-    { id:'lottes', label:'CRT (Lottes)', react:'beam', hint:'Timothy Lottes\' public-domain CRT shader: a gaussian beam drawn per scanline in linear light, with his shadow masks. Replaces the plain sampler while on.', params:[
-      { key:'beam', label:'Beam hardness',  def:33, min:0, max:100, step:1, fmt:v=>`${v}%` },
-      { key:'sharp', label:'Pixel sharpness', def:40, min:0, max:100, step:1, fmt:v=>`${v}%` },
-      { key:'mask', type:'seg', label:'Mask', def:'grille', opts:[['none','None'],['grille','Grille'],['tv','TV'],['vga','VGA']] },
-      { key:'maskamt', label:'Mask depth', def:60, min:0, max:100, step:1, fmt:v=>`${v}%` },
     ]},
   ];
 
@@ -4883,6 +4895,7 @@ const FX = (() => {
       if (!enabled[d.id]) continue;
       for (const par of d.params) {
         if (par.type === 'seg') {
+          if (par.key === 'scope') { params[d.id][par.key] = 'pic'; continue; }
           const opts = par.opts.map(o => o[0]);
           params[d.id][par.key] = opts[Math.floor(rand() * opts.length) % opts.length];
           continue;
@@ -5047,6 +5060,9 @@ uniform vec4  uBgSeed;         // screen bleed, oscillator, osc phase, osc scale
 uniform vec4  uLot;            // hardScan, hardPix, mask type, mask strength
 uniform float uLotOn;
 uniform vec4  uBgFb2;          // drift shift x, drift shift y, echo, echo phase
+uniform vec4  uScopeA;         // scopes: tint, grade, invert, rainbow map
+uniform vec4  uScopeB;         // scopes: scanlines, lcd, grid, dot
+uniform vec4  uScopeC;         // scopes: noise, vignette, rollbar, dither
 
 const float TAU = 6.28318530718;
 
@@ -5132,6 +5148,9 @@ vec3 MaskL(vec2 pos) {
   }
   return mask;
 }
+
+// Effect scope: 0 = picture only, 1 = backdrop only, 2 = both.
+bool scOK(float s, float b) { return s > 1.5 || (b > 0.5 ? s > 0.5 : s < 0.5); }
 
 float bayer4(vec2 p) {
   // 4x4 ordered dither matrix, unrolled — GLSL ES 1.0 has no dynamic
@@ -5233,6 +5252,11 @@ void main() {
   if (uPix.x > 0.0)
     q = clamp((floor(q / uPix) + 0.5) * uPix, 0.5 * uPix, vec2(1.0) - 0.5 * uPix);
 
+  float bgPix = oob ? 1.0 : 0.0;
+  vec2 unit = vec2(1.0 / ${DEV_W}.0, 1.0 / ${DEV_H}.0);
+  // The coordinate a scoped treatment measures against: content space
+  // for the picture, frame space for the backdrop.
+  vec2 sq = oob ? p : q;
   vec3 col = uBg;
   // ── Background synth ─────────────────────────────────────
   // The letterbox region becomes a video-enhancer feedback loop: last
@@ -5278,7 +5302,6 @@ void main() {
   }
   if (!oob) {
     // ── Sampling ─────────────────────────────────────────
-    vec2 unit = vec2(1.0 / ${DEV_W}.0, 1.0 / ${DEV_H}.0);
     vec2 sh = uRgb.xy * unit;
     vec2 rad = vec2(0.0);
     if (abs(uRgb.z) > 0.0001) {
@@ -5397,16 +5420,8 @@ void main() {
       }
     }
 
-    // ── Colour ───────────────────────────────────────────
+    // ── Colour (picture side) ────────────────────────────
     col = clamp(uChMat * col, 0.0, 1.0);
-
-    if (uTint.w > 0.0) col = mix(col, uTint.rgb * lum(col), uTint.w);
-
-    col = pow(max(col, 0.0), vec3(uGrade.w));
-    col = (col - 0.5) * uGrade.y + 0.5;
-    col *= uGrade.x;
-    col = mix(vec3(lum(col)), col, uGrade.z);
-    col = clamp(col, 0.0, 1.0);
 
     // ── Bent enhancer ────────────────────────────────────
     // The sharpness circuit driven into oscillation: repeating edge
@@ -5431,60 +5446,76 @@ void main() {
       float m = step(uFlick.y, lum(col));
       col = mix(col, vec3(1.0) - col, m * uFlick.x);
     }
-    if (uRmap.x > 0.0) {
-      // luma-keyed rainbow colorizer — hot posterised bands riding
-      // brightness, swept over time
-      float yv = lum(col);
-      float hph = clamp(yv, 0.0, 1.2) * uRmap.y + uRmap.z;
-      vec3 pal = 0.5 + 0.5 * cos(TAU * (hph + vec3(0.0, 0.33, 0.67)));
-      pal *= 0.3 + smoothstep(0.02, 0.85, yv);
-      col = mix(col, clamp(pal, 0.0, 1.0), uRmap.x);
-    }
+  }
 
-    if (uInv > 0.0) col = mix(col, vec3(1.0) - col, uInv);
+  // ── Scoped treatments: Picture / Backdrop / Both ───────
+  // Colour and texture effects can target the picture, the live
+  // backdrop behind it, or the whole frame. Each measures against sq —
+  // content space on the picture, frame space on the backdrop.
+  if (uTint.w > 0.0 && scOK(uScopeA.x, bgPix)) col = mix(col, uTint.rgb * lum(col), uTint.w);
 
-    // ── Masks ────────────────────────────────────────────
-    // All of these are measured in DEVICE pixels off q, not in output
-    // pixels off p, so they follow the curve and the fill instead of
-    // beating against it, and look identical at every output size.
-    if (uScan.y > 0.0) {
-      float f = fract(q.y * ${DEV_H}.0 / uScan.z);
-      // Soften by about half an output pixel so the gap does not alias
-      // when the pitch is not a whole number of screen pixels.
-      float soft = clamp(0.5 / max(uPx * uScan.z, 1.0), 0.02, 0.30);
-      float m = smoothstep(1.0 - uScan.x - soft, 1.0 - uScan.x + soft, f);
-      col *= 1.0 - m * uScan.y;
-      // Put back the light the mask removed, or heavy scanlines read as
-      // "the picture got dark" rather than as scanlines.
-      col *= 1.0 / (1.0 - uScan.x * uScan.y * 0.8);
-    }
+  if (scOK(uScopeA.y, bgPix)) {
+    col = pow(max(col, 0.0), vec3(uGrade.w));
+    col = (col - 0.5) * uGrade.y + 0.5;
+    col *= uGrade.x;
+    col = mix(vec3(lum(col)), col, uGrade.z);
+    col = clamp(col, 0.0, 1.0);
+  }
 
-    if (uLcd.x > 0.0) {
-      float sub = mod(floor(q.x * ${DEV_W}.0 * 3.0), 3.0);
-      vec3 tintv = sub < 1.0 ? vec3(1.0, 1.0 - uLcd.x, 1.0 - uLcd.x)
-                 : sub < 2.0 ? vec3(1.0 - uLcd.x, 1.0, 1.0 - uLcd.x)
-                             : vec3(1.0 - uLcd.x, 1.0 - uLcd.x, 1.0);
-      col *= tintv;
-    }
+  if (uRmap.x > 0.0 && scOK(uScopeA.w, bgPix)) {
+    // luma-keyed rainbow colorizer — hot posterised bands riding
+    // brightness, swept over time
+    float yv = lum(col);
+    float hph = clamp(yv, 0.0, 1.2) * uRmap.y + uRmap.z;
+    vec3 pal = 0.5 + 0.5 * cos(TAU * (hph + vec3(0.0, 0.33, 0.67)));
+    pal *= 0.3 + smoothstep(0.02, 0.85, yv);
+    col = mix(col, clamp(pal, 0.0, 1.0), uRmap.x);
+  }
 
-    if (uGrid.x > 0.0) {
-      vec2 g = fract(q * vec2(${DEV_W}.0, ${DEV_H}.0));
-      float w = clamp(uGrid.y / max(uPx, 1.0), 0.02, 0.9);
-      float line = max(smoothstep(1.0 - w, 1.0, g.x), smoothstep(1.0 - w, 1.0, g.y));
-      col *= 1.0 - line * uGrid.x;
-    }
+  if (uInv > 0.0 && scOK(uScopeA.z, bgPix)) col = mix(col, vec3(1.0) - col, uInv);
 
-    if (uDot.y > 0.0) {
-      vec2 dc = fract(q * vec2(${DEV_W}.0, ${DEV_H}.0)) - 0.5;
-      float d = length(dc);
-      float edge = clamp(0.6 / max(uPx, 1.0), 0.02, 0.2);
-      float inside = 1.0 - smoothstep(uDot.x - edge, uDot.x + edge, d);
-      col *= mix(1.0 - uDot.y, 1.0, inside);
-      col *= 1.0 / (1.0 - uDot.y * 0.45);
-      if (uDot.z > 0.0)
-        col += vec3(uDot.z * 0.35 * (1.0 - smoothstep(uDot.x, uDot.x + 0.35, d)) * lum(col));
-    }
+  // ── Masks ────────────────────────────────────────────
+  // Measured in DEVICE pixels off sq, so they follow the curve and the
+  // fill on the picture and sit on the same grid on the backdrop.
+  if (uScan.y > 0.0 && scOK(uScopeB.x, bgPix)) {
+    float f = fract(sq.y * ${DEV_H}.0 / uScan.z);
+    // Soften by about half an output pixel so the gap does not alias
+    // when the pitch is not a whole number of screen pixels.
+    float soft = clamp(0.5 / max(uPx * uScan.z, 1.0), 0.02, 0.30);
+    float m = smoothstep(1.0 - uScan.x - soft, 1.0 - uScan.x + soft, f);
+    col *= 1.0 - m * uScan.y;
+    // Put back the light the mask removed, or heavy scanlines read as
+    // "the picture got dark" rather than as scanlines.
+    col *= 1.0 / (1.0 - uScan.x * uScan.y * 0.8);
+  }
 
+  if (uLcd.x > 0.0 && scOK(uScopeB.y, bgPix)) {
+    float sub = mod(floor(sq.x * ${DEV_W}.0 * 3.0), 3.0);
+    vec3 tintv = sub < 1.0 ? vec3(1.0, 1.0 - uLcd.x, 1.0 - uLcd.x)
+               : sub < 2.0 ? vec3(1.0 - uLcd.x, 1.0, 1.0 - uLcd.x)
+                           : vec3(1.0 - uLcd.x, 1.0 - uLcd.x, 1.0);
+    col *= tintv;
+  }
+
+  if (uGrid.x > 0.0 && scOK(uScopeB.z, bgPix)) {
+    vec2 g = fract(sq * vec2(${DEV_W}.0, ${DEV_H}.0));
+    float w = clamp(uGrid.y / max(uPx, 1.0), 0.02, 0.9);
+    float line = max(smoothstep(1.0 - w, 1.0, g.x), smoothstep(1.0 - w, 1.0, g.y));
+    col *= 1.0 - line * uGrid.x;
+  }
+
+  if (uDot.y > 0.0 && scOK(uScopeB.w, bgPix)) {
+    vec2 dc = fract(sq * vec2(${DEV_W}.0, ${DEV_H}.0)) - 0.5;
+    float d = length(dc);
+    float edge = clamp(0.6 / max(uPx, 1.0), 0.02, 0.2);
+    float inside = 1.0 - smoothstep(uDot.x - edge, uDot.x + edge, d);
+    col *= mix(1.0 - uDot.y, 1.0, inside);
+    col *= 1.0 / (1.0 - uDot.y * 0.45);
+    if (uDot.z > 0.0)
+      col += vec3(uDot.z * 0.35 * (1.0 - smoothstep(uDot.x, uDot.x + 0.35, d)) * lum(col));
+  }
+
+  if (!oob) {
     col *= interDark;
 
     // The two compensations above deliberately push the lit part of a
@@ -5501,87 +5532,84 @@ void main() {
       col = vec3(1.0) - (vec3(1.0) - col) * (vec3(1.0) - b);
     }
 
-    // ── Frame ────────────────────────────────────────────
-    // Everything below is confined to the picture so the letterbox bars
-    // stay exactly the chosen colour and can be keyed out in OBS.
     if (uLcd.y > 0.0) {
       float e = clamp(max(abs(c.x), abs(c.y)), 0.0, 1.0);
       col += vec3(uLcd.y * 0.20 * smoothstep(0.45, 1.0, e));
     }
+  }
 
-    if (uNoise.x > 0.0) {
-      vec2 np = floor(p * uOutRes);
-      float n;
-      if (uNoise.y < 0.5)      n = hash(np + uSeed.x) - 0.5;                 // film
-      else if (uNoise.y < 1.5) n = hash(np * 1.7 + uSeed.x * 3.0) - 0.5;     // static
-      else                     n = hash(vec2(np.y, uSeed.x)) - 0.5;          // bands
-      col += vec3(n * uNoise.x);
-      if (uNoise.y > 0.5 && uNoise.y < 1.5) {
-        col.r += (hash(np + uSeed.x + 11.0) - 0.5) * uNoise.x * 0.6;
-        col.b += (hash(np + uSeed.x + 23.0) - 0.5) * uNoise.x * 0.6;
-      }
-    }
-
-    if (uVig.x > 0.0) {
-      float rr = mix(length(c), max(abs(c.x), abs(c.y)), uVig.y);
-      float inner = 0.20 - uVig.x * 0.18;
-      float outer = 1.30 - uVig.x * 0.35;
-      col *= 1.0 - smoothstep(inner, outer, rr) * (0.30 + uVig.x * 0.68);
-    }
-
-    if (uRoll.x > 0.0) {
-      // The band crawls DOWN the picture the way it does on camera; q.y
-      // is 0 at the top of the content after the flip, so subtract.
-      float centre = 1.0 - uRoll.z;
-      float d = abs(q.y - centre);
-      d = min(d, 1.0 - d);                      // wrap so it re-enters smoothly
-      float band = smoothstep(uRoll.y, 0.0, d);
-      col += vec3(uRoll.x * 0.5 * band);
-      col *= 1.0 - uRoll.x * 0.18;              // dim the rest a touch, like exposure
-    }
-
-    if (uCurve.z > 0.0) {
-      // Glass glare — a soft highlight across the upper third of the
-      // picture. c.y is +1 at the top, since vUv.y is 0 at the bottom.
-      vec2 g = (c - vec2(0.0, 0.66)) / vec2(1.24, 0.68);
-      col += vec3(uCurve.z * 0.16 * max(0.0, 1.0 - dot(g, g)));
-    }
-
-    col = clamp(col, 0.0, 1.0);
-
-    // Trails sample LAST FRAME'S finished output, so everything above —
-    // glow, masks, colour — persists, not just the raw screen.
-    if (uTrailC.w > 0.0) {
-      // Rescan feedback: the previous frame can be zoomed, rotated and
-      // hue-spun before it persists — every frame compounds the last,
-      // so small numbers bloom into tunnels and colour spirals.
-      vec2 tp = p;
-      if (abs(uTrailXf.x) + abs(uTrailXf.y) > 0.0) {
-        vec2 d = p - 0.5;
-        float ang = uTrailXf.y * 0.35;
-        float ca = cos(ang), sa = sin(ang);
-        d = mat2(ca, -sa, sa, ca) * d;
-        d *= 1.0 - uTrailXf.x * 0.12;
-        tp = d + 0.5;
-      }
-      vec3 prev = texture2D(uTrail, tp).rgb;
-      if (uTrailXf.z > 0.0) {
-        vec3 py = rgb2yiq(prev);
-        float ha = uTrailXf.z * 1.2;
-        float hc = cos(ha), hs = sin(ha);
-        py.yz = mat2(hc, -hs, hs, hc) * py.yz;
-        prev = clamp(yiq2rgb(py), 0.0, 1.0);
-      }
-      col = max(col, prev * uTrailC.rgb * uTrailC.w);
-    }
-
-    if (uDither > 1.5) {
-      // levels tones means levels-1 steps between black and white.
-      float steps = uDither - 1.0;
-      col = floor(col * steps + bayer4(floor(p * uOutRes))) / steps;
+  if (uNoise.x > 0.0 && scOK(uScopeC.x, bgPix)) {
+    vec2 np = floor(p * uOutRes);
+    float n;
+    if (uNoise.y < 0.5)      n = hash(np + uSeed.x) - 0.5;                 // film
+    else if (uNoise.y < 1.5) n = hash(np * 1.7 + uSeed.x * 3.0) - 0.5;     // static
+    else                     n = hash(vec2(np.y, uSeed.x)) - 0.5;          // bands
+    col += vec3(n * uNoise.x);
+    if (uNoise.y > 0.5 && uNoise.y < 1.5) {
+      col.r += (hash(np + uSeed.x + 11.0) - 0.5) * uNoise.x * 0.6;
+      col.b += (hash(np + uSeed.x + 23.0) - 0.5) * uNoise.x * 0.6;
     }
   }
 
+  if (uVig.x > 0.0 && scOK(uScopeC.y, bgPix)) {
+    float rr = mix(length(c), max(abs(c.x), abs(c.y)), uVig.y);
+    float inner = 0.20 - uVig.x * 0.18;
+    float outer = 1.30 - uVig.x * 0.35;
+    col *= 1.0 - smoothstep(inner, outer, rr) * (0.30 + uVig.x * 0.68);
+  }
+
+  if (uRoll.x > 0.0 && scOK(uScopeC.z, bgPix)) {
+    // The band crawls DOWN the picture the way it does on camera; sq.y
+    // is 0 at the top of the content after the flip, so subtract.
+    float centre = 1.0 - uRoll.z;
+    float d = abs(sq.y - centre);
+    d = min(d, 1.0 - d);                      // wrap so it re-enters smoothly
+    float band = smoothstep(uRoll.y, 0.0, d);
+    col += vec3(uRoll.x * 0.5 * band);
+    col *= 1.0 - uRoll.x * 0.18;              // dim the rest a touch, like exposure
+  }
+
+  if (!oob && uCurve.z > 0.0) {
+    // Glass glare — a soft highlight across the upper third of the
+    // picture. c.y is +1 at the top, since vUv.y is 0 at the bottom.
+    vec2 g = (c - vec2(0.0, 0.66)) / vec2(1.24, 0.68);
+    col += vec3(uCurve.z * 0.16 * max(0.0, 1.0 - dot(g, g)));
+  }
+
+  col = clamp(col, 0.0, 1.0);
+
+  // Trails sample LAST FRAME'S finished output, so everything above —
+  // glow, masks, colour — persists, not just the raw screen. Picture
+  // only: the backdrop is already its own feedback loop.
+  if (!oob && uTrailC.w > 0.0) {
+    // Rescan feedback: the previous frame can be zoomed, rotated and
+    // hue-spun before it persists — every frame compounds the last,
+    // so small numbers bloom into tunnels and colour spirals.
+    vec2 tp = p;
+    if (abs(uTrailXf.x) + abs(uTrailXf.y) > 0.0) {
+      vec2 d = p - 0.5;
+      float ang = uTrailXf.y * 0.35;
+      float ca = cos(ang), sa = sin(ang);
+      d = mat2(ca, -sa, sa, ca) * d;
+      d *= 1.0 - uTrailXf.x * 0.12;
+      tp = d + 0.5;
+    }
+    vec3 prev = texture2D(uTrail, tp).rgb;
+    if (uTrailXf.z > 0.0) {
+      vec3 py = rgb2yiq(prev);
+      float ha = uTrailXf.z * 1.2;
+      float hc = cos(ha), hs = sin(ha);
+      py.yz = mat2(hc, -hs, hs, hc) * py.yz;
+      prev = clamp(yiq2rgb(py), 0.0, 1.0);
+    }
+    col = max(col, prev * uTrailC.rgb * uTrailC.w);
+  }
+
+  if (uDither > 1.5 && scOK(uScopeC.w, bgPix)) {
+    // levels tones means levels-1 steps between black and white.
+    float steps = uDither - 1.0;
+    col = floor(col * steps + bayer4(floor(p * uOutRes))) / steps;
+  }
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }`;
 
@@ -6009,6 +6037,12 @@ void main() {
         Math.cos(wrap(time * (0.037 + drift * 0.13), 1) * 6.2832) * drift * 0.05,
         bgOn ? (bgp.echo ?? 0) / 100 : 0,
         wrap(time * 0.07, 1));
+      // Scope routing: 0 picture, 1 backdrop, 2 both.
+      const SCV = { pic: 0, bg: 1, both: 2 };
+      const scOf = id => SCV[P(id).scope] ?? 0;
+      gl.uniform4f(u(progMain, 'uScopeA'), scOf('tint'), scOf('grade'), scOf('invert'), scOf('rainbowmap'));
+      gl.uniform4f(u(progMain, 'uScopeB'), scOf('scanlines'), scOf('lcd'), scOf('grid'), scOf('dot'));
+      gl.uniform4f(u(progMain, 'uScopeC'), scOf('noise'), scOf('vignette'), scOf('rollbar'), scOf('dither'));
       const lo = P('lottes');
       const LMASK = { none: 0, tv: 1, grille: 2, vga: 3 };
       gl.uniform1f(u(progMain, 'uLotOn'), on('lottes') ? 1 : 0);
@@ -6726,14 +6760,29 @@ const Mirror = (() => {
     popRaf = 0; popWin = null; popCtx = null;
   }
 
-  function popOut() {
-    if (popWin && !popWin.closed) { popWin.focus(); return; }
-    // window.open with an empty URL returns an EXISTING window of that
-    // name without navigating it — after a reload of this page the old
-    // pop-out is still out there, so wipe its body rather than stacking
-    // a second canvas into it.
-    popWin = window.open('', 'pt-mirror', 'width=960,height=740');
-    if (!popWin) { setNote('The browser blocked the pop-out window. Allow pop-ups for this site and try again.'); return; }
+  async function popOut() {
+    if (popWin && !popWin.closed) { popWin.focus?.(); return; }
+    // Document Picture-in-Picture gives a CLEAN window: no title bar
+    // text, no about:blank address bar — the ideal capture surface.
+    // Fall back to a normal pop-up where the API is missing, and scrub
+    // its about:blank display with replaceState (same-origin, allowed).
+    if (window.documentPictureInPicture?.requestWindow) {
+      try {
+        popWin = await documentPictureInPicture.requestWindow({
+          width: Math.min(out.width, screen.availWidth - 40),
+          height: Math.min(out.height + 20, screen.availHeight - 40),
+        });
+      } catch { popWin = null; }
+    }
+    if (!popWin) {
+      // window.open with an empty URL returns an EXISTING window of that
+      // name without navigating it — after a reload of this page the old
+      // pop-out is still out there, so wipe its body rather than stacking
+      // a second canvas into it.
+      popWin = window.open('', 'pt-mirror', 'width=960,height=740');
+      if (!popWin) { setNote('The browser blocked the pop-out window. Allow pop-ups for this site and try again.'); return; }
+      try { popWin.history.replaceState(null, '', location.href); } catch {}
+    }
     const doc = popWin.document;
     doc.title = 'picoTracker mirror';
     doc.body.innerHTML = '';

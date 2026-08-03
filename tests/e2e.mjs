@@ -2755,6 +2755,46 @@ check('output: custom dims are clamped to sane GPU sizes', await page.evaluate((
   return d.w === 3840 && d.h === 240;
 }));
 
+// Scope routing: a treatment aimed at the Backdrop textures the bars
+// and leaves the picture alone; aimed back at the Picture, the bars
+// clear again.
+check('scope: scanlines routed to the Backdrop hit the bars only', await page.evaluate(async () => {
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const st = Mirror.getState();
+  const off = FX.presetState('off');
+  st.enabled = off.enabled; st.params = off.params; st.react = FX.blankReact();
+  st.on = true; st.output = '1920x1080'; st.bg = '#606060'; st.zoom = 0;
+  st.enabled.scanlines = true;
+  st.params.scanlines = { variant: 'thick', pitch: 2, mix: 90, scope: 'bg' };
+  const frame = async () => { Mirror.invalidate(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); };
+  Mirror.syncUI(); await frame(); await frame();
+  const colVar = x => {
+    const px = new Uint8Array(4 * 160);
+    gl.readPixels(x, 300, 1, 160, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const vals = [];
+    for (let i = 0; i < px.length; i += 4) vals.push(px[i]);
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+    return vals.reduce((a, b) => a + (b - mean) * (b - mean), 0) / vals.length;
+  };
+  const barLined = colVar(30) > 40;                 // pillar shows the mask
+  st.params.scanlines.scope = 'pic';
+  Mirror.syncUI(); await frame();
+  const barClear = colVar(30) < 5;                  // routed back: flat again
+  st.output = '960x720'; st.bg = '#000000';
+  st.enabled.scanlines = false;
+  Mirror.syncUI(); await frame();
+  return barLined && barClear;
+}));
+check('scope: every scoped effect card offers the Apply-to control', await page.evaluate(() => {
+  const ids = ['tint','grade','invert','rainbowmap','scanlines','lcd','grid','dot','noise','vignette','rollbar','dither'];
+  return ids.every(id => {
+    const card = document.querySelector(`.fx-card[data-fx="${id}"]`);
+    return card && [...card.querySelectorAll('.fx-seg button, .seg button, button')]
+      .some(b => /Backdrop/.test(b.textContent));
+  });
+}));
+
 // Lottes CRT: the beam modulates rows (a bright row's vertical profile
 // dips between scanlines), and the three masks render distinctly.
 check('lottes: the beam draws real scanlines and the masks differ', await page.evaluate(async () => {

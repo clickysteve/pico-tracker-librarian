@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.4.0 — Picture / Backdrop / Both
+
+- **Effect scope routing.** Twelve colour and texture treatments —
+  phosphor tint, colour grade, invert, rainbow map, scanlines, LCD,
+  pixel grid, dot matrix, noise, vignette, refresh bar and dither —
+  gain an **Apply to** control: Picture, Backdrop, or Both. Backdrop
+  scanlines over the feedback loop, a rainbow map on the background
+  while the display stays clean, a vignette over the whole frame:
+  compose freely. Old looks load unchanged (everything defaults to
+  Picture), 🎲 Random keeps its rolls on the picture, and the
+  sampler-based effects (composite, tape rot, Lottes, ghosts, RGB
+  offsets) stay picture-side where they have meaning.
+- **The pop-out lost its browser chrome.** It now opens as a Document
+  Picture-in-Picture window where Chrome offers it — no title bar
+  text, no about:blank address bar, an always-on-top clean capture
+  surface. Browsers without the API fall back to the old pop-up, with
+  its address display scrubbed to the app's own URL.
+- **CRT (Lottes) moved to the top of the effects list**, next to the
+  screen curve where a display emulation belongs.
+- Internal: the shader tail was restructured so scoped treatments run
+  for every pixel with per-effect scope gates; the bent enhancer now
+  reads the pre-grade picture (circuit order), which can shift its look
+  a hair at extreme settings.
+
+
 ## v1.3.0 — Lottes CRT, and the background loop learns to move
 
 - **CRT (Lottes)** (32nd effect): a port of Timothy Lottes'
