@@ -2020,8 +2020,8 @@ const fxBase = await page.evaluate(() => ({
   outputs: document.querySelectorAll('#fx-output option').length,
 }));
 check('fx: WebGL renderer came up', fxBase.hasGl);
-check('fx: one card per effect definition', fxBase.cards === fxBase.defs && fxBase.cards === 30);
-check('fx: preset list has every preset plus Custom', fxBase.presets === FXPRESETS + 1 && FXPRESETS === 21);
+check('fx: one card per effect definition', fxBase.cards === fxBase.defs && fxBase.cards === 31);
+check('fx: preset list has every preset plus Custom', fxBase.presets === FXPRESETS + 1 && FXPRESETS === 22);
 check('fx: output list is populated', fxBase.outputs === 5);   // four presets + Custom
 
 // Every preset must render without raising a GL error, and must actually
@@ -2066,7 +2066,15 @@ check('fx: output size changes the canvas', await page.evaluate(() => {
   const c = document.getElementById('usb-canvas');
   return c.width === 1280 && c.height === 720;
 }));
-check('fx: a 16:9 output pillarboxes rather than stretching', await page.evaluate(() => {
+check('fx: a 16:9 output pillarboxes rather than stretching', await page.evaluate(async () => {
+  // the preset sweep above may have left a background-feedback look on;
+  // the bars are only black with effects off
+  const st = Mirror.getState();
+  const off = FX.presetState('off');
+  st.enabled = off.enabled; st.params = off.params; st.on = false;
+  Mirror.syncUI(); Mirror.invalidate();
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await new Promise(r => setTimeout(r, 150));
   const cv = document.getElementById('usb-canvas');
   const gl = cv.getContext('webgl');
   const px = new Uint8Array(cv.width * cv.height * 4);
@@ -2191,7 +2199,7 @@ check('fx: a stand-in screen is painted with no device connected', await page.ev
 // ── 31. audio-reactive effects ─────────────────────────
 check('fx: a react row for every effect that can be driven', await page.evaluate(() =>
   document.querySelectorAll('.fx-react').length === FX.DEFS.filter(d => d.react).length &&
-  document.querySelectorAll('.fx-react').length === 29));
+  document.querySelectorAll('.fx-react').length === 30));
 check('fx: react rows are hidden until audio-reactive is switched on', await page.evaluate(() =>
   getComputedStyle(document.querySelector('.fx-react')).display === 'none'));
 
@@ -2736,6 +2744,38 @@ check('output: Custom frees the canvas dimensions', await page.evaluate(async ()
 check('output: custom dims are clamped to sane GPU sizes', await page.evaluate(() => {
   const d = FX.outputDims({ output: 'custom', outW: 99999, outH: 1 });
   return d.w === 3840 && d.h === 240;
+}));
+
+// Background feedback: the bars come alive, the picture shrinks with
+// inset, and the loop actually evolves frame over frame.
+check('bgfeed: the letterbox region lights up and keeps evolving', await page.evaluate(async () => {
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const st = Mirror.getState();
+  const next = FX.presetState('enhancerloop');
+  st.enabled = next.enabled; st.params = next.params; st.react = FX.blankReact();
+  st.on = true; st.output = '1920x1080';   // wide output = real pillars
+  Mirror.syncUI(); Mirror.invalidate();
+  const frame = async () => { Mirror.invalidate(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); };
+  for (let i = 0; i < 25; i++) await frame();
+  // sample a pillar column (far left, clear of the inset picture)
+  const grab = () => {
+    const px = new Uint8Array(40 * 200 * 4);
+    gl.readPixels(10, 400, 40, 200, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let sum = 0, sig = '';
+    for (let i = 0; i < px.length; i += 512) { sum += px[i] + px[i+1] + px[i+2]; sig += px[i] + ','; }
+    return { sum, sig };
+  };
+  const a = grab();
+  for (let i = 0; i < 15; i++) await frame();
+  const b = grab();
+  const err = gl.getError();
+  st.output = '960x720';
+  const off = FX.presetState('off');
+  st.enabled = off.enabled; st.params = off.params;
+  Mirror.syncUI(); Mirror.invalidate();
+  await frame();
+  return err === 0 && a.sum > 200 && a.sig !== b.sig;
 }));
 
 // Trails: a bright frame lingers, then fades.

@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.2.0 — background feedback: the bars come alive
+
+- **Background feedback** (31st effect): the letterbox region becomes a
+  live video-enhancer feedback loop. Last frame's own output is
+  resampled through a zoom/rotate/hue-spin transform at near-unity
+  **loop gain** and soft-clipped like a saturating tube, so it
+  self-oscillates into swirling analogue colour instead of whiting out.
+  Two things excite the loop: **screen bleed** — the display's own
+  spilled glow (the bloom prepass now runs whenever the background
+  needs it, even with the glow effect off) — and a slow video-synth
+  **oscillator** for colour waves when the screen is dark. **Picture
+  inset** floats the display smaller over the loop, and everything is
+  audio-routable. With a Custom wide output, the display sits on a
+  churning wall of feedback — the "camera pointed at the monitor" rig
+  with none of the cables.
+- New preset: **Enhancer loop** (22 total).
+- The loop shares the rescan/trails feedback texture, composes with
+  every other effect, and keeps rendering whenever it is on (it is
+  temporal, like trails).
+
+
 ## v1.1.0 — the SIGNAL//ROT round: a real video-effects rig
 
 The mirror's effects grow up, with the whole circuit-bent signal path
