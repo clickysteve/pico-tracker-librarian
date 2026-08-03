@@ -1,7 +1,7 @@
 // picoTracker Librarian service worker — cache-first with background
 // refresh, so the app opens instantly offline and still picks up
 // deployed updates on the next visit.
-const CACHE = 'pt-librarian-v1-0-4';
+const CACHE = 'pt-librarian-v1-1-0';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

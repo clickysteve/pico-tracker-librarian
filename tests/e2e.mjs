@@ -2020,9 +2020,9 @@ const fxBase = await page.evaluate(() => ({
   outputs: document.querySelectorAll('#fx-output option').length,
 }));
 check('fx: WebGL renderer came up', fxBase.hasGl);
-check('fx: one card per effect definition', fxBase.cards === fxBase.defs && fxBase.cards === 25);
-check('fx: preset list has every preset plus Custom', fxBase.presets === FXPRESETS + 1 && FXPRESETS === 17);
-check('fx: output list is populated', fxBase.outputs === 4);
+check('fx: one card per effect definition', fxBase.cards === fxBase.defs && fxBase.cards === 30);
+check('fx: preset list has every preset plus Custom', fxBase.presets === FXPRESETS + 1 && FXPRESETS === 21);
+check('fx: output list is populated', fxBase.outputs === 5);   // four presets + Custom
 
 // Every preset must render without raising a GL error, and must actually
 // change the picture — a preset that silently does nothing is a bug.
@@ -2191,7 +2191,7 @@ check('fx: a stand-in screen is painted with no device connected', await page.ev
 // ── 31. audio-reactive effects ─────────────────────────
 check('fx: a react row for every effect that can be driven', await page.evaluate(() =>
   document.querySelectorAll('.fx-react').length === FX.DEFS.filter(d => d.react).length &&
-  document.querySelectorAll('.fx-react').length === 24));
+  document.querySelectorAll('.fx-react').length === 29));
 check('fx: react rows are hidden until audio-reactive is switched on', await page.evaluate(() =>
   getComputedStyle(document.querySelector('.fx-react')).display === 'none'));
 
@@ -2689,6 +2689,55 @@ check('presets: the seven new ones render clean',
 check('presets: no two of the new ones are identical',
   new Set(Object.values(newPresets).map(v => v.sig)).size === 7);
 
+// The SIGNAL//ROT ports: four presets sweep the new effects (composite,
+// tape rot, sync damage, bent enhancer, rainbow map, rescan trails).
+const rotPresets = await page.evaluate(async () => {
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const sigs = {};
+  for (const id of ['signalrot', 'thirdgen', 'bentenh', 'rescan', 'off']) {
+    const st = Mirror.getState();
+    const next = FX.presetState(id);
+    st.enabled = next.enabled; st.params = next.params; st.react = next.react;
+    st.on = id !== 'off'; st.preset = next.preset;
+    Mirror.syncUI(); Mirror.invalidate();
+    await new Promise(r => setTimeout(r, 250));
+    const px = new Uint8Array(cv.width * cv.height * 4);
+    gl.readPixels(0, 0, cv.width, cv.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let sig = '', sum = 0;
+    for (let i = 0; i < px.length; i += 4096) { sig += px[i] + ','; sum += px[i] + px[i+1] + px[i+2]; }
+    sigs[id] = { sig, sum, err: gl.getError() };
+  }
+  return sigs;
+});
+check('signal path: the four SIGNAL//ROT presets render clean',
+  ['signalrot', 'thirdgen', 'bentenh', 'rescan'].every(id => rotPresets[id].err === 0 && rotPresets[id].sum > 0));
+check('signal path: each differs from the raw picture and from each other',
+  new Set(Object.values(rotPresets).map(v => v.sig)).size === 5);
+
+// Custom output dimensions: a wide banner canvas.
+check('output: Custom frees the canvas dimensions', await page.evaluate(async () => {
+  const sel = document.getElementById('fx-output');
+  sel.value = 'custom';
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  const w = document.getElementById('fx-outw'), h = document.getElementById('fx-outh');
+  const visible = document.getElementById('fx-outdims').style.display !== 'none';
+  w.value = '1920'; w.dispatchEvent(new Event('change', { bubbles: true }));
+  h.value = '360';  h.dispatchEvent(new Event('change', { bubbles: true }));
+  Mirror.invalidate();
+  await new Promise(r => setTimeout(r, 300));
+  const cv = document.getElementById('usb-canvas');
+  const ok = visible && cv.width === 1920 && cv.height === 360;
+  sel.value = '960x720';
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 200));
+  return ok;
+}));
+check('output: custom dims are clamped to sane GPU sizes', await page.evaluate(() => {
+  const d = FX.outputDims({ output: 'custom', outW: 99999, outH: 1 });
+  return d.w === 3840 && d.h === 240;
+}));
+
 // Trails: a bright frame lingers, then fades.
 check('trails: the previous frame persists and decays', await page.evaluate(async () => {
   const cv = document.getElementById('usb-canvas');
@@ -2785,7 +2834,7 @@ check('look: import round-trips through the sanitiser', await page.evaluate(asyn
 check('recording is gone: no record button, no recorder API on Mirror', await page.evaluate(() =>
   !document.getElementById('fx-record') &&
   Mirror.toggleRecord === undefined && Mirror.isRecording === undefined));
-check('look: a hostile file is rejected politely', await page.evaluate(async () => {
+const hostileDiag = await page.evaluate(async () => {
   const file = new File(['{"evil":true}'], 'x.json', { type: 'application/json' });
   const input = document.getElementById('fx-import-file');
   const dt = new DataTransfer();
@@ -2794,9 +2843,13 @@ check('look: a hostile file is rejected politely', await page.evaluate(async () 
   const before = JSON.stringify(Mirror.getState().enabled);
   input.dispatchEvent(new Event('change', { bubbles: true }));
   await new Promise(r => setTimeout(r, 250));
-  return JSON.stringify(Mirror.getState().enabled) === before &&
-         /not a saved look/.test(document.getElementById('fx-note').textContent);
-}));
+  return { same: JSON.stringify(Mirror.getState().enabled) === before,
+           note: document.getElementById('fx-note').textContent };
+});
+if (!hostileDiag.same || !/not a saved look/.test(hostileDiag.note))
+  console.log('HOSTILE DIAG:', JSON.stringify(hostileDiag));
+check('look: a hostile file is rejected politely',
+  hostileDiag.same && /not a saved look/.test(hostileDiag.note));
 
 // Regressions found by review of this round.
 

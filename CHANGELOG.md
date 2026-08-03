@@ -1,5 +1,51 @@
 # Changelog
 
+## v1.1.0 — the SIGNAL//ROT round: a real video-effects rig
+
+The mirror's effects grow up, with the whole circuit-bent signal path
+from SIGNAL//ROT (same author) ported into the librarian's WebGL pass.
+
+**Five new / upgraded effects (30 total):**
+- **Composite signal** — the picture through a composite cable, decoded
+  in YIQ where the artefacts actually live: chroma bleeding sideways,
+  NTSC rainbows crawling on luma edges, dot crawl, sharpness-circuit
+  ringing.
+- **Tape rot** — a tired cassette: bandwidth-limited streaky luma
+  noise, chroma speckle, comet-tail dropouts, generation loss (soft
+  luma, washed chroma).
+- **Sync damage** — bent H-sync wobble, a slipping V-hold that rolls
+  the whole picture with a blanking bar at the seam, and a mains hum
+  bar drifting through.
+- **Bent enhancer** — a video enhancer with the feedback pot snapped
+  off: oscillating edge ghosts, colours chasing brightness (luma-hue),
+  strobing luma-keyed inversion.
+- **Trails → Trails / rescan** — the feedback buffer can now be zoomed,
+  rotated and hue-spun as it decays, so it compounds frame over frame
+  into tunnels and colour spirals, video-feedback style. Old looks load
+  unchanged (the new knobs default to off).
+- **Rainbow map** — luma replaced with hot posterised rainbow bands,
+  swept over time.
+
+All of it is audio-reactive through the existing per-parameter routing,
+seeded/quantised like the rest of the pass (nothing degrades over a
+long stream), included in 🎲 Random's curated pools, and shipped with
+four new presets: **Signal rot**, **Third-gen tape**, **Bent
+enhancer**, **Rescan feedback** (21 presets total).
+
+**Custom output dimensions.** The Output picker gains **Custom…** with
+free width × height (320-3840 × 240-2160) — wide banners, ultrawide
+walls, whatever the capture rig wants. Custom dims persist, survive
+Reset, and travel in look files.
+
+**The 2.2-release harvest, honestly.** After 1.0.4's Advance mirror
+work, the rest of the newly public Advance adapter was checked for more
+unlocks: the Remote UI protocol is identical (no hidden opcodes), the
+playback semantics we model are unchanged, and the Advance's tracker
+application code — SAMPLESOURCE amp envelopes included — is still not
+in the public repo. The envelope stays the top playback-fidelity gap on
+the roadmap, waiting on source.
+
+
 ## v1.0.4 — the Advance gets mirrored as an Advance
 
 The missing-waveform mystery is solved, and the answer was on our side

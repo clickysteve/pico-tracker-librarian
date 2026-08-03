@@ -1119,7 +1119,7 @@
     <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
       <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
          title="Source, issues and release notes on GitHub"
-         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.0.4 Beta</a>
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.1.0 Beta</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -1411,7 +1411,12 @@
             <select id="fx-preset" title="Load a preset"></select>
             <label class="fx-mini" title="Animate the effects that move (noise, jitter, glitch, interlace)"><input type="checkbox" id="fx-anim"> Motion</label>
             <span class="fx-sep"></span>
-            <label class="fx-mini">Output <select id="fx-output" title="Size of the canvas that OBS or a capture card sees"></select></label>
+            <label class="fx-mini">Output <select id="fx-output" title="Size of the canvas that OBS or a capture card sees — Custom frees the width and height (wide banners, ultrawide walls)"></select></label>
+            <span id="fx-outdims" style="display:none;align-items:center;gap:3px">
+              <input type="number" id="fx-outw" min="320" max="3840" step="10" class="search" style="width:58px;padding:3px 5px;font-size:11px" title="Output width in pixels (320-3840)">
+              <span style="color:var(--muted);font-size:10px">×</span>
+              <input type="number" id="fx-outh" min="240" max="2160" step="10" class="search" style="width:52px;padding:3px 5px;font-size:11px" title="Output height in pixels (240-2160)">
+            </span>
             <label class="fx-mini" title="0% fits the 4:3 screen inside the frame; 100% fills the frame and crops the sides">Fill <input type="range" id="fx-zoom" min="0" max="100" step="1"><span id="fx-zoom-v" class="fx-pval"></span></label>
             <label class="fx-mini" title="Colour of the letterbox bars and the bezel">Bars <input type="color" id="fx-bg" value="#000000"></label>
             <label class="fx-mini" title="Text stamped on the mirror — on the stand-in AND over a connected device's screen, so the song title can be replaced for capture. Top covers the title area; Bottom writes along the last row. Blank shows the device's own text.">Text <input type="text" id="fx-demo-text" class="search" maxlength="27" placeholder="PT LIBRARIAN" style="width:110px;padding:3px 7px;font-size:11px"></label>
@@ -4588,8 +4593,11 @@ const FX = (() => {
     { id:'dither', label:'Posterise / dither', react:'levels', hint:'Ordered Bayer dithering down to a few tones per channel.', params:[
       { key:'levels', label:'Tones', def:4, min:2, max:12, step:1, fmt:v=>v===2?'2 (1-bit)':`${v}` },
     ]},
-    { id:'trails', label:'Phosphor trails', react:'decay', hint:'What moved a moment ago is still faintly there, like a slow long-persistence tube.', params:[
+    { id:'trails', label:'Trails / rescan', react:'decay', hint:'What moved a moment ago is still faintly there — and the past can be zoomed, rotated and hue-spun as it decays, video-feedback style.', params:[
       { key:'decay', label:'Persistence', def:60, min:5, max:97, step:1, fmt:v=>`${v}%` },
+      { key:'zoom',   label:'Rescan zoom',   def:0, min:-100, max:100, step:1, fmt:v=>v?`${v}%`:'Off' },
+      { key:'rotate', label:'Rescan rotate', def:0, min:-100, max:100, step:1, fmt:v=>v?`${v}%`:'Off' },
+      { key:'hue',    label:'Hue spin',      def:0, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Off' },
       { key:'colour', type:'seg', label:'Trail colour', def:'source', opts:[['source','Source'],['green','Green'],['amber','Amber'],['blue','Blue']] },
     ]},
     { id:'pixelate', label:'Pixelate', react:'size', hint:'Mosaic the picture down to fat blocks.', params:[
@@ -4610,6 +4618,34 @@ const FX = (() => {
     ]},
     { id:'invert', label:'Invert / solarise', react:'amount', hint:'Negative at full, solarised part-way.', params:[
       { key:'amount', label:'Amount', def:100, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'composite', label:'Composite signal', react:'bleed', hint:'The picture through a composite cable: chroma bleeding sideways, NTSC rainbows on edges, dot crawl, ringing.', params:[
+      { key:'bleed',   label:'Chroma bleed', def:35, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'rainbow', label:'Edge rainbow', def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'crawl',   label:'Dot crawl',    def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'ringing', label:'Ringing',      def:25, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'taperot', label:'Tape rot', react:'noise', hint:'A tired cassette: streaky luma noise, chroma speckle, dropout streaks, generation loss.', params:[
+      { key:'noise',   label:'Luma noise',   def:30, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'chroma',  label:'Chroma noise', def:25, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'dropout', label:'Dropouts',     def:20, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'gen',     label:'Generations',  def:30, min:0, max:100, step:1, fmt:v=>`${v}%` },
+    ]},
+    { id:'syncrot', label:'Sync damage', react:'hum', hint:'H-sync wobble, a slipping V-hold rolling the whole picture, and a mains hum bar drifting through.', params:[
+      { key:'wobble', label:'H wobble', def:25, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Off' },
+      { key:'roll',   label:'V roll',   def:20, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Held' },
+      { key:'hum',    label:'Hum bar',  def:40, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Off' },
+    ]},
+    { id:'bent', label:'Bent enhancer', react:'ring', hint:'A video enhancer with its feedback pot snapped off: oscillating edge ghosts, colours chasing brightness, strobing inversion.', params:[
+      { key:'ring',    label:'Edge ring',   def:35, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'space',   label:'Ring space',  def:30, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'lumahue', label:'Luma hue',    def:0,  min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Off' },
+      { key:'flicker', label:'Inv flicker', def:0,  min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Off' },
+    ]},
+    { id:'rainbowmap', label:'Rainbow map', react:'amount', hint:'Luma replaced with hot posterised rainbows — brightness picks the colour, the map sweeps over time.', params:[
+      { key:'amount', label:'Amount',  def:60, min:0, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'bands',  label:'Bands',   def:30, min:5, max:100, step:1, fmt:v=>`${v}%` },
+      { key:'sweep',  label:'Sweep',   def:15, min:0, max:100, step:1, fmt:v=>v?`${v}%`:'Still' },
     ]},
   ];
 
@@ -4752,6 +4788,23 @@ const FX = (() => {
       trails:{decay:93,colour:'blue'}, ghost:{offset:70,fade:75},
       tint:{colour:'blue',amount:70}, noise:{amount:14,type:'film'}, vignette:{falloff:60} },
       r:{ trails:{src:'level',depth:30}, ghost:{src:'mid',depth:40} } },
+  { id:'signalrot', label:'Signal rot', on:['composite','taperot','syncrot','scanlines','vignette'], p:{
+      composite:{bleed:45,rainbow:30,crawl:25,ringing:30}, taperot:{noise:35,chroma:30,dropout:25,gen:35},
+      syncrot:{wobble:20,roll:12,hum:35}, scanlines:{variant:'medium',mix:40}, vignette:{falloff:35} },
+      r:{ taperot:{src:'level',depth:45}, syncrot:{src:'hit',depth:60} } },
+    { id:'thirdgen', label:'Third-gen tape', on:['taperot','ghost','composite','noise','grade'], p:{
+      taperot:{noise:45,chroma:45,dropout:40,gen:70}, ghost:{offset:55,fade:65},
+      composite:{bleed:65,rainbow:10,crawl:15,ringing:15}, noise:{amount:12,type:'film'},
+      grade:{brightness:104,contrast:92,saturation:80,gamma:104} },
+      r:{ taperot:{src:'level',depth:35}, ghost:{src:'mid',depth:30} } },
+    { id:'bentenh', label:'Bent enhancer', on:['bent','rainbowmap','rgbshift','bloom'], p:{
+      bent:{ring:55,space:35,lumahue:25,flicker:15}, rainbowmap:{amount:40,bands:35,sweep:20},
+      rgbshift:{shiftH:90,shiftV:0,shiftR:0}, bloom:{intensity:45,radius:70} },
+      r:{ bent:{src:'high',depth:55}, rainbowmap:{src:'level',depth:40} } },
+    { id:'rescan', label:'Rescan feedback', on:['trails','bloom','curve','vignette'], p:{
+      trails:{decay:90,zoom:18,rotate:10,hue:12,colour:'source'},
+      bloom:{intensity:55,radius:90}, curve:{amount:25,corner:14,spec:15}, vignette:{falloff:40} },
+      r:{ trails:{src:'level',depth:25}, bloom:{src:'hit',depth:45} } },
   ];
 
   // A random look, deterministic in the rand() it is handed so tests can
@@ -4768,8 +4821,9 @@ const FX = (() => {
     };
     const chosen = new Set([
       ...pickN(['scanlines', 'lcd', 'grid', 'dot', 'pixelate'], rand() < 0.85 ? 1 : 0),
-      ...pickN(['tint', 'huecycle', 'invert', 'chswap', 'grade'], 1 + (rand() < 0.35 ? 1 : 0)),
-      ...pickN(['jitter', 'glitch', 'warp', 'rollbar', 'interlace', 'noise', 'trails', 'ghost'],
+      ...pickN(['tint', 'huecycle', 'invert', 'chswap', 'grade', 'rainbowmap'], 1 + (rand() < 0.35 ? 1 : 0)),
+      ...pickN(['jitter', 'glitch', 'warp', 'rollbar', 'interlace', 'noise', 'trails', 'ghost',
+                'composite', 'taperot', 'syncrot', 'bent'],
                1 + (rand() < 0.5 ? 1 : 0)),
       ...pickN(['curve', 'vignette', 'kaleido'], rand() < 0.7 ? 1 : 0),
       ...pickN(['bloom', 'rgbshift', 'planes', 'dither'], 1 + (rand() < 0.4 ? 1 : 0)),
@@ -4781,6 +4835,12 @@ const FX = (() => {
     const LIMIT = {
       'noise.amount': [5, 40], 'glitch.density': [5, 45], 'glitch.shift': [10, 60],
       'jitter.amount': [5, 45], 'pixelate.size': [4, 40], 'trails.decay': [40, 92],
+      'trails.zoom': [-25, 25], 'trails.rotate': [-20, 20], 'trails.hue': [0, 30],
+      'composite.bleed': [15, 70], 'composite.rainbow': [0, 45], 'composite.crawl': [0, 40],
+      'taperot.noise': [10, 50], 'taperot.dropout': [0, 45], 'taperot.gen': [10, 60],
+      'syncrot.wobble': [0, 40], 'syncrot.roll': [0, 30], 'syncrot.hum': [10, 55],
+      'bent.ring': [15, 65], 'bent.lumahue': [0, 50], 'bent.flicker': [0, 35],
+      'rainbowmap.amount': [25, 75], 'rainbowmap.bands': [10, 70],
       'invert.amount': [35, 100], 'warp.amplitude': [3, 30], 'dither.levels': [3, 10],
       'grade.brightness': [85, 125], 'grade.contrast': [85, 125], 'grade.saturation': [60, 180],
       'grade.gamma': [80, 125], 'vignette.falloff': [15, 70], 'curve.amount': [10, 60],
@@ -4841,6 +4901,18 @@ const FX = (() => {
   ];
 
   const SRC_W = 960, SRC_H = 720, DEV_W = 320, DEV_H = 240;
+
+  // The output canvas size the state asks for: one of the presets, or
+  // free W x H when output === 'custom' — wide banners, ultrawide
+  // walls, whatever the capture rig wants. Clamped to sane GPU sizes.
+  function outputDims(st) {
+    if (st && st.output === 'custom') {
+      const w = Math.max(320, Math.min(3840, Math.round(st.outW || 1280)));
+      const h = Math.max(240, Math.min(2160, Math.round(st.outH || 400)));
+      return { id: 'custom', w, h };
+    }
+    return OUTPUTS.find(o => o.id === (st && st.output)) || OUTPUTS[0];
+  }
 
   // ── Shaders ─────────────────────────────────────────────
   const VERT = `
@@ -4927,8 +4999,30 @@ uniform vec3  uRoll;           // intensity, band height, phase 0..1
 uniform float uInv;            // invert amount
 uniform sampler2D uTrail;
 uniform vec4  uTrailC;         // rgb tint, decay (0 = off)
+uniform vec3  uTrailXf;        // zoom, rotate, hue spin (rescan feedback)
+
+// ── SIGNAL PATH (ported from SIGNAL//ROT, same author) ──
+uniform vec4  uComp;           // chroma bleed, rainbow, dot crawl, ringing
+uniform vec4  uTape;           // luma noise, chroma noise, dropout, gen loss
+uniform vec4  uSync;           // wobble, wobble phase, roll phase, roll on
+uniform float uHum;            // hum bar amount
+uniform float uHumPos;         // hum bar phase 0..1
+uniform vec4  uBent;           // ring, ring space, luma hue, unused
+uniform vec2  uFlick;          // inversion amount while gate open, threshold
+uniform vec3  uRmap;           // amount, bands, sweep phase
 
 const float TAU = 6.28318530718;
+
+vec3 rgb2yiq(vec3 c) {
+  return vec3(dot(c, vec3(0.299, 0.587, 0.114)),
+              dot(c, vec3(0.596, -0.274, -0.322)),
+              dot(c, vec3(0.211, -0.523, 0.312)));
+}
+vec3 yiq2rgb(vec3 y) {
+  return vec3(y.x + 0.956 * y.y + 0.621 * y.z,
+              y.x - 0.272 * y.y - 0.647 * y.z,
+              y.x - 1.106 * y.y + 1.703 * y.z);
+}
 
 float hash(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
@@ -4995,6 +5089,17 @@ void main() {
     }
   }
 
+  // Sync damage: horizontal wobble (bent H-sync) and vertical roll
+  // (a slipping V-hold — the whole picture crawls, with a blanking bar
+  // at the wrap seam, painted in the colour stage below).
+  if (uSync.x > 0.0)
+    q.x += sin(q.y * 9.0 + uSync.y * TAU) * uSync.x * 0.02;
+  float rollSeam = -1.0;
+  if (uSync.w > 0.5) {
+    q.y = fract(q.y + uSync.z);
+    rollSeam = fract(1.0 - uSync.z);
+  }
+
   float interDark = 1.0;
   if (uInter.x > 0.0) {
     if (mod(devRow + uSeed.w, 2.0) > 0.5) {
@@ -5058,6 +5163,87 @@ void main() {
       col = min(vec3(1.0), col + g1 * a1 + g2 * a2);
     }
 
+    // ── Composite signal + tape rot ──────────────────────
+    // The picture through a composite cable and a tired tape: decoded
+    // in YIQ, where these artefacts actually live.
+    if (uComp.x + uComp.y + uComp.z + uComp.w + uTape.x + uTape.y + uTape.z + uTape.w > 0.0) {
+      float px1 = unit.x;
+      float rowI = floor(q.y * ${DEV_H}.0);
+      vec3 yiq = rgb2yiq(col);
+      float y = yiq.x;
+      vec2 iq = yiq.yz;
+      if (uComp.w > 0.0) {          // ringing: the sharpness circuit
+        float yl = lum(texture2D(uSrc, q - vec2(2.0 * px1, 0.0)).rgb);
+        float yr = lum(texture2D(uSrc, q + vec2(2.0 * px1, 0.0)).rgb);
+        y += uComp.w * 1.4 * (y - 0.5 * (yl + yr));
+      }
+      if (uComp.x > 0.0) {          // chroma bleeds sideways
+        float spread = mix(0.6, 8.0, uComp.x) * px1;
+        vec2 acc = vec2(0.0);
+        for (int i = -2; i <= 2; i++) {
+          vec3 t = rgb2yiq(texture2D(uSrc, q + vec2(float(i) * spread, 0.0)).rgb);
+          acc += t.yz;
+        }
+        iq = acc / 5.0;
+      }
+      if (uComp.y > 0.0) {          // NTSC rainbow on luma edges
+        float e = lum(texture2D(uSrc, q + vec2(px1, 0.0)).rgb)
+                - lum(texture2D(uSrc, q - vec2(px1, 0.0)).rgb);
+        float ph = q.x * ${DEV_W}.0 * 1.85 + rowI * 2.3 + uSeed.x * 3.7;
+        iq += uComp.y * e * 2.6 * vec2(sin(ph), cos(ph * 0.93));
+      }
+      if (uComp.z > 0.0) {          // dot crawl on coloured edges
+        float crawl = sin(q.x * ${DEV_W}.0 * 3.14159 + rowI * 3.14159 + uSeed.x * 4.1);
+        y += uComp.z * length(iq) * crawl * 0.35;
+      }
+      if (uTape.w > 0.0) {          // generation loss: soft luma, weak chroma
+        float ys = 0.5 * (lum(texture2D(uSrc, q - vec2(3.0 * px1, 0.0)).rgb)
+                        + lum(texture2D(uSrc, q + vec2(3.0 * px1, 0.0)).rgb));
+        y = mix(y, ys, uTape.w * 0.7);
+        iq *= 1.0 - uTape.w * 0.45;
+      }
+      if (uTape.x > 0.0) {          // bandwidth-limited, streaky luma noise
+        float nx = q.x * ${DEV_W}.0 / 3.5;
+        float nseed = rowI * 7.13 + uSeed.x * 13.7;
+        float nb = mix(hash(vec2(floor(nx), nseed)), hash(vec2(floor(nx) + 1.0, nseed)),
+                       smoothstep(0.0, 1.0, fract(nx)));
+        float streak = smoothstep(0.55, 0.95, hash(vec2(rowI, uSeed.x + 3.0)));
+        y += (nb - 0.5) * uTape.x * (0.22 + 0.85 * streak);
+      }
+      if (uTape.y > 0.0) {          // chroma noise
+        float nx2 = q.x * ${DEV_W}.0 / 3.5;
+        float ns2 = rowI * 7.13 + uSeed.x * 13.7;
+        iq += (vec2(hash(vec2(floor(nx2) * 1.7, ns2 + 31.0)),
+                    hash(vec2(floor(nx2) * 2.3, ns2 + 57.0))) - 0.5) * uTape.y * 0.55;
+      }
+      if (uTape.z > 0.0) {          // dropouts: comet-tail streaks
+        float dr = hash(vec2(rowI * 1.31, uSeed.y));
+        if (dr < uTape.z * 0.05) {
+          float xs = hash(vec2(rowI, uSeed.y + 7.0));
+          float len = 0.06 + hash(vec2(rowI, 99.0)) * 0.5;
+          float f = (q.x - xs) / len;
+          if (f > 0.0 && f < 1.0) {
+            float k = pow(1.0 - f, 1.8) * 0.95;
+            y = mix(y, 1.05, k);
+            iq *= 1.0 - k;
+          }
+        }
+      }
+      col = clamp(yiq2rgb(vec3(y, iq)), 0.0, 1.0);
+    }
+    // Hum bar and the roll seam's blanking bar, in signal space.
+    if (uHum > 0.0)
+      col *= 1.0 - smoothstep(0.18, 0.0, abs(fract(q.y - uHumPos) - 0.5)) * uHum * 0.35;
+    if (rollSeam >= 0.0) {
+      float d = abs(q.y - rollSeam);
+      d = min(d, 1.0 - d);
+      float bar = smoothstep(0.045, 0.015, d);
+      if (bar > 0.001) {
+        float syncp = 0.03 + 0.2 * hash(vec2(floor(q.x * 32.0), floor(q.y * ${DEV_H}.0)));
+        col = mix(col, vec3(syncp), bar * 0.92);
+      }
+    }
+
     // ── Colour ───────────────────────────────────────────
     col = clamp(uChMat * col, 0.0, 1.0);
 
@@ -5068,6 +5254,39 @@ void main() {
     col *= uGrade.x;
     col = mix(vec3(lum(col)), col, uGrade.z);
     col = clamp(col, 0.0, 1.0);
+
+    // ── Bent enhancer ────────────────────────────────────
+    // The sharpness circuit driven into oscillation: repeating edge
+    // ghosts; colours that chase brightness; strobing inversion.
+    if (uBent.x > 0.0) {
+      float y0 = lum(col);
+      float sp = (2.0 + uBent.y * 14.0) * unit.x;
+      float e = 0.0, w = 1.0;
+      w *= 0.72; e += w * (y0 - lum(texture2D(uSrc, q - vec2(sp, 0.0)).rgb));
+      w *= 0.72; e += w * (y0 - lum(texture2D(uSrc, q - vec2(2.0 * sp, 0.0)).rgb));
+      w *= 0.72; e += w * (y0 - lum(texture2D(uSrc, q - vec2(3.0 * sp, 0.0)).rgb));
+      col = clamp(col + uBent.x * 2.2 * e * vec3(1.25, 1.0, 1.45), 0.0, 1.0);
+    }
+    if (uBent.z > 0.0) {
+      vec3 yy = rgb2yiq(col);
+      float ha = clamp(yy.x, 0.0, 1.0) * uBent.z * TAU;
+      float hc = cos(ha), hs = sin(ha);
+      yy.yz = mat2(hc, -hs, hs, hc) * yy.yz;
+      col = clamp(yiq2rgb(yy), 0.0, 1.0);
+    }
+    if (uFlick.x > 0.0) {
+      float m = step(uFlick.y, lum(col));
+      col = mix(col, vec3(1.0) - col, m * uFlick.x);
+    }
+    if (uRmap.x > 0.0) {
+      // luma-keyed rainbow colorizer — hot posterised bands riding
+      // brightness, swept over time
+      float yv = lum(col);
+      float hph = clamp(yv, 0.0, 1.2) * uRmap.y + uRmap.z;
+      vec3 pal = 0.5 + 0.5 * cos(TAU * (hph + vec3(0.0, 0.33, 0.67)));
+      pal *= 0.3 + smoothstep(0.02, 0.85, yv);
+      col = mix(col, clamp(pal, 0.0, 1.0), uRmap.x);
+    }
 
     if (uInv > 0.0) col = mix(col, vec3(1.0) - col, uInv);
 
@@ -5180,8 +5399,27 @@ void main() {
     // Trails sample LAST FRAME'S finished output, so everything above —
     // glow, masks, colour — persists, not just the raw screen.
     if (uTrailC.w > 0.0) {
-      vec3 prev = texture2D(uTrail, p).rgb * uTrailC.rgb * uTrailC.w;
-      col = max(col, prev);
+      // Rescan feedback: the previous frame can be zoomed, rotated and
+      // hue-spun before it persists — every frame compounds the last,
+      // so small numbers bloom into tunnels and colour spirals.
+      vec2 tp = p;
+      if (abs(uTrailXf.x) + abs(uTrailXf.y) > 0.0) {
+        vec2 d = p - 0.5;
+        float ang = uTrailXf.y * 0.35;
+        float ca = cos(ang), sa = sin(ang);
+        d = mat2(ca, -sa, sa, ca) * d;
+        d *= 1.0 - uTrailXf.x * 0.12;
+        tp = d + 0.5;
+      }
+      vec3 prev = texture2D(uTrail, tp).rgb;
+      if (uTrailXf.z > 0.0) {
+        vec3 py = rgb2yiq(prev);
+        float ha = uTrailXf.z * 1.2;
+        float hc = cos(ha), hs = sin(ha);
+        py.yz = mat2(hc, -hs, hs, hc) * py.yz;
+        prev = clamp(yiq2rgb(py), 0.0, 1.0);
+      }
+      col = max(col, prev * uTrailC.rgb * uTrailC.w);
     }
 
     if (uDither > 1.5) {
@@ -5310,7 +5548,7 @@ void main() {
     let trailW = 0, trailH = 0, trailWas = false;
 
     function render(srcCanvas, st, time, upload) {
-      const out = OUTPUTS.find(o => o.id === st.output) || OUTPUTS[0];
+      const out = outputDims(st);
       if (canvas.width !== out.w || canvas.height !== out.h) {
         canvas.width = out.w; canvas.height = out.h;
       }
@@ -5554,6 +5792,47 @@ void main() {
 
       gl.uniform1f(u(progMain, 'uInv'), on('invert') ? (P('invert').amount ?? 0) / 100 : 0);
 
+      // ── Signal path (SIGNAL//ROT ports) ─────────────────
+      const cp = P('composite');
+      gl.uniform4f(u(progMain, 'uComp'),
+        on('composite') ? (cp.bleed ?? 0) / 100 : 0,
+        on('composite') ? (cp.rainbow ?? 0) / 100 : 0,
+        on('composite') ? (cp.crawl ?? 0) / 100 : 0,
+        on('composite') ? (cp.ringing ?? 0) / 100 : 0);
+      const tp2 = P('taperot');
+      gl.uniform4f(u(progMain, 'uTape'),
+        on('taperot') ? (tp2.noise ?? 0) / 100 : 0,
+        on('taperot') ? (tp2.chroma ?? 0) / 100 : 0,
+        on('taperot') ? (tp2.dropout ?? 0) / 100 : 0,
+        on('taperot') ? (tp2.gen ?? 0) / 100 : 0);
+      const sy = P('syncrot');
+      const syOn = on('syncrot');
+      gl.uniform4f(u(progMain, 'uSync'),
+        syOn ? (sy.wobble ?? 0) / 100 : 0,
+        wrap(time * 0.9, 1),
+        wrap(time * (0.02 + (sy.roll ?? 0) / 100 * 0.6), 1),
+        syOn && (sy.roll ?? 0) > 0 ? 1 : 0);
+      gl.uniform1f(u(progMain, 'uHum'), syOn ? (sy.hum ?? 0) / 100 : 0);
+      gl.uniform1f(u(progMain, 'uHumPos'), wrap(time * 0.13, 1));
+      const bn = P('bent');
+      gl.uniform4f(u(progMain, 'uBent'),
+        on('bent') ? (bn.ring ?? 0) / 100 : 0,
+        (bn.space ?? 30) / 100,
+        on('bent') ? (bn.lumahue ?? 0) / 100 : 0, 0);
+      // Inversion strobes: the gate opens half of each cycle; the
+      // threshold breathes. Both computed here, quantised, so the
+      // shader never sees raw seconds.
+      const fk = on('bent') ? (bn.flicker ?? 0) / 100 : 0;
+      const gateOpen = fk > 0 && wrap(time * (1.5 + 13 * fk), 1) < 0.5;
+      gl.uniform2f(u(progMain, 'uFlick'),
+        gateOpen ? Math.min(1, fk * 1.6) : 0,
+        0.45 + 0.3 * Math.sin(wrap(time * 0.14, 1) * 6.2832));
+      const rm = P('rainbowmap');
+      gl.uniform3f(u(progMain, 'uRmap'),
+        on('rainbowmap') ? (rm.amount ?? 0) / 100 : 0,
+        0.3 + (rm.bands ?? 30) / 100 * 4.7,
+        wrap(time * (rm.sweep ?? 0) / 100 * 0.55, 1));
+
       const tr = P('trails');
       const trailsOn = on('trails') && (tr.decay ?? 0) > 0;
       // Coming back on (or changing output size) must start from black:
@@ -5574,6 +5853,10 @@ void main() {
       gl.activeTexture(gl.TEXTURE0);
       gl.uniform4f(u(progMain, 'uTrailC'), tt[0], tt[1], tt[2],
         trailsOn ? (tr.decay ?? 60) / 100 : 0);
+      gl.uniform3f(u(progMain, 'uTrailXf'),
+        trailsOn ? (tr.zoom ?? 0) / 100 : 0,
+        trailsOn ? (tr.rotate ?? 0) / 100 : 0,
+        trailsOn ? (tr.hue ?? 0) / 100 : 0);
 
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
@@ -5596,7 +5879,7 @@ void main() {
 
   return { DEFS, ORDER, PRESETS, OUTPUTS, REACT_TARGET, MAX_ROUTES, defaults, blankReact,
            reactableParams, presetState, randomLook, modulate, createRenderer,
-           SRC_W, SRC_H, DEV_W, DEV_H, hexToRgb };
+           SRC_W, SRC_H, DEV_W, DEV_H, hexToRgb, outputDims };
 })();
 
 
@@ -6046,7 +6329,7 @@ const Mirror = (() => {
   function blankState() {
     const st = FX.presetState('off');
     st.on = false; st.animate = true;
-    st.output = '960x720'; st.bg = '#000000'; st.zoom = 0;
+    st.output = '960x720'; st.outW = 1280; st.outH = 400; st.bg = '#000000'; st.zoom = 0;
     st.audio = { deviceId: '', gain: 100, on: false };
     st.levels = { ...AudioReact.ZERO };
     return st;
@@ -6085,7 +6368,9 @@ const Mirror = (() => {
     for (const d of FX.DEFS) st.enabled[d.id] = !!(raw.enabled && raw.enabled[d.id]);
     st.on = !!raw.on;
     st.animate = raw.animate !== false;
-    if (FX.OUTPUTS.some(o => o.id === raw.output)) st.output = raw.output;
+    if (FX.OUTPUTS.some(o => o.id === raw.output) || raw.output === 'custom') st.output = raw.output;
+    if (Number.isFinite(+raw.outW)) st.outW = Math.max(320, Math.min(3840, Math.round(+raw.outW)));
+    if (Number.isFinite(+raw.outH)) st.outH = Math.max(240, Math.min(2160, Math.round(+raw.outH)));
     if (typeof raw.bg === 'string' && /^#[0-9a-f]{6}$/i.test(raw.bg)) st.bg = raw.bg;
     st.zoom = Math.min(100, Math.max(0, Number(raw.zoom) || 0));
     st.preset = FX.PRESETS.some(x => x.id === raw.preset) ? raw.preset : 'custom';
@@ -6136,7 +6421,7 @@ const Mirror = (() => {
   function outputCanvas() { return out; }
 
   function sizeFallback() {
-    const o = FX.OUTPUTS.find(o => o.id === state.output) || FX.OUTPUTS[0];
+    const o = FX.outputDims(state);
     if (out.width !== o.w || out.height !== o.h) { out.width = o.w; out.height = o.h; }
     return o;
   }
@@ -6162,7 +6447,7 @@ const Mirror = (() => {
     USB.stampOverlay();       // over whatever the device (or demo) drew
     if (renderer) renderer.render(USB.sourceCanvas(), state, tSec, upload !== false);
     else blit();
-    const o = FX.OUTPUTS.find(x => x.id === state.output) || FX.OUTPUTS[0];
+    const o = FX.outputDims(state);
     const ar = (o.w / o.h).toFixed(4);
     if (out.style.aspectRatio !== ar) out.style.aspectRatio = ar;
     if (popWin && !popWin.closed && popCtx) {
@@ -6307,7 +6592,8 @@ const Mirror = (() => {
       + '<option value="custom">Custom</option>';
 
     const outSel = $('fx-output');
-    outSel.innerHTML = FX.OUTPUTS.map(o => `<option value="${o.id}">${o.label}</option>`).join('');
+    outSel.innerHTML = FX.OUTPUTS.map(o => `<option value="${o.id}">${o.label}</option>`).join('')
+      + '<option value="custom">Custom…</option>';
 
     const grid = $('fx-grid');
     grid.innerHTML = FX.DEFS.map(d => `
@@ -6356,10 +6642,24 @@ const Mirror = (() => {
       if (e.target.value !== 'off') state.on = true;
       syncUI(); save(); invalidate();
     });
+    const syncOutDims = () => {
+      $('fx-outdims').style.display = state.output === 'custom' ? 'inline-flex' : 'none';
+      $('fx-outw').value = state.outW;
+      $('fx-outh').value = state.outH;
+    };
     outSel.addEventListener('change', e => {
       state.output = e.target.value;
+      syncOutDims();
       save(); invalidate();
     });
+    const onDim = () => {
+      state.outW = Math.max(320, Math.min(3840, Math.round(+$('fx-outw').value || 1280)));
+      state.outH = Math.max(240, Math.min(2160, Math.round(+$('fx-outh').value || 400)));
+      save(); invalidate();
+    };
+    $('fx-outw').addEventListener('change', onDim);
+    $('fx-outh').addEventListener('change', onDim);
+    syncOutDims();
     $('fx-zoom').addEventListener('input', e => {
       state.zoom = +e.target.value;
       $('fx-zoom-v').textContent = state.zoom ? state.zoom + '%' : 'Fit';
@@ -6471,7 +6771,7 @@ const Mirror = (() => {
       // Clears the look only. Output size, fill and bar colour are how
       // the stream is plumbed, not part of the look, and dropping them
       // would resize the canvas OBS is already capturing.
-      const keep = { output: state.output, bg: state.bg, zoom: state.zoom, animate: state.animate,
+      const keep = { output: state.output, outW: state.outW, outH: state.outH, bg: state.bg, zoom: state.zoom, animate: state.animate,
                      audio: state.audio };
       state = Object.assign(blankState(), keep);
       syncUI(); save(); invalidate();
@@ -6665,6 +6965,11 @@ const Mirror = (() => {
     $('fx-anim').checked = state.animate;
     $('fx-preset').value = FX.PRESETS.some(p => p.id === state.preset) ? state.preset : 'custom';
     $('fx-output').value = state.output;
+    { const od = document.getElementById('fx-outdims');
+      if (od) od.style.display = state.output === 'custom' ? 'inline-flex' : 'none';
+      const ow = document.getElementById('fx-outw'), oh = document.getElementById('fx-outh');
+      if (ow) ow.value = state.outW;
+      if (oh) oh.value = state.outH; }
     $('fx-zoom').value = state.zoom;
     $('fx-zoom-v').textContent = state.zoom ? state.zoom + '%' : 'Fit';
     $('fx-bg').value = state.bg;

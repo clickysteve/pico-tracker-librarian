@@ -30,9 +30,10 @@ actually audible rather than theoretical:
 - **Advance `SAMPLESOURCE` amp envelopes aren't applied**, so notes sustain
   until the next one instead of decaying. On projects where every
   instrument loops, this is the most noticeable difference from the
-  device. That firmware is closed, and guessing at its parameter ranges is
-  what caused the slice bugs fixed in 0.9.1 — this needs establishing by
-  ear against real hardware, not assumption.
+  device. Checked against the 2.2-release branch (1.1.0): the Advance
+  ADAPTER is public now but its tracker application code is not, so the
+  envelope semantics are still unpublished — this waits on source, or on
+  establishing the curves by ear against real hardware.
 - Synth voices (SID/OPAL) and most FX beyond `VOL`/`PAN`/`KIL`/`GRV`/`HOP`
   are out of scope by design.
 
