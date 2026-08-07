@@ -2795,6 +2795,32 @@ check('scope: every scoped effect card offers the Apply-to control', await page.
   });
 }));
 
+// Regression (review round): the mask brightness compensations used to
+// run on backdrop pixels too, and the backdrop is a feedback loop — so a
+// mask routed there compounded >1.0 gain into solid white within a
+// second. Dot matrix at its default depth was enough.
+check('scope: a mask on the backdrop does not blow the loop out to white', await page.evaluate(async () => {
+  const cv = document.getElementById('usb-canvas');
+  const gl = cv.getContext('webgl');
+  const st = Mirror.getState();
+  const next = FX.presetState('enhancerloop');
+  st.enabled = next.enabled; st.params = next.params; st.react = FX.blankReact();
+  st.on = true; st.output = '1920x1080'; st.zoom = 0;
+  st.enabled.dot = true;
+  st.params.dot = { radius: 44, depth: 80, halation: 20, scope: 'bg' };
+  const frame = async () => { Mirror.invalidate(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); };
+  Mirror.syncUI();
+  for (let i = 0; i < 60; i++) await frame();
+  const px = new Uint8Array(4 * 200);
+  gl.readPixels(20, 300, 50, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  let white = 0;
+  for (let i = 0; i < px.length; i += 4) if (px[i] > 250 && px[i+1] > 250 && px[i+2] > 250) white++;
+  const off = FX.presetState('off');
+  st.enabled = off.enabled; st.params = off.params; st.on = false; st.output = '960x720';
+  Mirror.syncUI(); await frame();
+  return white < 25;      // some highlights are fine; a solid white wall is not
+}));
+
 // Lottes CRT: the beam modulates rows (a bright row's vertical profile
 // dips between scanlines), and the three masks render distinctly.
 check('lottes: the beam draws real scanlines and the masks differ', await page.evaluate(async () => {

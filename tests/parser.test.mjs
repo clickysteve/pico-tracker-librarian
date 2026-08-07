@@ -971,6 +971,73 @@ t('passes: eventsOnly skips marks but emits identical events', () => {
   eq(b.events.length, a.events.length);
   eq(b.duration, a.duration);
 });
+// ── v1.5: review round — firmware-accuracy fixes ───────
+function walkFixtureProj() {
+  const proj = loopFixtureProj();
+  proj.grid.fill(PT.EMPTY);
+  proj.grid[0] = 0;
+  proj.chains.fill(PT.EMPTY);
+  proj.chains[0] = 0;
+  proj.phrases.notes.fill(PT.EMPTY);
+  proj.phrases.instr.fill(PT.EMPTY);
+  proj.instruments = [{ id: 5, sample: 'x.wav', params: {} }];
+  return proj;
+}
+t('walk: a note with no instrument uses the channel\'s last one', () => {
+  const proj = walkFixtureProj();
+  proj.phrases.notes[0] = 60; proj.phrases.instr[0] = 5;
+  proj.phrases.notes[4] = 62;               // instrument column blank
+  proj.phrases.notes[8] = 64;               // blank too
+  const ons = PT.buildEventTimeline(proj, {}).events.filter(e => e.type === 'on');
+  eq(ons.map(e => e.instr), [5, 5, 5], 'the tracker idiom: instrument on the first note only');
+});
+t('walk: an out-of-range phrase in a chain step cannot hang the walk', () => {
+  const proj = walkFixtureProj();
+  proj.phrases.notes[0] = 60; proj.phrases.instr[0] = 5;
+  proj.grid[1] = 1;                          // ch1
+  proj.chains[1 * 16 + 0] = 0x90;            // chain 1 step 0 → phrase 144 (>= 128)
+  const t0 = Date.now();
+  const tl = PT.buildEventTimeline(proj, {});
+  ok(tl && Date.now() - t0 < 2000, 'must terminate, not spin on an unplayable chain');
+});
+t('walk: KIL carries a note length rather than cutting at the step', () => {
+  const proj = walkFixtureProj();
+  proj.phrases.notes[0] = 60; proj.phrases.instr[0] = 5;
+  proj.phrases.cmd1[1] = 0x1E; proj.phrases.param1[1] = 0x0C;   // KIL 0C on step 1
+  const tl = PT.buildEventTimeline(proj, {});
+  const off = tl.events.find(e => e.type === 'off');
+  const tickSec = 60 / (120 * 24);
+  ok(off && Math.abs(off.time / tickSec - 19) < 1e-6,
+     `off at ${off ? (off.time / tickSec).toFixed(2) : 'none'} ticks, expected 6 + 13`);
+});
+t('walk: a HOP on the step a phrase is entered at still plays', () => {
+  const proj = walkFixtureProj();
+  proj.phrases.notes[0] = 60; proj.phrases.instr[0] = 5;
+  proj.phrases.cmd1[0] = 0x1B; proj.phrases.param1[0] = 0x00;   // HOP 00 on step 0
+  const tl = PT.buildEventTimeline(proj, {});
+  ok(tl && tl.events.some(e => e.type === 'on'),
+     'the firmware reads the hop at pos+1, so the entry step is played');
+});
+t('walk: groove values above 0x80 are legal tick counts', () => {
+  const proj = walkFixtureProj();
+  proj.phrases.notes[0] = 60; proj.phrases.instr[0] = 5;
+  proj.phrases.notes[1] = 62;
+  proj.grooves = [[0xC0, 0xC0]];
+  const tl = PT.buildEventTimeline(proj, {});
+  const ons = tl.events.filter(e => e.type === 'on');
+  const tickSec = 60 / (120 * 24);
+  ok(Math.abs((ons[1].time - ons[0].time) / tickSec - 0xC0) < 1e-6,
+     'a 0xC0 groove step is 192 ticks, not the [6] fallback');
+});
+t('walk: a hop-heavy song does not truncate over many passes', () => {
+  const proj = walkFixtureProj();
+  for (let i = 0; i < 15; i++) { proj.phrases.notes[i] = 60; proj.phrases.instr[i] = 5; }
+  proj.phrases.cmd1[15] = 0x1B; proj.phrases.param1[15] = 0x00;   // HOP 00 on step 0F
+  proj.grooves = [[1]];
+  const one = PT.buildEventTimeline(proj, { passes: 1 }).events.filter(e => e.type === 'on').length;
+  const many = PT.buildEventTimeline(proj, { passes: 400 }).events.filter(e => e.type === 'on').length;
+  eq(many, one * 400, 'a HOP step spends budget without emitting a tick');
+});
 t('midi: the export walks the main island, matching the preview', () => {
   const proj = islandFixtureProj();
   const bytes = PT.buildMidi(proj, 'ISLANDS');

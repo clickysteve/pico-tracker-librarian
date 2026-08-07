@@ -1,5 +1,114 @@
 # Changelog
 
+## v1.5.0 — the review round
+
+A deep code and performance audit before this goes further into the
+wild: four independent reviews of the write path, the playback engine,
+the effects pipeline and runtime performance. Everything below was
+confirmed against the code (and, where it settles a question, against
+the firmware source) before being fixed.
+
+**Playback accuracy — the big one**
+
+- **Notes with a blank instrument column were silent.** Writing the
+  instrument on a phrase's first note and leaving it blank on the rest
+  is the standard tracker idiom, and the device falls back to the
+  channel's last instrument (`Player.cpp`: `instr == 0xFF` →
+  `GetLastInstrument`). The librarian took the blank literally, so most
+  notes of most phrases never sounded — in the preview, in rendered
+  WAVs and in every stem. The MIDI export already had this right, so
+  the two disagreed about the same project.
+- **`KIL` is a note length, not a cut.** The firmware sets
+  `timeToLive_ = param + 1` and counts down a tick at a time; the app
+  ignored the parameter and cut at the step.
+- **A `HOP` on the step a phrase is entered at now plays**, as it does
+  on the device (the firmware reads the hop at `pos + 1`). A phrase
+  whose step 00 held a HOP previously reported "nothing playable".
+- **Instrument `pan` is applied**, in preview and in renders. It was
+  parsed and then never used, so hard-panned instruments all sat
+  centred.
+- **`end` trims one-shots**, not just looping modes, matching
+  `SILM_ONESHOT`. Trimmed samples played to the end of the file.
+- **Groove steps above 0x80 are legal tick counts** and are no longer
+  filtered out into a flat default.
+- **A malformed project can no longer hang the tab.** A chain whose
+  first step named an out-of-range phrase spun the walk forever — in a
+  librarian whose job is inspecting broken cards.
+- **Hop-heavy songs no longer fade out after ~20 minutes** of looping:
+  the walk's budget counted ticks while HOP steps spend budget without
+  emitting one, so long sessions silently truncated.
+
+**Data safety**
+
+- **A stale parse could silently revert a project.** With edits pending
+  in memory, anything that triggered a rescan refreshed the project's
+  record while the older parse survived — and the pre-write staleness
+  check compared the card against that refreshed record, so it passed.
+  Every parse now remembers the exact file it was read from, and saves
+  check against *that*.
+- **One write lock per project.** The song editor, the slice editor and
+  the instrument parameter editor all did read-modify-write on the same
+  `.dat` and all rolled back by rewriting the whole file they started
+  from; two in flight could lose one's work or resurrect a file the
+  other had already replaced.
+- **Sample repair no longer overwrites a file that reappeared.** If you
+  restored a missing sample by hand after the scan, "fix all exact
+  matches" would replace *your* file with a same-named one from
+  elsewhere — unrecoverably, since a repair is not a trash.
+- **The pre-write backup is verified** before the main write proceeds
+  (it was the one write in the app taken on faith), and the trash's
+  filename-dedup loop can no longer fall through and overwrite.
+
+**Effects**
+
+- **A mask routed to the Backdrop turned it solid white.** The
+  scanline/dot "put the light back" compensations deliberately push
+  past 1.0 and were paired with a renormalise that stayed picture-side
+  in the v1.4 restructure — and the backdrop is a feedback loop, so the
+  excess compounded every frame.
+- **The vignette and the LCD backlight bleed now measure the output
+  frame on the backdrop** (they used the picture's coordinate, which is
+  past 1.0 everywhere outside it, so the vignette was a flat darkening
+  and the bleed ignored its own scope control).
+- **The bent enhancer runs after tint and grade again**, restoring the
+  v1.3 circuit order — under a phosphor tint its Luma hue had become a
+  no-op.
+- **Lottes + Pixelate**: the beam now reads the unsnapped coordinate.
+  An even block size dimmed the whole picture by up to 8×.
+- **No more black frame** when trails or the background loop switch on,
+  or when the output size changes while they are on (the reseed left
+  the source texture unbound).
+
+**Performance**
+
+- **Playback scheduling was O(t²).** Every 45-second refill re-walked
+  the song from the beginning with an ever-larger pass count, so after
+  an hour each refill built, sorted and scanned ~150,000 events — a
+  visible main-thread stall on a fixed cadence, right next to a live
+  audio context. The walk is cached and extended instead.
+- **The trails/background feedback texture** is allocated once and
+  updated with `copyTexSubImage2D` rather than re-specified every
+  frame: at 1920×1080 that was ~370 MB/s of pointless texture
+  reallocation whenever either was on.
+- **The mirror no longer renders twice per displayed frame** when the
+  pop-out and the Device tab are both visible — the intended streaming
+  setup was doing double the GPU work.
+- Large cards: instrument usage is indexed by name (sorting a big
+  instrument list did tens of millions of string comparisons), the
+  sample browser's unused-pool test is a Set rather than a linear scan,
+  and project similarity memoises its operand.
+- The base sampler takes one texture fetch instead of three when no
+  channel offsets are active; per-frame constant literals hoisted; the
+  screen-text overlay only stamps on frames that reach the GPU; the raw
+  sample cache is released on stop instead of being held for the rest
+  of the session.
+
+Known and deliberately not changed: an all-channels `GRV` (non-zero
+high byte) still retunes only its own channel — modelling it needs
+state shared across the eight independent channel walks, which would
+break the determinism the playback scheduler depends on.
+
+
 ## v1.4.0 — Picture / Backdrop / Both
 
 - **Effect scope routing.** Twelve colour and texture treatments —

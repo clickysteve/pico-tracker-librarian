@@ -1119,7 +1119,7 @@
     <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
       <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
          title="Source, issues and release notes on GitHub"
-         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.4.0 Beta</a>
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.5.0 Beta</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -2904,7 +2904,9 @@ const PT = (() => {
     const tickSec = 60 / (bpm * 24);       // 24 ticks per beat, default step = 6 ticks
     const rows = geom(proj).songRows;
     const grooveOf = g => {
-      const steps = (proj.grooves[g] || []).filter(v => v > 0 && v <= 0x80);
+      // The parser already truncates at the 0xFF terminator; every other
+      // non-zero value is a legal tick count on the device.
+      const steps = (proj.grooves[g] || []).filter(v => v > 0 && v < 0xFF);
       return steps.length ? steps : [6];
     };
     // Playable = the firmware's isPlayable: a chain sits here and its
@@ -2930,6 +2932,12 @@ const PT = (() => {
     const walk = (t, stopTick, budget) => {
       const emit = stopTick !== null;
       let tick = 0, gSteps = grooveOf(0), gPos = 0, hopEntry = 0;
+      // A phrase step that names a note but no instrument uses the
+      // channel's LAST instrument, as the firmware does (Player.cpp:
+      // instr == 0xFF falls back to mixer_.GetLastInstrument). Writing
+      // the instrument only on a phrase's first note is the standard
+      // tracker idiom, so without this most notes were silent.
+      let lastInstr = EMPTY;
       if (!solo && !playableAt(startRow, t)) return 0;
       let row = startRow;
       // One full pass can legitimately be songRows × 16 chain steps × 16
@@ -2942,6 +2950,10 @@ const PT = (() => {
           const { phrase, transpose } = opts.phrase != null
             ? (cs === 0 ? { phrase: opts.phrase, transpose: 0 } : { phrase: EMPTY, transpose: 0 })
             : chainStep(proj, c, cs);
+          // Budget a chain step too: a chain whose step 0 names an
+          // out-of-range phrase breaks below without ever reaching the
+          // phrase-step loop, and phase 2 would spin forever on it.
+          if (guard-- <= 0) return tick;
           // The chain ends at its FIRST empty step (Player.cpp: canContinue).
           if (phrase === EMPTY || phrase >= geom(proj).phraseCount) break;
           const enterAt = hopEntry; hopEntry = 0;
@@ -2949,12 +2961,20 @@ const PT = (() => {
             if (guard-- <= 0) return tick;
             if (emit && tick > stopTick) return tick;
             const st = phraseStep(proj, phrase, ps);
-            if (st.cmd1 === CMD_HOP || st.cmd2 === CMD_HOP) {
+            // The step a phrase is ENTERED at always plays, HOP and all:
+            // the firmware reads the hop at phrasePlayPos_ + 1, so a hop
+            // on the entry step is not seen until the step after.
+            if (ps !== enterAt && (st.cmd1 === CMD_HOP || st.cmd2 === CMD_HOP)) {
               hopEntry = (st.cmd1 === CMD_HOP ? st.param1 : st.param2) & 0xF;
               break;
             }
             if (st.cmd1 === CMD_GRV || st.cmd2 === CMD_GRV) {
               const g = (st.cmd1 === CMD_GRV ? st.param1 : st.param2) & 0xFF;
+              // Note: the device also honours a non-zero HIGH byte as
+              // "retune every channel". Modelling that needs state shared
+              // across the eight independent walks, which would break the
+              // determinism the window scheduler relies on — so an
+              // all-channels GRV currently retunes only its own channel.
               if (g < GROOVE_COUNT) { gSteps = grooveOf(g); gPos = 0; }
             }
             if (emit) {
@@ -2964,15 +2984,22 @@ const PT = (() => {
               // (Skipped for the player's scheduling walks, which only
               // need events — marks are per-step and dominate the garbage.)
               if (!opts.eventsOnly) marks.push({ time, ch: t, row, chain: c, step: cs, phrase, pstep: ps });
-              if (st.cmd1 === CMD_KIL || st.cmd2 === CMD_KIL || st.note === NOTE_OFF)
+              // KIL's parameter is a note LENGTH: the firmware sets
+              // timeToLive_ = param + 1 and decrements it once per tick,
+              // so the note rings on past this step.
+              const kilP = st.cmd1 === CMD_KIL ? st.param1 : st.cmd2 === CMD_KIL ? st.param2 : null;
+              if (kilP !== null)
+                events.push({ time: time + ((kilP & 0xFF) + 1) * tickSec, ch: t, type: 'off' });
+              else if (st.note === NOTE_OFF)
                 events.push({ time, ch: t, type: 'off' });
               for (const [cmd, param] of [[st.cmd1, st.param1], [st.cmd2, st.param2]]) {
                 if (cmd === CMD_VOL) events.push({ time, ch: t, type: 'vol', value: (param & 0xFF) / 255 });
                 if (cmd === CMD_PAN) events.push({ time, ch: t, type: 'pan', value: ((param & 0xFF) - 0x7F) / 127 });
               }
               if (st.note !== EMPTY && st.note !== NOTE_OFF && st.note <= 119) {
+                if (st.instr !== EMPTY) lastInstr = st.instr;
                 events.push({ time, ch: t, type: 'on', note: st.note,
-                  transpose: transpose + proj.transpose, instr: st.instr });
+                  transpose: transpose + proj.transpose, instr: lastInstr });
               }
             }
             tick += gSteps[gPos % gSteps.length];
@@ -2996,9 +3023,12 @@ const PT = (() => {
     // live player can schedule continuous playback in windows. duration
     // stays ONE pass (the transport's length); span is the whole emit.
     const passes = Math.max(1, Math.floor(opts.passes || 1));
-    // Phase 2's step budget: every step advances at least one tick, so
-    // the emitted tick count is a true upper bound however short the loop.
-    for (let t = 0; t < chanCount; t++) walk(t, endTick * passes - 1, endTick * passes + 1000);
+    // Phase 2's step budget. A step usually advances at least one tick,
+    // but a HOP step consumes budget and emits none — so budget in STEPS
+    // (rows x chain steps x phrase steps per pass) as well as ticks, or a
+    // hop-heavy song silently truncates after ~20 minutes of looping.
+    const stepBudget = endTick * passes + rows * STEPS * STEPS * (passes + 1) + 1000;
+    for (let t = 0; t < chanCount; t++) walk(t, endTick * passes - 1, stepBudget);
     events.sort((a, b) => a.time - b.time);
     marks.sort((a, b) => a.time - b.time);
     // Drop anything past the end (a loop pass can overshoot by a step).
@@ -3572,9 +3602,17 @@ const Scanner = (() => {
   }
 
   // Jaccard similarity by shared pool sample names
+  // poolSet(p) memoises a project's lowercased pool names on the project
+  // record; jaccardSim is called once per project against a fixed left
+  // operand, which used to rebuild that operand's set every time.
+  function poolSet(p) {
+    if (p.__poolSet && p.__poolSetFor === p.pool) return p.__poolSet;
+    p.__poolSetFor = p.pool;
+    return (p.__poolSet = new Set(p.pool.map(s => s.name.toLowerCase())));
+  }
   function jaccardSim(a, b) {
-    const sa = new Set(a.pool.map(s => s.name.toLowerCase()));
-    const sb = new Set(b.pool.map(s => s.name.toLowerCase()));
+    const sa = poolSet(a);
+    const sb = poolSet(b);
     if (sa.size === 0 && sb.size === 0) return 0;
     const inter = [...sa].filter(x => sb.has(x)).length;
     const union = new Set([...sa, ...sb]).size;
@@ -5249,6 +5287,11 @@ void main() {
   // After the bounds test, and with the block centre clamped inside the
   // content: a partial last block must resample the picture's edge, not
   // fall out of bounds and paint a strip of the bars colour.
+  // The Lottes beam is a function of the sub-texel position, so it must
+  // read the UNSNAPPED coordinate: a pixelated q lands on a constant
+  // fraction and scales the whole picture by a constant (an even block
+  // size halved the brightness, an odd one did nothing).
+  vec2 qBeam = q;
   if (uPix.x > 0.0)
     q = clamp((floor(q / uPix) + 0.5) * uPix, 0.5 * uPix, vec2(1.0) - 0.5 * uPix);
 
@@ -5322,13 +5365,15 @@ void main() {
       // scanlines in linear light, then the shadow mask in output px.
       // (RGB offset / planes offsets pause while it is on — the beam IS
       // the sampler.)
-      col = TriL(q);
+      col = TriL(qBeam);
       if (uLot.w > 0.0 && uLot.z > 0.5) col *= MaskL(floor(p * uOutRes));
       col = clamp(ToSrgb(col), 0.0, 1.0);
-    } else {
+    } else if (dot(abs(rOff) + abs(bOff), vec2(1.0)) > 0.0) {
       col.r = texture2D(uSrc, q + rOff).r;
       col.g = texture2D(uSrc, q).g;
       col.b = texture2D(uSrc, q + bOff).b;
+    } else {
+      col = texture2D(uSrc, q).rgb;      // no channel offsets: one fetch
     }
 
     if (uGhost.x > 0.0) {
@@ -5423,29 +5468,6 @@ void main() {
     // ── Colour (picture side) ────────────────────────────
     col = clamp(uChMat * col, 0.0, 1.0);
 
-    // ── Bent enhancer ────────────────────────────────────
-    // The sharpness circuit driven into oscillation: repeating edge
-    // ghosts; colours that chase brightness; strobing inversion.
-    if (uBent.x > 0.0) {
-      float y0 = lum(col);
-      float sp = (2.0 + uBent.y * 14.0) * unit.x;
-      float e = 0.0, w = 1.0;
-      w *= 0.72; e += w * (y0 - lum(texture2D(uSrc, q - vec2(sp, 0.0)).rgb));
-      w *= 0.72; e += w * (y0 - lum(texture2D(uSrc, q - vec2(2.0 * sp, 0.0)).rgb));
-      w *= 0.72; e += w * (y0 - lum(texture2D(uSrc, q - vec2(3.0 * sp, 0.0)).rgb));
-      col = clamp(col + uBent.x * 2.2 * e * vec3(1.25, 1.0, 1.45), 0.0, 1.0);
-    }
-    if (uBent.z > 0.0) {
-      vec3 yy = rgb2yiq(col);
-      float ha = clamp(yy.x, 0.0, 1.0) * uBent.z * TAU;
-      float hc = cos(ha), hs = sin(ha);
-      yy.yz = mat2(hc, -hs, hs, hc) * yy.yz;
-      col = clamp(yiq2rgb(yy), 0.0, 1.0);
-    }
-    if (uFlick.x > 0.0) {
-      float m = step(uFlick.y, lum(col));
-      col = mix(col, vec3(1.0) - col, m * uFlick.x);
-    }
   }
 
   // ── Scoped treatments: Picture / Backdrop / Both ───────
@@ -5474,6 +5496,32 @@ void main() {
 
   if (uInv > 0.0 && scOK(uScopeA.z, bgPix)) col = mix(col, vec3(1.0) - col, uInv);
 
+  if (!oob) {
+    // ── Bent enhancer ────────────────────────────────────
+    // The sharpness circuit driven into oscillation: repeating edge
+    // ghosts; colours that chase brightness; strobing inversion.
+    if (uBent.x > 0.0) {
+      float y0 = lum(col);
+      float sp = (2.0 + uBent.y * 14.0) * unit.x;
+      float e = 0.0, w = 1.0;
+      w *= 0.72; e += w * (y0 - lum(texture2D(uSrc, q - vec2(sp, 0.0)).rgb));
+      w *= 0.72; e += w * (y0 - lum(texture2D(uSrc, q - vec2(2.0 * sp, 0.0)).rgb));
+      w *= 0.72; e += w * (y0 - lum(texture2D(uSrc, q - vec2(3.0 * sp, 0.0)).rgb));
+      col = clamp(col + uBent.x * 2.2 * e * vec3(1.25, 1.0, 1.45), 0.0, 1.0);
+    }
+    if (uBent.z > 0.0) {
+      vec3 yy = rgb2yiq(col);
+      float ha = clamp(yy.x, 0.0, 1.0) * uBent.z * TAU;
+      float hc = cos(ha), hs = sin(ha);
+      yy.yz = mat2(hc, -hs, hs, hc) * yy.yz;
+      col = clamp(yiq2rgb(yy), 0.0, 1.0);
+    }
+    if (uFlick.x > 0.0) {
+      float m = step(uFlick.y, lum(col));
+      col = mix(col, vec3(1.0) - col, m * uFlick.x);
+    }
+  }
+
   // ── Masks ────────────────────────────────────────────
   // Measured in DEVICE pixels off sq, so they follow the curve and the
   // fill on the picture and sit on the same grid on the backdrop.
@@ -5485,8 +5533,10 @@ void main() {
     float m = smoothstep(1.0 - uScan.x - soft, 1.0 - uScan.x + soft, f);
     col *= 1.0 - m * uScan.y;
     // Put back the light the mask removed, or heavy scanlines read as
-    // "the picture got dark" rather than as scanlines.
-    col *= 1.0 / (1.0 - uScan.x * uScan.y * 0.8);
+    // "the picture got dark" rather than as scanlines. Picture only: the
+    // backdrop is a feedback loop, and >1.0 gain here compounds every
+    // frame until the bars clip to white.
+    if (!oob) col *= 1.0 / (1.0 - uScan.x * uScan.y * 0.8);
   }
 
   if (uLcd.x > 0.0 && scOK(uScopeB.y, bgPix)) {
@@ -5510,7 +5560,7 @@ void main() {
     float edge = clamp(0.6 / max(uPx, 1.0), 0.02, 0.2);
     float inside = 1.0 - smoothstep(uDot.x - edge, uDot.x + edge, d);
     col *= mix(1.0 - uDot.y, 1.0, inside);
-    col *= 1.0 / (1.0 - uDot.y * 0.45);
+    if (!oob) col *= 1.0 / (1.0 - uDot.y * 0.45);   // see the scanline note
     if (uDot.z > 0.0)
       col += vec3(uDot.z * 0.35 * (1.0 - smoothstep(uDot.x, uDot.x + 0.35, d)) * lum(col));
   }
@@ -5532,10 +5582,12 @@ void main() {
       col = vec3(1.0) - (vec3(1.0) - col) * (vec3(1.0) - b);
     }
 
-    if (uLcd.y > 0.0) {
-      float e = clamp(max(abs(c.x), abs(c.y)), 0.0, 1.0);
-      col += vec3(uLcd.y * 0.20 * smoothstep(0.45, 1.0, e));
-    }
+  }
+
+  if (uLcd.y > 0.0 && scOK(uScopeB.y, bgPix)) {
+    vec2 lc = oob ? (p * 2.0 - 1.0) : c;
+    float e = clamp(max(abs(lc.x), abs(lc.y)), 0.0, 1.0);
+    col += vec3(uLcd.y * 0.20 * smoothstep(0.45, 1.0, e));
   }
 
   if (uNoise.x > 0.0 && scOK(uScopeC.x, bgPix)) {
@@ -5552,7 +5604,11 @@ void main() {
   }
 
   if (uVig.x > 0.0 && scOK(uScopeC.y, bgPix)) {
-    float rr = mix(length(c), max(abs(c.x), abs(c.y)), uVig.y);
+    // c is the PICTURE's frame coordinate and is > 1 everywhere outside
+    // it, which would saturate the falloff into a flat darkening; the
+    // backdrop measures against the output frame instead.
+    vec2 vc = oob ? (p * 2.0 - 1.0) : c;
+    float rr = mix(length(vc), max(abs(vc.x), abs(vc.y)), uVig.y);
     float inner = 0.20 - uVig.x * 0.18;
     float outer = 1.30 - uVig.x * 0.35;
     col *= 1.0 - smoothstep(inner, outer, rr) * (0.30 + uVig.x * 0.68);
@@ -5614,6 +5670,9 @@ void main() {
 }`;
 
   // ── Renderer ────────────────────────────────────────────
+  const TRAIL_TINTS = { source: [1, 1, 1], green: [0.3, 1, 0.45], amber: [1, 0.7, 0.2], blue: [0.4, 0.7, 1] };
+  const SCOPE_VAL = { pic: 0, bg: 1, both: 2 };
+  const LOTTES_MASK = { none: 0, tv: 1, grille: 2, vga: 3 };
   const CH_MAPS = {
     rgb:[0,1,2], rbg:[0,2,1], grb:[1,0,2], gbr:[1,2,0], brg:[2,0,1], bgr:[2,1,0],
   };
@@ -6038,18 +6097,16 @@ void main() {
         bgOn ? (bgp.echo ?? 0) / 100 : 0,
         wrap(time * 0.07, 1));
       // Scope routing: 0 picture, 1 backdrop, 2 both.
-      const SCV = { pic: 0, bg: 1, both: 2 };
-      const scOf = id => SCV[P(id).scope] ?? 0;
+      const scOf = id => SCOPE_VAL[P(id).scope] ?? 0;
       gl.uniform4f(u(progMain, 'uScopeA'), scOf('tint'), scOf('grade'), scOf('invert'), scOf('rainbowmap'));
       gl.uniform4f(u(progMain, 'uScopeB'), scOf('scanlines'), scOf('lcd'), scOf('grid'), scOf('dot'));
       gl.uniform4f(u(progMain, 'uScopeC'), scOf('noise'), scOf('vignette'), scOf('rollbar'), scOf('dither'));
       const lo = P('lottes');
-      const LMASK = { none: 0, tv: 1, grille: 2, vga: 3 };
       gl.uniform1f(u(progMain, 'uLotOn'), on('lottes') ? 1 : 0);
       gl.uniform4f(u(progMain, 'uLot'),
         -4 - (lo.beam ?? 33) / 100 * 12,       // hardScan -4 .. -16
         -1 - (lo.sharp ?? 40) / 100 * 5,       // hardPix  -1 .. -6
-        LMASK[lo.mask] ?? 2,
+        LOTTES_MASK[lo.mask] ?? 2,
         (lo.maskamt ?? 60) / 100);
 
       const tr = P('trails');
@@ -6057,14 +6114,33 @@ void main() {
       // Coming back on (or changing output size) must start from black:
       // the texture otherwise still holds whatever was on screen when
       // trails were last active, which flashes over the current picture.
+      // Allocated at full size here so the per-frame feedback copy can be
+      // a copyTexSubImage2D into existing storage rather than a
+      // copyTexImage2D, which re-specifies (and typically reallocates)
+      // several MB of texture every single frame.
       if (trailsOn && (!trailWas || trailW !== out.w || trailH !== out.h)) {
+        gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, trailTex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE,
-          new Uint8Array([0, 0, 0]));
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, out.w, out.h, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+        // texImage2D with null leaves the contents undefined on some
+        // drivers; clear it to black through an FBO so the first frame
+        // never samples garbage.
+        const fbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, trailTex, 0);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE) {
+          gl.viewport(0, 0, out.w, out.h);
+          gl.clearColor(0, 0, 0, 1);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.deleteFramebuffer(fbo);
+        gl.viewport(0, 0, out.w, out.h);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, srcTex);     // unit 0 must stay the source
         trailW = out.w; trailH = out.h;
       }
       trailWas = trailsOn;
-      const TRAIL_TINTS = { source: [1, 1, 1], green: [0.3, 1, 0.45], amber: [1, 0.7, 0.2], blue: [0.4, 0.7, 1] };
       const tt = TRAIL_TINTS[tr.colour] || TRAIL_TINTS.source;
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, trailTex);
@@ -6079,11 +6155,14 @@ void main() {
 
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-      // Feed the finished frame back for next time. copyTexImage2D reads
-      // the drawing buffer, which preserveDrawingBuffer keeps alive.
-      if (trailsOn) {
+      // Feed the finished frame back for next time. The copy reads the
+      // drawing buffer, which preserveDrawingBuffer keeps alive. Sub-image
+      // into the storage allocated above: no per-frame reallocation.
+      if (trailsOn && trailW === out.w && trailH === out.h) {
+        gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, trailTex);
-        gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGB, 0, 0, out.w, out.h, 0);
+        gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, out.w, out.h);
+        gl.activeTexture(gl.TEXTURE0);
       }
     }
 
@@ -6668,7 +6747,9 @@ const Mirror = (() => {
   }
 
   function draw(tSec, upload) {
-    USB.stampOverlay();       // over whatever the device (or demo) drew
+    // Only worth stamping on frames whose source actually reaches the
+    // GPU; on the others the glyphs would be redrawn and discarded.
+    if (upload !== false) USB.stampOverlay();   // over what the device drew
     if (renderer) renderer.render(USB.sourceCanvas(), state, tSec, upload !== false);
     else blit();
     const o = FX.outputDims(state);
@@ -6707,7 +6788,10 @@ const Mirror = (() => {
   function step(ts) {
     if (!out || lost) return;
     if (!wanted()) return;
-    if (ts - lastStep < 6) return;
+    // Two rAF loops can be live at once (the main window and the
+    // pop-out). A 6ms guard let two phase-offset 60Hz loops both through,
+    // rendering the whole chain twice per displayed frame.
+    if (ts - lastStep < 13) return;
     lastStep = ts;
     // Sample first: a live input is itself a reason to redraw, because
     // the picture is moving even when the device screen is not.
@@ -7379,7 +7463,9 @@ const SongPlayer = (() => {
     if (ctx) { try { ctx.close(); } catch {} ctx = null; }
     const cb = state?.onEnd;
     state = null;
-    if (!silent) cb?.();
+    // A real stop releases the raw sample bytes too; only seek/loop
+    // rebuilds (silent) keep them, since they re-decode immediately.
+    if (!silent) { bufCache = { key: null, raw: null }; cb?.(); }
   }
 
   let playToken = 0;
@@ -7432,15 +7518,23 @@ const SongPlayer = (() => {
     // exactly (boundary floats are reused between calls).
     let schedTo = 0;                     // timeline seconds scheduled so far
     const AHEAD = 45, REFILL = 15;
+    // Per-channel event lists, built once per cached walk rather than on
+    // every window.
+    let byChCache = null, byChFor = null;
     function scheduleWindow(look, winStart, winEnd) {
       const spanEnd = t0 + (look.span ?? look.duration);
-      const byCh = Array.from({ length: 8 }, () => []);
-      for (const e of look.events) byCh[e.ch].push(e);
+      let byCh = byChCache;
+      if (byChFor !== look) {
+        byCh = Array.from({ length: 8 }, () => []);
+        for (const e of look.events) byCh[e.ch].push(e);
+        byChCache = byCh; byChFor = look;
+      }
       for (let c = 0; c < 8; c++) {
         const evs = byCh[c];
         for (let i = 0; i < evs.length; i++) {
           const e = evs[i];
-          if (e.time < winStart || e.time >= winEnd) continue;
+          if (e.time >= winEnd) break;        // events are in tick order
+          if (e.time < winStart) continue;
           // VOL param is 0..255 → 0..1. The old 1.4x boost had no basis and
           // pushed full-volume channels straight into clipping.
           // gain/pan before the seek point still apply, just immediately
@@ -7463,6 +7557,16 @@ const SongPlayer = (() => {
           const vg = ctx.createGain();
           vg.gain.value = m.gain;
           src.connect(vg); vg.connect(chans[c].g);
+          // (an instrument pan node may be spliced in below)
+          // The instrument's own pan is per-note on the device; a PAN
+          // command still rides the channel node on top of it.
+          let vgOut = vg;
+          if (m.pan && ctx.createStereoPanner) {
+            const ip = ctx.createStereoPanner();
+            ip.pan.value = Math.max(-1, Math.min(1, m.pan));
+            vg.disconnect(); vg.connect(ip); ip.connect(chans[c].g);
+            vgOut = ip;
+          }
           const sliceCount = m.slices.length;
           let offset = 0, dur = null, rate = 1;
           if (sliceCount && e.note >= PT.SLICE_NOTE_BASE && e.note < PT.SLICE_NOTE_BASE + m.pads) {
@@ -7478,7 +7582,12 @@ const SongPlayer = (() => {
               const s = m.start / srcRate;
               if (s < buf.duration) offset = s;
             }
-            if (m.loopMode !== 'none') {
+            // `end` trims a one-shot too (firmware: SILM_ONESHOT stops at
+            // rendLoopEnd_), not only the looping modes.
+            if (m.loopMode === 'none') {
+              const lw = PT.loopWindow(m.start, m.loopEnd, srcRate, buf.duration);
+              if (lw && lw.end > offset) dur = lw.end - offset;
+            } else {
               const lw = PT.loopWindow(m.loopStart, m.loopEnd, srcRate, buf.duration);
               if (lw) {
                 let pp = null;
@@ -7499,7 +7608,7 @@ const SongPlayer = (() => {
           vg.gain.linearRampToValueAtTime(0, stopAt);   // declick
           // Looping playback runs indefinitely now, so finished notes must
           // free themselves or the graph grows a node per note forever.
-          src.onended = () => { try { src.disconnect(); vg.disconnect(); } catch {} };
+          src.onended = () => { try { src.disconnect(); vg.disconnect(); vgOut.disconnect(); } catch {} };
           try {
             if (dur !== null && !src.loop) src.start(start, offset, Math.min(dur, stopAt - start + 0.01));
             else { src.start(start, offset); src.stop(stopAt); }
@@ -7508,6 +7617,12 @@ const SongPlayer = (() => {
         }
       }
     }
+    // The walk is deterministic, so a walk of N passes is a strict
+    // prefix of a walk of N+M. Cache the last one and only re-walk when a
+    // window runs past it — rebuilding from tick 0 on every 45s refill
+    // was O(t^2) work and, on a long stream, a growing main-thread stall
+    // (and matching GC churn) right next to a live AudioContext.
+    let lookCache = null, lookPasses = 0;
     function extendSchedule() {
       const from = schedTo;
       // The first window also has to cover a mid-song seek, or nothing
@@ -7517,16 +7632,25 @@ const SongPlayer = (() => {
       // lookahead: a channel's next event is at most one pass away, so
       // the stop of a note near `to` is found rather than defaulted.
       const need = Math.max(1, Math.ceil((to + passDur) / passDur) + 1);
-      const look = PT.buildEventTimeline(parsed, { ...(opts || {}), passes: need, eventsOnly: true });
-      // The editors mutate `parsed` in place, and windows spliced from a
-      // CHANGED walk would desync against what is already scheduled. If
-      // the pass length moved (rows/grooves/hops edited) — or nothing is
-      // playable any more — restart cleanly from the new timeline instead
-      // of splicing.
-      if (!look || Math.abs(look.duration - passDur) > 1e-9) {
-        const a = state.ctxArgs;
-        play(a.sd, a.proj, a.parsed, a.onProgress, a.onEnd, { ...(a.opts || {}), startAt: 0, internal: true });
-        return;
+      let look = lookCache;
+      if (!look || lookPasses < need) {
+        // Walk in chunks so a short loop does not re-walk every refill:
+        // ask for well past what this window needs.
+        const grab = Math.max(need, lookPasses * 2, Math.ceil(600 / passDur));
+        look = PT.buildEventTimeline(parsed, { ...(opts || {}), passes: grab, eventsOnly: true });
+        // The editors mutate `parsed` in place, and windows spliced from
+        // a CHANGED walk would desync against what is already scheduled.
+        // If the pass length moved (rows/grooves/hops edited) — or nothing
+        // is playable any more — restart cleanly from the new timeline
+        // instead of splicing.
+        if (!look || Math.abs(look.duration - passDur) > 1e-9) {
+          lookCache = null; lookPasses = 0;
+          const a = state?.ctxArgs;
+          if (a) play(a.sd, a.proj, a.parsed, a.onProgress, a.onEnd, { ...(a.opts || {}), startAt: 0, internal: true });
+          else stop();
+          return;
+        }
+        lookCache = look; lookPasses = grab;
       }
       scheduleWindow(look, from, to);
       schedTo = to;
@@ -7784,6 +7908,7 @@ const UI = (() => {
     for (const k of [...fullCacheClean.keys()])
       if (!fullCache.has(k)) fullCacheClean.delete(k);   // keep the diff source in step
     sampleNameMap = Scanner.buildSampleNameMap(lib.projects, lib.library);
+    instrNameMap = null;      // rebuilt lazily against the new scan
     dupeNameMap = Scanner.buildInstrDupeMap(lib.ptis);
     renderHealth();
     renderCurrent();
@@ -8023,11 +8148,24 @@ const UI = (() => {
   }
 
   // ── Project modal (full detail + pattern viewer) ──────
+  // Every parse remembers the exact file it was read from. A rescan can
+  // refresh a project's record while an EDITED parse from an older file
+  // survives in fullCache; comparing the card against the record would
+  // then pass and silently write the old arrangement over the new one.
+  const parseStamp = new WeakMap();
   async function readProjectFull(p) {
     const dir = await (await sd.getDirectoryHandle('projects')).getDirectoryHandle(p.dirName);
     const fh = await dir.getFileHandle(p.datName);
     const file = await fh.getFile();
-    return { parsed: PT.parseProject(await file.text()), file, fh, dir };
+    const parsed = PT.parseProject(await file.text());
+    parseStamp.set(parsed, { lastModified: file.lastModified, size: file.size });
+    return { parsed, file, fh, dir };
+  }
+  // The file a pending edit is based on: the parse's own stamp when we
+  // have one, else the scan record (a freshly scanned, unedited project).
+  function baseOf(p, parsed) {
+    return (parsed && parseStamp.get(parsed))
+      || { lastModified: p.lastModified, size: p.fileSize };
   }
 
   async function openProjModal(dirName) {
@@ -9578,6 +9716,7 @@ const UI = (() => {
       const num = (k, d) => { const v = parseInt(q[k], 10); return isNaN(v) ? d : v; };
       return { sample: i.sample, rootNote: num('root note', 60),
         gain: Math.min(2, num('volume', num('level', 128)) / 128),
+        pan: (num('pan', 0x7F) - 0x7F) / 127,
         loopMode: q.loopmode || 'none', start: num('start', 0),
         loopStart: num('loopstart', 0), loopEnd: num('end', 0),
         slices: (i.slices || []).slice().sort((a, b) => a.index - b.index),
@@ -9607,7 +9746,14 @@ const UI = (() => {
         let useBuf = buf;        // set once at the end — the property is write-once
         const vg = off.createGain();
         vg.gain.value = m.gain;
-        src.connect(vg); vg.connect(chans[c].g);
+        src.connect(vg);
+        let vgOut = vg;
+        if (m.pan && off.createStereoPanner) {
+          const ip = off.createStereoPanner();
+          ip.pan.value = Math.max(-1, Math.min(1, m.pan));
+          vg.connect(ip); ip.connect(chans[c].g);
+          vgOut = ip;
+        } else vg.connect(chans[c].g);
         let offset = 0, dur = null, rate = 1;
         if (m.slices.length && e.note >= PT.SLICE_NOTE_BASE && e.note < PT.SLICE_NOTE_BASE + m.pads) {
           const w = PT.sliceWindow(m.slices, e.note - PT.SLICE_NOTE_BASE, srcRate, buf.duration, m.pads);
@@ -9616,7 +9762,10 @@ const UI = (() => {
         } else {
           rate = Math.pow(2, (e.note + e.transpose - m.rootNote) / 12);
           if (m.start > 0 && m.start / srcRate < buf.duration) offset = m.start / srcRate;
-          if (m.loopMode !== 'none') {
+          if (m.loopMode === 'none') {
+            const lw = PT.loopWindow(m.start, m.loopEnd, srcRate, buf.duration);
+            if (lw && lw.end > offset) dur = lw.end - offset;
+          } else {
             const lw = PT.loopWindow(m.loopStart, m.loopEnd, srcRate, buf.duration);
             if (lw) {
               let pp = null;
@@ -11050,9 +11199,21 @@ const UI = (() => {
     no.onclick = close;
   }
 
+  // Every writer to a project's .dat takes this lock. They all do
+  // read-modify-write on the same file and all roll back by writing the
+  // whole file they started from, so two in flight can lose one's work or
+  // resurrect a file another already replaced.
+  const cardWriteLock = new Set();
+  async function withCardLock(key, fn, onBusy) {
+    if (cardWriteLock.has(key)) { onBusy?.(); return; }
+    cardWriteLock.add(key);
+    try { return await fn(); }
+    finally { cardWriteLock.delete(key); }
+  }
   async function saveEdits(host) {
     if (saveInFlight) return;                 // double-click must not run two passes
     const p = modalProj;
+    if (p && cardWriteLock.has(p.dirName)) return;   // no two writers on one .dat
     const parsed = p && fullCache.get(p.dirName);
     if (!p || !parsed) {
       const bar = document.getElementById('pv-save-bar');
@@ -11061,6 +11222,7 @@ const UI = (() => {
     }
     if (!await ensureWrite()) return;
     saveInFlight = true;
+    cardWriteLock.add(p.dirName);
     const saveBtn = document.getElementById('btn-save-edits');
     if (saveBtn) saveBtn.disabled = true;
     const bar = document.getElementById('pv-save-bar');
@@ -11077,8 +11239,9 @@ const UI = (() => {
     let backedUp = false, original = null, committed = false;
     try {
       const { file: curFile, bytes: curBytes, text } = await readCardFileForEdit(projPath, p.datName);
-      if (curFile.lastModified !== p.lastModified || curFile.size !== p.fileSize)
-        throw new Error('project changed on card since the last scan — rescan first (nothing written)');
+      const base = baseOf(p, parsed);
+      if (curFile.lastModified !== base.lastModified || curFile.size !== base.size)
+        throw new Error('the project on the card is not the one these edits were made against (it changed since you opened it) — nothing written. Close without saving and reopen to start from the card\'s version.');
       let res = PT.rewriteSongSections(text, parsed);
       if (!res.ok) throw new Error(res.error);
       if (dirtyGrooves.has(p.dirName)) {
@@ -11104,6 +11267,11 @@ const UI = (() => {
       setBar('Backing up…');
       original = curBytes;
       await writeCardFile(`PTLibrarian_Backups/${stamp}/${p.dirName}`, p.datName, curBytes);
+      // The safety net is the one write worth verifying hardest: a
+      // short backup on a nearly-full card would be discovered only
+      // after the main write had already failed.
+      { const bk = await readCardFile(`PTLibrarian_Backups/${stamp}/${p.dirName}`, p.datName);
+        if (bk.size !== curBytes.byteLength) throw new Error('backup verification failed — nothing written'); }
       backedUp = true;
       setBar('Writing…');
       await writeCardFile(projPath, p.datName, res.text);
@@ -11142,6 +11310,10 @@ const UI = (() => {
         eP?.size ? `phrases [${[...eP].map(PT.hx2).join(' ')}]` : null,
       ].filter(Boolean).join(', ');
       committed = true;   // past this point the card holds a verified good file
+      // The parse now matches the file we just wrote — re-stamp it, or a
+      // second save of further edits would refuse against its old base.
+      { const nf = await readCardFile(projPath, p.datName);
+        parseStamp.set(parsed, { lastModified: nf.lastModified, size: nf.size }); }
       logRepair(true, 'edit-song', `${p.name}: ${what} edited — original backed up`);
       dirtyPhrases.delete(p.dirName);
       dirtyChains.delete(p.dirName);
@@ -11176,6 +11348,7 @@ const UI = (() => {
       }
     } finally {
       saveInFlight = false;
+    cardWriteLock.delete(p.dirName);
       const b = host.querySelector('#btn-save-edits');
       if (b) b.disabled = false;
     }
@@ -11293,11 +11466,26 @@ const UI = (() => {
           out.push({...i, source:'project', proj:p, srcLabel:p.name+' · '+i.idHex, key:'proj:'+p.dirName+':'+i.idHex});
     return out;
   }
+  // name → projects that carry an instrument of that name. Built once per
+  // scan: instrUsage runs from a sort comparator and from the problem
+  // counters, where a scan of every instrument of every project made
+  // sorting a big card's instrument list take seconds.
+  let instrNameMap = null;
+  function buildInstrNameMap() {
+    instrNameMap = new Map();
+    for (const p of lib.projects)
+      for (const i of p.instruments) {
+        const k = (i.name || '').toLowerCase();
+        let arr = instrNameMap.get(k);
+        if (!arr) instrNameMap.set(k, arr = []);
+        if (arr[arr.length - 1] !== p) arr.push(p);
+      }
+  }
   function instrUsage(inst) {
     // For a library .pti: projects containing an instrument of same name.
     if (inst.source === 'project') return inst.used ? [inst.proj] : [];
-    const nm = inst.name.toLowerCase();
-    return lib.projects.filter(p => p.instruments.some(i => i.name.toLowerCase() === nm));
+    if (!instrNameMap) buildInstrNameMap();
+    return instrNameMap.get(inst.name.toLowerCase()) || [];
   }
   function instrSampleState(inst) {
     if (!inst.sample) return null;
@@ -11463,8 +11651,10 @@ const UI = (() => {
       const files = p.pool.filter(s => !q || s.name.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
       if (!files.length) continue;
       html += `<div class="grp"><div class="grp-hdr"><span class="grp-chev">▶</span><span class="grp-name">projects/${esc(p.name)}/samples/</span><span class="grp-cnt">${p.pool.length} · ${fmtBytes(p.poolBytes)}</span></div><div class="grp-body">`;
+      // Set, not Array.includes: a 400-sample pool made this quadratic.
+      const unusedSet = new Set(p.unusedPool);
       for (const s of files) {
-        const unused = p.unusedPool.includes(s.name);
+        const unused = unusedSet.has(s.name);
         const rowIdx = sampbrRows.length;
         sampbrRows.push({path:`projects/${p.dirName}/samples/${s.name}`, name:s.name});
         html += `<div class="sb-file-row" data-row="${rowIdx}">
@@ -12308,6 +12498,13 @@ const UI = (() => {
           if (bytes.byteLength < 44 || !PT.parseWavHeader(new Uint8Array(bytes.slice(0, 4096)), bytes.byteLength))
             throw new Error(`source for ${ch.name} is not a readable wav`);
           await getPathDir(projPath, false);
+          // The fix is only valid while the file really is missing. If one
+          // has appeared since the scan (the user restored it themselves),
+          // copying would silently replace THEIR file with a same-named
+          // one from elsewhere — and unlike a trash, unrecoverably.
+          let already = false;
+          try { await (await getPathDir(`${projPath}/samples`, false)).getFileHandle(ch.name); already = true; } catch {}
+          if (already) throw new Error(`${ch.name} is already in that pool now — rescan first (nothing written)`);
           await writeCardFile(`${projPath}/samples`, ch.name, bytes);
           const verify = await readCardFile(`${projPath}/samples`, ch.name);
           if (verify.size !== bytes.byteLength) throw new Error(`copy verification failed for ${ch.name}`);
@@ -13036,7 +13233,13 @@ const UI = (() => {
     const p = Slicer.proj, inst = Slicer.inst;
     if (!p || !inst || !await ensureWrite()) return;
     const setStatus = m => $('slice-status').textContent = m;
+    if (cardWriteLock.has(p.dirName)) {
+      setStatus('Another save to this project is still running — try again in a moment.');
+      return;
+    }
+    cardWriteLock.add(p.dirName);
     $('btn-slice-save').disabled = true;
+    try {
     const projPath = `projects/${p.dirName}`;
     const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
     let backedUp = false, original = null;
@@ -13050,6 +13253,11 @@ const UI = (() => {
       setStatus('Backing up…');
       original = curBytes;
       await writeCardFile(`PTLibrarian_Backups/${stamp}/${p.dirName}`, p.datName, curBytes);
+      // The safety net is the one write worth verifying hardest: a
+      // short backup on a nearly-full card would be discovered only
+      // after the main write had already failed.
+      { const bk = await readCardFile(`PTLibrarian_Backups/${stamp}/${p.dirName}`, p.datName);
+        if (bk.size !== curBytes.byteLength) throw new Error('backup verification failed — nothing written'); }
       backedUp = true;
       setStatus('Writing…');
       await writeCardFile(projPath, p.datName, res.text);
@@ -13074,6 +13282,7 @@ const UI = (() => {
       } else setStatus(`Failed: ${e.message || e} (nothing written)`);
       $('btn-slice-save').disabled = false;
     }
+    } finally { cardWriteLock.delete(p.dirName); }
   }
 
   // ── INSTRUMENT PARAM EDITOR (experimental) ─────────────
@@ -13129,6 +13338,12 @@ const UI = (() => {
   async function saveInstrumentParams(p, inst, changes, statusEl) {
     if (!await ensureWrite()) return;
     const setStatus = m => { if (statusEl) statusEl.textContent = m; };
+    if (cardWriteLock.has(p.dirName)) {
+      setStatus('Another save to this project is still running — try again in a moment.');
+      return;
+    }
+    cardWriteLock.add(p.dirName);
+    try {
     const projPath = `projects/${p.dirName}`;
     const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
     let backedUp = false, original = null;
@@ -13143,6 +13358,11 @@ const UI = (() => {
       setStatus('Backing up…');
       original = curBytes;
       await writeCardFile(`PTLibrarian_Backups/${stamp}/${p.dirName}`, p.datName, curBytes);
+      // The safety net is the one write worth verifying hardest: a
+      // short backup on a nearly-full card would be discovered only
+      // after the main write had already failed.
+      { const bk = await readCardFile(`PTLibrarian_Backups/${stamp}/${p.dirName}`, p.datName);
+        if (bk.size !== curBytes.byteLength) throw new Error('backup verification failed — nothing written'); }
       backedUp = true;
       setStatus('Writing…');
       await writeCardFile(projPath, p.datName, res.text);
@@ -13165,6 +13385,7 @@ const UI = (() => {
         catch { setStatus(`Failed: ${e.message || e} — RESTORE FAILED, backup at PTLibrarian_Backups/${stamp}/`); }
       } else setStatus(`Failed: ${e.message || e} (nothing written)`);
     }
+    } finally { cardWriteLock.delete(p.dirName); }
   }
 
   // ── EXTRACT INSTRUMENT AS .PTI ─────────────────────────
@@ -13244,6 +13465,11 @@ const UI = (() => {
         if (bytes.byteLength < 44 || !PT.parseWavHeader(new Uint8Array(bytes.slice(0, 4096)), bytes.byteLength))
           throw new Error('source is not a readable wav — skipped');
         await getPathDir(`projects/${job.proj.dirName}`, false);   // never resurrect a deleted project
+        // Only fix what is still missing: a file restored by hand since
+        // the scan must never be silently replaced (see applyFixes).
+        let already = false;
+        try { await (await getPathDir(`projects/${job.proj.dirName}/samples`, false)).getFileHandle(job.name); already = true; } catch {}
+        if (already) throw new Error('already in the pool now — rescan first (skipped)');
         await writeCardFile(`projects/${job.proj.dirName}/samples`, job.name, bytes);
         const verify = await readCardFile(`projects/${job.proj.dirName}/samples`, job.name);
         if (verify.size !== bytes.byteLength) throw new Error('size mismatch after copy');
@@ -13279,6 +13505,7 @@ const UI = (() => {
         try { await tDir.getFileHandle(destName); destName = sampleName.replace(/\.wav$/i, '') + n + '.wav'; }
         catch { free = true; }
       }
+      if (!free) throw new Error('could not find a free name in the trash — nothing moved');
       await writeCardFile(trashDir, destName, bytes);
       const verify = await readCardFile(trashDir, destName);
       if (verify.size !== bytes.byteLength) throw new Error('trash copy verification failed — pool untouched');
@@ -13311,6 +13538,7 @@ const UI = (() => {
         try { await tDir.getFileHandle(destName); destName = name.replace(/\.wav$/i, '') + n + '.wav'; }
         catch { free = true; }
       }
+      if (!free) throw new Error('could not find a free name in the trash — nothing moved');
       await writeCardFile(trashDir, destName, bytes);
       const verify = await readCardFile(trashDir, destName);
       if (verify.size !== bytes.byteLength) throw new Error('trash copy verification failed — library untouched');

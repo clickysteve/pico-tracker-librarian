@@ -56,6 +56,24 @@ actually audible rather than theoretical:
   coordination with xiphonics before any client sends input. (Ask on
   Discord / issue #1432.)
 
+## Known gaps found by the 1.5.0 review
+
+- **All-channels `GRV`** — a non-zero high byte should retune every
+  channel's groove; the librarian retunes only the channel that issued
+  it. Needs groove state shared across the eight independent walks
+  without breaking their determinism (the playback scheduler splices
+  windows out of repeated walks and relies on identical prefixes).
+- **`oscillator` and `looper sync` loop modes** play as plain forward
+  loops. Both derive their playback rate from the loop length rather
+  than the sample rate (`SampleInstrument.cpp` `SILM_OSC` /
+  `SILM_LOOPSYNC`), so a single-cycle wavetable sounds octaves flat.
+- **`VOL`/`PAN` commands are channel-persistent** in the librarian; on
+  the device they are per-voice and reset on the next note, and `VOL`
+  *replaces* the instrument volume rather than scaling it (so it can
+  only attenuate here, never boost).
+- **The sample browser is not chunked** — a card with thousands of pool
+  samples builds the whole list in one pass.
+
 ## Ideas
 
 - **Video render.** The pieces are now all in place: the player knows every
