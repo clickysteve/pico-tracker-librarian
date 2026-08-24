@@ -136,7 +136,7 @@ Tests are zero-dependency Node scripts that extract modules straight out of `ind
 node tests/parser.test.mjs   # 197 unit tests: formats, MIDI timing, slice/loop units, islands, pingpong, round-trips, generators, scales, audio analysis
 node tests/fuzz.test.mjs     # seeded fuzz — parsers must never throw
 node tests/audio.test.mjs    # renders the mix and a WAV export offline: no clipping, correct slice offsets, valid stems
-node tests/e2e.mjs           # 326 browser checks (needs: npm i -D playwright)
+node tests/e2e.mjs           # 328 browser checks (needs: npm i -D playwright)
 ```
 
 The parser tests run round-trip checks against real Advance project files when they're present locally; those files are not in this repository.

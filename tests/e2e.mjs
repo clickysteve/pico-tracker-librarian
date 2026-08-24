@@ -2328,6 +2328,56 @@ check('fx: effects with no react target cannot be given one', !rSafe.chswap && !
 check('fx: a non-string device id is rejected',
   typeof rSafe.dev === 'string' && rSafe.dev !== 42 && rSafe.dev !== '42');
 check('fx: an out-of-range sensitivity is clamped', rSafe.gain === 10);
+// Multi-input interfaces: the device list must survive re-enumeration,
+// and a 2-in box must offer its inputs individually rather than silently
+// downmixing them (a picoTracker on input 2 read as dead).
+check('audio: a multi-input interface offers its inputs, and the pick sticks', await page.evaluate(async () => {
+  const realGUM = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+  const realEnum = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);
+  try {
+    const ac = new AudioContext();
+    const dest = ac.createMediaStreamDestination();
+    dest.channelCount = 2; dest.channelCountMode = 'explicit'; dest.channelInterpretation = 'discrete';
+    const merger = ac.createChannelMerger(2);
+    const osc = ac.createOscillator(); osc.connect(merger, 0, 1); osc.start();
+    merger.connect(dest);
+    navigator.mediaDevices.getUserMedia = async () => dest.stream;
+    navigator.mediaDevices.enumerateDevices = async () => ([
+      { kind: 'audioinput', deviceId: 'default', label: 'Default - Built-in Mic' },
+      { kind: 'audioinput', deviceId: 'iface-2in', label: 'Two-input interface' },
+    ]);
+    const dev = document.getElementById('fx-audio-dev');
+    const ch = document.getElementById('fx-audio-ch');
+    document.getElementById('fx-audio-connect').click();
+    await new Promise(r => setTimeout(r, 900));
+    const listed = [...dev.options].some(o => /Two-input/.test(o.textContent))
+                && [...dev.options].some(o => /System default/.test(o.textContent));
+    const offered = ch.style.display !== 'none' && ch.options.length === 3;
+    const pick = async v => {
+      ch.value = v; ch.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 600));
+      return AudioReact.openedInfo().channel;
+    };
+    const one = await pick('0'), two = await pick('1'), mix = await pick('mix');
+    // Choosing the interface then re-enumerating must not reset it.
+    dev.value = 'iface-2in'; dev.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 700));
+    await Mirror.refreshInputs?.();
+    await new Promise(r => setTimeout(r, 300));
+    const stuck = document.getElementById('fx-audio-dev').value === 'iface-2in';
+    AudioReact.stop();
+    return listed && offered && one === 0 && two === 1 && mix === 'mix' && stuck;
+  } finally {
+    navigator.mediaDevices.getUserMedia = realGUM;
+    navigator.mediaDevices.enumerateDevices = realEnum;
+  }
+}));
+check('audio: a mono input hides the channel picker', await page.evaluate(() => {
+  AudioReact.stop();
+  Mirror.syncUI();
+  return document.getElementById('fx-audio-ch').style.display === 'none';
+}));
+
 check('fx: the audio input is never opened without a click',
   rSafe.on === false && rSafe.running === false);
 

@@ -1119,7 +1119,7 @@
     <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
       <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
          title="Source, issues and release notes on GitHub"
-         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.5.0 Beta</a>
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.5.1 Beta</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -1433,7 +1433,8 @@
           </div>
           <div class="fx-top" id="fx-audio-bar">
             <label class="fx-master" title="Drive the effects from an audio input, so the picture moves with what you are hearing"><input type="checkbox" id="fx-react-on"> AUDIO REACTIVE</label>
-            <select id="fx-audio-dev" title="Which input the picoTracker (or your mixer) is plugged into"></select>
+            <select id="fx-audio-dev" title="Which interface the picoTracker (or your mixer) is plugged into. The list refreshes when you plug something in."></select>
+            <select id="fx-audio-ch" title="Which input of that interface to analyse — the whole mix, or one input on its own" style="display:none"></select>
             <button class="btn ghost sm" id="fx-audio-connect" title="Ask the browser for permission and open this input">Enable input</button>
             <label class="fx-mini" title="How hard the incoming level pushes the effects">Sensitivity <input type="range" id="fx-audio-gain" min="10" max="400" step="5"><span id="fx-audio-gain-v" class="fx-pval"></span></label>
             <div class="fx-meters" id="fx-meters" aria-hidden="true">
@@ -4442,8 +4443,9 @@ const AudioReact = (() => {
   }
 
   // ── Live input ──────────────────────────────────────────
-  let actx = null, stream = null, srcNode = null, analyser = null;
+  let actx = null, stream = null, srcNode = null, analyser = null, splitter = null;
   let freqBuf = null, timeBuf = null;
+  let openInfo = { deviceId: '', label: '', channels: 1, channel: 'mix', rate: 0 };
   let env = blankEnv();
   let levels = { ...ZERO };
   let status = 'Not connected', running = false;
@@ -4459,33 +4461,73 @@ const AudioReact = (() => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
     try {
       const all = await navigator.mediaDevices.enumerateDevices();
+      // Chrome reports one entry per device plus a synthetic "default".
+      // Both are real choices (the default follows the system setting),
+      // so both are listed — but the default is labelled as such, since
+      // picking it and picking the interface by name behave differently
+      // when the system default later changes.
       return all.filter(d => d.kind === 'audioinput')
-                .map((d, i) => ({ id: d.deviceId, label: d.label || `Input ${i + 1}` }));
+                .map((d, i) => ({
+                  id: d.deviceId,
+                  label: d.deviceId === 'default'
+                    ? (d.label ? d.label.replace(/^Default\s*-\s*/i, 'System default — ') : 'System default')
+                    : (d.label || `Input ${i + 1}`),
+                }));
     } catch { return []; }
   }
 
-  async function start(deviceId) {
+  const openedInfo = () => ({ ...openInfo });
+
+  // deviceId picks the interface; channel picks what to analyse from it:
+  // 'mix' downmixes everything, a number takes that input on its own.
+  async function start(deviceId, channel = 'mix') {
     if (running) stop();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setStatus('This browser has no audio input support.');
       return false;
     }
-    try {
-      // Every processing option off: this is a line input carrying music,
-      // and echo cancellation or AGC would fight the analysis.
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          deviceId: deviceId ? { exact: deviceId } : undefined,
-          echoCancellation: false, noiseSuppression: false, autoGainControl: false,
-        },
-      });
-    } catch (e) {
-      stream = null;
-      setStatus(e && e.name === 'NotAllowedError'
+    // Every processing option off: this is a line input carrying music,
+    // and echo cancellation or AGC would fight the analysis. channelCount
+    // is asked for as an IDEAL: a multi-input interface then hands over
+    // all of its inputs (a Scarlett's 2, a bigger box's 8) instead of the
+    // single mixed-down channel the browser gives a microphone, and a
+    // plain mono mic still opens rather than failing the constraint.
+    const audioBase = {
+      echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+      channelCount: { ideal: 8 },
+    };
+    const attempts = deviceId
+      ? [{ ...audioBase, deviceId: { exact: deviceId } },
+         { ...audioBase, deviceId: { ideal: deviceId } },
+         { ...audioBase }]
+      : [{ ...audioBase }];
+    let lastErr = null, fellBack = false;
+    for (let i = 0; i < attempts.length; i++) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: attempts[i] });
+        fellBack = i > 0;
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        stream = null;
+        // Permission is a dead end; an over-constrained device is not —
+        // an interface can be busy, at an unsupported rate, or have been
+        // re-enumerated with a new id since the list was built.
+        if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) break;
+      }
+    }
+    if (!stream) {
+      const e = lastErr;
+      setStatus(e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')
         ? 'Microphone permission was refused. Allow it for this site to use audio input.'
+        : e && e.name === 'NotReadableError'
+        ? 'That interface is busy — another app (a DAW, or another tab) has the input open.'
         : 'Could not open that input: ' + ((e && e.message) || e));
       return false;
     }
+    const track = stream.getAudioTracks()[0];
+    const settings = (track && track.getSettings && track.getSettings()) || {};
     try {
       actx = new (window.AudioContext || window.webkitAudioContext)();
       if (actx.state === 'suspended') await actx.resume();
@@ -4493,10 +4535,38 @@ const AudioReact = (() => {
       analyser = actx.createAnalyser();
       analyser.fftSize = 2048;
       analyser.smoothingTimeConstant = 0.6;
-      srcNode.connect(analyser);       // deliberately not connected to the
-                                       // destination: this must never make sound
+      // How many channels actually arrived. getSettings is authoritative
+      // where it reports it; the source node's own count is the fallback.
+      const chans = Math.max(1, settings.channelCount || srcNode.channelCount || 1);
+      const pick = channel === 'mix' ? -1 : Math.min(chans - 1, Math.max(0, +channel || 0));
+      if (pick >= 0 && chans > 1) {
+        // One input on its own: split and analyse just that leg. A plain
+        // connection would downmix every input together, which is why
+        // picking an interface with the picoTracker on input 2 looked
+        // dead — input 1's silence was averaged in.
+        splitter = actx.createChannelSplitter(chans);
+        srcNode.connect(splitter);
+        splitter.connect(analyser, pick);
+      } else {
+        // Downmix everything. Take all channels rather than the default
+        // stereo interpretation, or inputs 3+ of a big interface are
+        // dropped on the floor.
+        analyser.channelCount = chans;
+        analyser.channelCountMode = 'explicit';
+        analyser.channelInterpretation = 'discrete';
+        srcNode.connect(analyser);
+      }
+      // deliberately never connected to the destination: this must never
+      // make sound, only measure.
       freqBuf = new Uint8Array(analyser.frequencyBinCount);
       timeBuf = new Uint8Array(analyser.fftSize);
+      openInfo = {
+        deviceId: settings.deviceId || deviceId || '',
+        label: (track && track.label) || '',
+        channels: chans,
+        channel: pick >= 0 ? pick : 'mix',
+        rate: actx.sampleRate,
+      };
     } catch (e) {
       stop();
       setStatus('Could not start audio analysis: ' + ((e && e.message) || e));
@@ -4505,9 +4575,12 @@ const AudioReact = (() => {
     env = blankEnv();
     levels = { ...ZERO };
     running = true;
-    const track = stream.getAudioTracks()[0];
     if (track) track.addEventListener('ended', () => { stop(); setStatus('The audio input disappeared.'); });
-    setStatus('Listening' + (track && track.label ? ' to ' + track.label : ''));
+    const what = openInfo.label || 'the default input';
+    const chTxt = openInfo.channels > 1
+      ? ` · ${openInfo.channel === 'mix' ? `all ${openInfo.channels} inputs` : `input ${openInfo.channel + 1} of ${openInfo.channels}`}`
+      : '';
+    setStatus((fellBack ? 'Asked-for input unavailable, listening to ' : 'Listening to ') + what + chTxt);
     return true;
   }
 
@@ -4516,8 +4589,9 @@ const AudioReact = (() => {
     levels = { ...ZERO };
     try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch {}
     try { if (srcNode) srcNode.disconnect(); } catch {}
+    try { if (splitter) splitter.disconnect(); } catch {}
     try { if (actx) actx.close(); } catch {}
-    stream = null; srcNode = null; analyser = null; actx = null;
+    stream = null; srcNode = null; analyser = null; actx = null; splitter = null;
     freqBuf = null; timeBuf = null;
     setStatus('Not connected');
   }
@@ -4534,7 +4608,7 @@ const AudioReact = (() => {
   function setOnChange(fn) { onChange = fn || (() => {}); }
 
   return { SOURCES, BANDS, ZERO, blankEnv, analyse,
-           listInputs, start, stop, sample, setOnChange,
+           listInputs, start, stop, sample, setOnChange, openedInfo,
            isRunning, getStatus, getLevels };
 })();
 
@@ -6631,7 +6705,7 @@ const Mirror = (() => {
     const st = FX.presetState('off');
     st.on = false; st.animate = true;
     st.output = '960x720'; st.outW = 1280; st.outH = 400; st.bg = '#000000'; st.zoom = 0;
-    st.audio = { deviceId: '', gain: 100, on: false };
+    st.audio = { deviceId: '', channel: 'mix', gain: 100, on: false };
     st.levels = { ...AudioReact.ZERO };
     return st;
   }
@@ -6702,6 +6776,7 @@ const Mirror = (() => {
     const a = raw.audio && typeof raw.audio === 'object' ? raw.audio : {};
     st.audio = {
       deviceId: typeof a.deviceId === 'string' ? a.deviceId.slice(0, 200) : '',
+      channel: a.channel === 'mix' || Number.isFinite(+a.channel) ? a.channel : 'mix',
       gain: Math.min(400, Math.max(10, Number(a.gain) || 100)),
       // Never auto-open the input on load: getUserMedia needs a gesture,
       // and silently grabbing an audio device at page load would be rude.
@@ -7131,9 +7206,22 @@ const Mirror = (() => {
     $('fx-audio-connect').addEventListener('click', () => connectAudio());
     $('fx-audio-dev').addEventListener('change', async e => {
       state.audio.deviceId = e.target.value;
+      // A different interface has its own inputs; the old channel choice
+      // is meaningless against it.
+      state.audio.channel = 'mix';
+      save();
+      if (AudioReact.isRunning()) await connectAudio();
+      else refreshChannels();
+    });
+    $('fx-audio-ch').addEventListener('change', async e => {
+      state.audio.channel = e.target.value;
       save();
       if (AudioReact.isRunning()) await connectAudio();
     });
+    // Plugging an interface in (or unplugging one) while the drawer is
+    // open should show up without a reload. If the input we are listening
+    // to is the one that vanished, the track's own 'ended' handles it.
+    navigator.mediaDevices?.addEventListener?.('devicechange', () => { refreshInputs(); });
     $('fx-audio-gain').addEventListener('input', e => {
       state.audio.gain = +e.target.value;
       $('fx-audio-gain-v').textContent = state.audio.gain + '%';
@@ -7196,21 +7284,53 @@ const Mirror = (() => {
     }
   }
 
+  // The channel picker only means something once an input is open — only
+  // then do we know how many inputs the interface actually handed over.
+  function refreshChannels() {
+    const sel = $('fx-audio-ch');
+    if (!sel) return;
+    const info = AudioReact.openedInfo();
+    const n = AudioReact.isRunning() ? info.channels : 0;
+    if (n < 2) { sel.style.display = 'none'; sel.innerHTML = ''; return; }
+    const want = String(state.audio.channel ?? 'mix');
+    let html = `<option value="mix">All ${n} inputs</option>`;
+    for (let i = 0; i < n; i++) html += `<option value="${i}">Input ${i + 1}</option>`;
+    if (sel.innerHTML !== html) sel.innerHTML = html;
+    sel.value = [...sel.options].some(o => o.value === want) ? want : 'mix';
+    state.audio.channel = sel.value;
+    sel.style.display = '';
+  }
+
   async function refreshInputs() {
     const sel = $('fx-audio-dev');
     if (!sel) return;
     const list = await AudioReact.listInputs();
     // Before permission is granted the browser reports devices with blank
     // labels, so say so rather than showing a list of empty rows.
-    sel.innerHTML = list.length
+    const html = list.length
       ? list.map(d => `<option value="${d.id}">${d.label.replace(/[<>]/g, '')}</option>`).join('')
       : '<option value="">Default input</option>';
+    if (sel.innerHTML !== html) sel.innerHTML = html;
+    // Keep the user's choice. Re-enumeration after permission (or after
+    // plugging an interface in) renumbers ids, and silently rewriting the
+    // stored id to whatever happens to be first is how "I picked my
+    // Focusrite" turned back into the built-in microphone.
     if (list.some(d => d.id === state.audio.deviceId)) sel.value = state.audio.deviceId;
-    else if (list.length) state.audio.deviceId = sel.value;
+    else if (AudioReact.isRunning() && list.some(d => d.id === AudioReact.openedInfo().deviceId)) {
+      // Opened by fallback: show what is actually being listened to.
+      state.audio.deviceId = AudioReact.openedInfo().deviceId;
+      sel.value = state.audio.deviceId;
+    } else if (list.length && !state.audio.deviceId) {
+      state.audio.deviceId = sel.value;
+    } else if (list.length) {
+      sel.value = state.audio.deviceId;         // may not match: shows blank
+      if (!sel.value) { sel.selectedIndex = 0; state.audio.deviceId = sel.value; }
+    }
+    refreshChannels();
   }
 
   async function connectAudio() {
-    const ok = await AudioReact.start(state.audio.deviceId);
+    const ok = await AudioReact.start(state.audio.deviceId, state.audio.channel);
     if (ok) {
       state.audio.on = true;
       // Labels only become readable once permission has been granted, so
@@ -7219,6 +7339,7 @@ const Mirror = (() => {
       save();
     } else {
       state.audio.on = false;
+      refreshChannels();
     }
     syncUI();
     invalidate();
@@ -7324,6 +7445,7 @@ const Mirror = (() => {
     $('fx-audio-gain').value = state.audio.gain;
     $('fx-audio-gain-v').textContent = state.audio.gain + '%';
     $('fx-audio-status').textContent = AudioReact.getStatus();
+    refreshChannels();
     const live = AudioReact.isRunning();
     $('fx-audio-connect').textContent = live ? 'Reconnect' : 'Enable input';
     $('fx-audio-connect').disabled = !renderer;
@@ -7375,7 +7497,7 @@ const Mirror = (() => {
     raf = requestAnimationFrame(tick);
   }
 
-  return { init, invalidate, snapshotPng, popOut, outputCanvas,
+  return { init, invalidate, snapshotPng, popOut, outputCanvas, refreshInputs,
            hasEffects: () => !!renderer,
            getState: () => state, syncUI };
 })();

@@ -1,5 +1,45 @@
 # Changelog
 
+## v1.5.1 — audio interfaces, properly
+
+Audio-reactive input assumed a microphone. On a real interface it fell
+over in three separate ways, which together explain "I select my
+Focusrite and it goes dead".
+
+- **A multi-input interface now offers its inputs individually.** The
+  browser hands over every channel an interface has; the app connected
+  them straight to the analyser, which **downmixes them together** — so
+  a picoTracker on input 2 was averaged against input 1's silence and
+  read as half level, or nothing at all if input 1 carried noise. There
+  is now a channel picker beside the device list: **All N inputs**, or
+  one input on its own, routed through a channel splitter. It appears
+  only when the opened interface actually has more than one input, and
+  the choice is remembered per look.
+- **Choosing an interface no longer silently reverts to the built-in
+  mic.** The device list is rebuilt after permission is granted (that is
+  when labels become readable) and browsers renumber device ids across
+  that rebuild — the old code responded by rewriting the stored choice
+  to whatever landed first in the list. The selection is now preserved,
+  and if a fallback did open a different device, the list and the status
+  say which one rather than pretending.
+- **The list refreshes when you plug something in.** A `devicechange`
+  listener re-enumerates, so an interface connected after the page
+  loaded appears without a reload.
+- **Channels are requested explicitly** (`channelCount: ideal 8`), so an
+  interface hands over all its inputs instead of the single mixed
+  channel a microphone would give; a mono input is unaffected. The
+  downmix path also takes every channel discretely, where the default
+  stereo interpretation dropped inputs 3 and up entirely.
+- **Failures are legible.** An over-constrained device id retries with a
+  looser constraint instead of dying, a busy interface says so ("another
+  app has the input open") rather than reporting a generic failure, and
+  the status line names the device and the input being listened to —
+  "Listening to Scarlett 2i2 USB · input 2 of 2".
+- The system default entry is labelled as such, so it is distinguishable
+  from picking the same interface by name (they behave differently when
+  the system default later changes).
+
+
 ## v1.5.0 — the review round
 
 A deep code and performance audit before this goes further into the
