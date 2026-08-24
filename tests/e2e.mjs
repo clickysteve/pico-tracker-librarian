@@ -2352,7 +2352,7 @@ check('audio: a multi-input interface offers its inputs, and the pick sticks', a
     await new Promise(r => setTimeout(r, 900));
     const listed = [...dev.options].some(o => /Two-input/.test(o.textContent))
                 && [...dev.options].some(o => /System default/.test(o.textContent));
-    const offered = ch.style.display !== 'none' && ch.options.length === 3;
+    const offered = ch.style.display !== 'none' && !ch.disabled && ch.options.length === 3;
     const pick = async v => {
       ch.value = v; ch.dispatchEvent(new Event('change', { bubbles: true }));
       await new Promise(r => setTimeout(r, 600));
@@ -2372,10 +2372,13 @@ check('audio: a multi-input interface offers its inputs, and the pick sticks', a
     navigator.mediaDevices.enumerateDevices = realEnum;
   }
 }));
-check('audio: a mono input hides the channel picker', await page.evaluate(() => {
+check('audio: the channel picker stays visible and explains itself when idle', await page.evaluate(() => {
   AudioReact.stop();
   Mirror.syncUI();
-  return document.getElementById('fx-audio-ch').style.display === 'none';
+  const ch = document.getElementById('fx-audio-ch');
+  // Findable at all times: hidden reads as "this feature does not exist".
+  return ch.style.display !== 'none' && ch.disabled &&
+         /connect first/i.test(ch.options[0].textContent);
 }));
 
 check('fx: the audio input is never opened without a click',

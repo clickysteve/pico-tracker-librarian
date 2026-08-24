@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.5.2 — the channel picker is always on screen
+
+1.5.1 hid the channel picker whenever the open input had a single
+channel, which is correct for a built-in microphone and useless as
+communication: with the laptop mic selected the control simply was not
+there, so the feature looked missing rather than inapplicable.
+
+It is now always visible, and says which it is: **"Inputs — connect
+first"** before an input is open, **"Mono — 1 input"** on a
+single-channel device (both greyed, with a tooltip explaining that an
+interface with two or more inputs lists them here), and the real
+choices — **All N inputs**, **Input 1**, **Input 2**… — once a
+multi-input interface is open. The status line ends in `· mono` on a
+one-channel device so the two agree.
+
+
 ## v1.5.1 — audio interfaces, properly
 
 Audio-reactive input assumed a microphone. On a real interface it fell

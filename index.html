@@ -1084,6 +1084,9 @@
     .pe-c.pe-out { color:var(--warn) !important; }
     .pe-c.pe-out::after { content:'·'; margin-left:2px; color:var(--warn); }
     #fx-audio-dev { max-width:230px; }
+    /* A disabled picker still has to read as "nothing to choose here",
+       not as a broken control. */
+    .fx-top select:disabled { opacity:.5; cursor:default; }
     #fx-audio-gain { width:74px; }
     .fx-meters { display:flex; gap:8px; align-items:flex-end; }
     .fx-meter { display:flex; flex-direction:column; align-items:center; gap:3px; width:34px; }
@@ -1119,7 +1122,7 @@
     <div class="logo"><a id="logo-home" href="#" title="Back to the Projects tab">PICOTRACKER LIBRARIAN</a>
       <a href="https://github.com/clickysteve/pico-tracker-librarian" target="_blank" rel="noopener"
          title="Source, issues and release notes on GitHub"
-         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.5.1 Beta</a>
+         style="font-size:10px;font-weight:400;opacity:.55;letter-spacing:1px;color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">v1.5.2 Beta</a>
       <span class="exp-badge" title="Experimental software. Editing writes to your SD card. Back up your projects before using it — use at your own risk.">⚠ EXPERIMENTAL · BACK UP FIRST</span></div>
     <div class="hdr-right">
       <span id="sd-label">No SD card mounted</span>
@@ -1434,7 +1437,7 @@
           <div class="fx-top" id="fx-audio-bar">
             <label class="fx-master" title="Drive the effects from an audio input, so the picture moves with what you are hearing"><input type="checkbox" id="fx-react-on"> AUDIO REACTIVE</label>
             <select id="fx-audio-dev" title="Which interface the picoTracker (or your mixer) is plugged into. The list refreshes when you plug something in."></select>
-            <select id="fx-audio-ch" title="Which input of that interface to analyse — the whole mix, or one input on its own" style="display:none"></select>
+            <select id="fx-audio-ch" title="Which input of that interface to analyse — the whole mix, or one input on its own"><option value="mix">Inputs — connect first</option></select>
             <button class="btn ghost sm" id="fx-audio-connect" title="Ask the browser for permission and open this input">Enable input</button>
             <label class="fx-mini" title="How hard the incoming level pushes the effects">Sensitivity <input type="range" id="fx-audio-gain" min="10" max="400" step="5"><span id="fx-audio-gain-v" class="fx-pval"></span></label>
             <div class="fx-meters" id="fx-meters" aria-hidden="true">
@@ -4579,7 +4582,7 @@ const AudioReact = (() => {
     const what = openInfo.label || 'the default input';
     const chTxt = openInfo.channels > 1
       ? ` · ${openInfo.channel === 'mix' ? `all ${openInfo.channels} inputs` : `input ${openInfo.channel + 1} of ${openInfo.channels}`}`
-      : '';
+      : ' · mono';
     setStatus((fellBack ? 'Asked-for input unavailable, listening to ' : 'Listening to ') + what + chTxt);
     return true;
   }
@@ -7286,18 +7289,35 @@ const Mirror = (() => {
 
   // The channel picker only means something once an input is open — only
   // then do we know how many inputs the interface actually handed over.
+  // The channel picker is always on screen so it is findable, but it can
+  // only offer real choices once an input is open — until then, and on a
+  // mono device, it says why it has nothing to offer rather than
+  // vanishing (a hidden control reads as a missing feature).
   function refreshChannels() {
     const sel = $('fx-audio-ch');
     if (!sel) return;
-    const info = AudioReact.openedInfo();
-    const n = AudioReact.isRunning() ? info.channels : 0;
-    if (n < 2) { sel.style.display = 'none'; sel.innerHTML = ''; return; }
-    const want = String(state.audio.channel ?? 'mix');
-    let html = `<option value="mix">All ${n} inputs</option>`;
-    for (let i = 0; i < n; i++) html += `<option value="${i}">Input ${i + 1}</option>`;
+    const live = AudioReact.isRunning();
+    const n = live ? AudioReact.openedInfo().channels : 0;
+    let html, enabled = false;
+    if (!live) {
+      html = '<option value="mix">Inputs — connect first</option>';
+    } else if (n < 2) {
+      html = '<option value="mix">Mono — 1 input</option>';
+    } else {
+      html = `<option value="mix">All ${n} inputs</option>`;
+      for (let i = 0; i < n; i++) html += `<option value="${i}">Input ${i + 1}</option>`;
+      enabled = true;
+    }
     if (sel.innerHTML !== html) sel.innerHTML = html;
+    const want = String(state.audio.channel ?? 'mix');
     sel.value = [...sel.options].some(o => o.value === want) ? want : 'mix';
-    state.audio.channel = sel.value;
+    if (enabled) state.audio.channel = sel.value;
+    sel.disabled = !enabled;
+    sel.title = enabled
+      ? 'Which input of this interface to analyse — the whole mix, or one input on its own'
+      : live
+        ? 'This device has a single input, so there is nothing to choose. An interface with two or more inputs lists them here.'
+        : 'Connect an input first; an interface with two or more inputs lists them here.';
     sel.style.display = '';
   }
 
